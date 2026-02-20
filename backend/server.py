@@ -263,6 +263,10 @@ async def _resolve_contact_id(contact_id: str) -> str:
 
 
 async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = None) -> None:
+    """
+    Create or update a contact record.
+    Caller is responsible for passing the resolved (non-merged) contact_id via _resolve_contact_id.
+    """
     cid = data.get('contact_id')
     if not cid:
         return
@@ -270,21 +274,8 @@ async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = 
     existing = await db.contacts.find_one({"contact_id": cid}, {"_id": 0})
     now_str = dt_to_str(now)
 
-    # ── If this contact was merged into a parent, redirect the update there ──
-    # The browser still holds the old contact_id in localStorage. All future
-    # events for that device should update the visible (parent) contact.
-    if existing and existing.get('merged_into'):
-        parent_id = existing['merged_into']
-        parent = await db.contacts.find_one({"contact_id": parent_id}, {"_id": 0})
-        if parent:
-            redirected = dict(data)
-            redirected['contact_id'] = parent_id
-            await _upsert_contact(redirected, now, client_ip)
-            return
-        # Parent not found (shouldn't happen) — fall through and update child
-
     if existing:
-        update = {"updated_at": now_str}
+        update: dict = {"updated_at": now_str}
         for field in ['name', 'email', 'phone', 'first_name', 'last_name', 'session_id']:
             if data.get(field):
                 update[field] = data[field]
@@ -293,12 +284,10 @@ async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = 
         if data.get('attribution'):
             existing_attr = existing.get('attribution')
             if not existing_attr or not isinstance(existing_attr, dict):
-                # attribution is null/missing — build and set the whole object at once
                 built = safe_attribution(data['attribution'])
                 if built:
                     update['attribution'] = strip_nulls(built.model_dump())
             else:
-                # attribution exists — patch individual fields that are missing
                 for k, v in data['attribution'].items():
                     if k == 'extra' and isinstance(v, dict):
                         existing_extra = existing_attr.get('extra')
@@ -306,7 +295,6 @@ async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = 
                                      if ev and (not isinstance(existing_extra, dict) or not existing_extra.get(ek))}
                         if new_extra:
                             if not isinstance(existing_extra, dict):
-                                # extra is null — set the whole object, not individual sub-fields
                                 update['attribution.extra'] = new_extra
                             else:
                                 for ek, ev in new_extra.items():
@@ -315,18 +303,19 @@ async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = 
                         update[f'attribution.{k}'] = v
         await db.contacts.update_one({"contact_id": cid}, {"$set": update})
     else:
-        # Only create a NEW contact record when it carries meaningful data.
-        # Pure pageview-only contacts (no identity, no attribution) are skipped —
-        # their visits are still logged in page_visits and will be associated
-        # when the contact is eventually identified via a lead/registration event.
+        # Only create a new contact if it has identity OR meaningful attribution.
+        # Pure anonymous page loads (no UTMs, no email) are skipped — their visits
+        # are still logged in page_visits and will be attached once identified.
         has_identity = any(data.get(f) for f in ['name', 'email', 'phone', 'first_name', 'last_name'])
         raw_attr = data.get('attribution') or {}
-        attr_fields = {'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
-                       'utm_id', 'campaign_id', 'adset_id', 'ad_id',
-                       'fbclid', 'gclid', 'ttclid', 'source_link_tag', 'fb_ad_set_id', 'google_campaign_id'}
-        has_attribution = any(raw_attr.get(k) for k in attr_fields)
+        attr_signal_fields = {
+            'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
+            'utm_id', 'campaign_id', 'adset_id', 'ad_id',
+            'fbclid', 'gclid', 'ttclid', 'source_link_tag', 'fb_ad_set_id', 'google_campaign_id'
+        }
+        has_attribution = any(raw_attr.get(k) for k in attr_signal_fields)
         if not has_identity and not has_attribution:
-            return  # skip — don't pollute contacts with anonymous page-load-only records
+            return
 
         contact = Contact(
             contact_id=cid,
