@@ -382,8 +382,12 @@ async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = 
             'fbclid', 'gclid', 'ttclid', 'source_link_tag', 'fb_ad_set_id', 'google_campaign_id'
         }
         has_attribution = any(raw_attr.get(k) for k in attr_signal_fields)
-        if not has_identity and not has_attribution:
-            return
+        # Also allow contacts that carry URL extra params (e.g. ?layout=styled-0 from joinnow.live).
+        # These are legitimate iframe visitors who need a document so IP-based stitching can
+        # later merge them with the attribution-rich landing-page contact.
+        has_extra = isinstance(raw_attr.get('extra'), dict) and bool(raw_attr.get('extra'))
+        if not has_identity and not has_attribution and not has_extra:
+            return  # skip truly blank page loads (no info whatsoever)
 
         contact = Contact(
             contact_id=cid,
