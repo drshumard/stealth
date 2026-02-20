@@ -1089,9 +1089,11 @@ async def track_pageview(data: PageViewCreate, request: Request):
     try:
         now = datetime.now(timezone.utc)
         ip  = get_client_ip(request)
-        await _upsert_contact({'contact_id': data.contact_id, 'session_id': data.session_id, 'attribution': data.attribution}, now, ip)
-        vid = await _log_visit(data.contact_id, data.session_id, data.current_url, data.referrer_url, data.page_title, data.attribution, now, ip)
-        await _ip_auto_stitch(data.contact_id, ip, now)
+        # Always resolve the effective (non-merged) contact_id before any operation
+        eid = await _resolve_contact_id(data.contact_id)
+        await _upsert_contact({'contact_id': eid, 'session_id': data.session_id, 'attribution': data.attribution}, now, ip)
+        vid = await _log_visit(eid, data.session_id, data.current_url, data.referrer_url, data.page_title, data.attribution, now, ip)
+        await _ip_auto_stitch(eid, ip, now)
         return {"status": "ok", "visit_id": vid, "contact_id": data.contact_id}
     except Exception as e:
         logger.error(f"Error tracking pageview: {e}")
@@ -1103,9 +1105,15 @@ async def track_lead(data: LeadCreate, request: Request):
     try:
         now = datetime.now(timezone.utc)
         ip  = get_client_ip(request)
-        await _upsert_contact({'contact_id': data.contact_id, 'session_id': data.session_id, 'email': data.email, 'phone': data.phone, 'name': data.name, 'first_name': data.first_name, 'last_name': data.last_name, 'attribution': data.attribution}, now, ip)
-        await _session_auto_stitch(data.contact_id, data.session_id, now)
-        await _ip_auto_stitch(data.contact_id, ip, now)
+        eid = await _resolve_contact_id(data.contact_id)
+        await _upsert_contact({
+            'contact_id': eid, 'session_id': data.session_id,
+            'email': data.email, 'phone': data.phone, 'name': data.name,
+            'first_name': data.first_name, 'last_name': data.last_name,
+            'attribution': data.attribution
+        }, now, ip)
+        await _session_auto_stitch(eid, data.session_id, now)
+        await _ip_auto_stitch(eid, ip, now)
         return {"status": "ok", "contact_id": data.contact_id}
     except Exception as e:
         logger.error(f"Error tracking lead: {e}")
@@ -1117,11 +1125,17 @@ async def track_registration(data: RegistrationCreate, request: Request):
     try:
         now = datetime.now(timezone.utc)
         ip  = get_client_ip(request)
-        await _upsert_contact({'contact_id': data.contact_id, 'session_id': data.session_id, 'email': data.email, 'phone': data.phone, 'name': data.name, 'first_name': data.first_name, 'last_name': data.last_name, 'attribution': data.attribution}, now, ip)
+        eid = await _resolve_contact_id(data.contact_id)
+        await _upsert_contact({
+            'contact_id': eid, 'session_id': data.session_id,
+            'email': data.email, 'phone': data.phone, 'name': data.name,
+            'first_name': data.first_name, 'last_name': data.last_name,
+            'attribution': data.attribution
+        }, now, ip)
         if data.current_url:
-            await _log_visit(data.contact_id, data.session_id, data.current_url, data.referrer_url, data.page_title or "Registration", data.attribution, now, ip)
-        await _session_auto_stitch(data.contact_id, data.session_id, now)
-        await _ip_auto_stitch(data.contact_id, ip, now)
+            await _log_visit(eid, data.session_id, data.current_url, data.referrer_url, data.page_title or "Registration", data.attribution, now, ip)
+        await _session_auto_stitch(eid, data.session_id, now)
+        await _ip_auto_stitch(eid, ip, now)
         return {"status": "ok", "contact_id": data.contact_id}
     except Exception as e:
         logger.error(f"Error tracking registration: {e}")
