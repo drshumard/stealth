@@ -288,16 +288,16 @@ export const ContactDetailModal = ({ contactId, open, onClose, onDelete }) => {
       <DialogContent
         hideClose
         data-testid="contact-detail-modal"
-        className="max-w-3xl p-0 overflow-hidden border"
+        className="max-w-4xl p-0 overflow-hidden border"
         style={{
           backgroundColor: '#ffffff',
           borderColor: 'var(--stroke)',
           color: 'var(--text)',
-          maxHeight: '90vh',
+          maxHeight: '92vh',
           boxShadow: 'var(--shadow)',
         }}
       >
-        <DialogHeader className="px-6 pt-5 pb-0" style={{ backgroundColor: '#fafaf8', borderBottom: '1px solid var(--stroke)' }}>
+        <DialogHeader className="px-8 pt-6 pb-0" style={{ backgroundColor: '#fafaf8', borderBottom: '1px solid var(--stroke)' }}>
           <div className="flex items-start justify-between gap-4">
             <div>
               <DialogTitle
@@ -370,7 +370,7 @@ export const ContactDetailModal = ({ contactId, open, onClose, onDelete }) => {
           </div>
         </DialogHeader>
 
-        <div className="px-6 pb-6 mt-4 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 120px)' }}>
+        <div className="px-8 pb-8 mt-5 overflow-y-auto" style={{ maxHeight: 'calc(92vh - 130px)' }}>
           {error ? (
             <div className="flex items-center gap-2 py-4" style={{ color: 'var(--red-error)' }}>
               <AlertCircle size={16} />
