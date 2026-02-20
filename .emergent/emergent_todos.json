@@ -1,15 +1,15 @@
 [
   {
     "content": "Update index.css: light theme CSS variables (dark → light)",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Rewrite App.js: new layout with TopNav inside white card on beige canvas",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Create TopNav.jsx: horizontal pill-tab navigation",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Rewrite ContactsTable.jsx: light design + pagination + source badges + sort",
