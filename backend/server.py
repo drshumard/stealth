@@ -782,15 +782,8 @@ def build_tracker_js(backend_url: str) -> str:
     send('/track/registration', buildPayload(fields));
   }
 
-  /* ─── Stitch two contacts together ─── */
-  function sendStitch(parentCid, childCid) {
-    if (!parentCid || !childCid || parentCid === childCid) return;
-    send('/track/stitch', {
-      parent_contact_id: parentCid,
-      child_contact_id:  childCid,
-      session_id:        store.config.sessionId || null
-    });
-  }
+  /* ─── Stitch is now backend-only — function kept as no-op for public API compat ─── */
+  function sendStitch() { /* backend handles all stitching via session_id */ }
 
   function logger(msg, data) {
     try {
