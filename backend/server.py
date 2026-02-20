@@ -344,15 +344,14 @@ async def _do_stitch(parent_id: str, child_id: str, now: datetime) -> dict:
 
 async def _ip_auto_stitch(contact_id: str, client_ip: Optional[str], now: datetime) -> None:
     """
-    Auto-stitch by IP: if same IP created another contact within 5 minutes,
-    and one has email but not attribution, and the other has attribution but no email,
-    stitch them (email-holder becomes child, attribution-holder becomes parent).
+    Auto-stitch by IP ONLY when one contact clearly has attribution (UTM/fbclid)
+    AND another has email/phone — and neither has both yet.
+    This prevents false-positive stitching of anonymous visitors.
     """
     if not client_ip:
         return
 
     window_start = dt_to_str(now - timedelta(minutes=5))
-    # Find other contacts with same IP, not already merged, within the last 5 min
     candidates = await db.contacts.find({
         "client_ip": client_ip,
         "contact_id": {"$ne": contact_id},
@@ -367,35 +366,31 @@ async def _ip_auto_stitch(contact_id: str, client_ip: Optional[str], now: dateti
     if not current or current.get('merged_into'):
         return
 
-    for candidate in candidates:
-        c_attr   = bool(current.get('attribution') and
-                        any(v for k, v in (current.get('attribution') or {}).items()
-                            if k not in ('extra',) and v))
-        cand_attr = bool(candidate.get('attribution') and
-                         any(v for k, v in (candidate.get('attribution') or {}).items()
-                             if k not in ('extra',) and v))
-        c_email    = bool(current.get('email'))
-        cand_email = bool(candidate.get('email'))
+    def has_attribution(c):
+        attr = c.get('attribution') or {}
+        return any(v for k, v in attr.items() if k not in ('extra',) and v)
 
-        # Decide who is parent (attribution-rich) and who is child (email-rich)
-        if c_attr and cand_email and not c_email:
-            # current has attribution, candidate has email → candidate is child
+    def has_identity(c):
+        return bool(c.get('email') or c.get('phone'))
+
+    c_attr  = has_attribution(current)
+    c_ident = has_identity(current)
+
+    for candidate in candidates:
+        cand_attr  = has_attribution(candidate)
+        cand_ident = has_identity(candidate)
+
+        # Only stitch when EXACTLY one side has attribution AND other has identity
+        # This prevents false positives between anonymous page-only visits
+        if c_attr and cand_ident and not c_ident and not cand_attr:
+            # current = landing page (attribution), candidate = iframe (email)
             await _do_stitch(contact_id, candidate['contact_id'], now)
             break
-        elif cand_attr and c_email and not cand_email:
-            # candidate has attribution, current has email → current is child
+        elif cand_attr and c_ident and not c_attr and not cand_ident:
+            # candidate = landing page (attribution), current = iframe (email)
             await _do_stitch(candidate['contact_id'], contact_id, now)
             break
-        elif not c_email and not cand_email:
-            # Neither has email yet — stitch by time (earlier = parent)
-            current_ts   = str_to_dt(current.get('created_at'))
-            candidate_ts = str_to_dt(candidate.get('created_at'))
-            if isinstance(current_ts, datetime) and isinstance(candidate_ts, datetime):
-                if current_ts <= candidate_ts:
-                    await _do_stitch(contact_id, candidate['contact_id'], now)
-                else:
-                    await _do_stitch(candidate['contact_id'], contact_id, now)
-            break
+        # All other cases: let explicit stitch handle it
 
 
 # ─────────────────────────── Tracker JS ───────────────────────────
