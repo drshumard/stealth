@@ -98,10 +98,11 @@ function AppShell() {
       <div className="main-card">
         <TopNav stats={stats} />
         <Routes>
-          <Route path="/"          element={<LeadsPage    {...shared} />} />
-          <Route path="/visitors"  element={<VisitorsPage {...shared} />} />
-          <Route path="/analytics" element={<AnalyticsPage stats={stats} contacts={contacts} />} />
-          <Route path="/logs"      element={<LogsPage />} />
+          <Route path="/"            element={<LeadsPage    {...shared} />} />
+          <Route path="/visitors"    element={<VisitorsPage {...shared} />} />
+          <Route path="/automations" element={<AutomationsPage />} />
+          <Route path="/analytics"   element={<AnalyticsPage stats={stats} contacts={contacts} />} />
+          <Route path="/logs"        element={<LogsPage />} />
         </Routes>
       </div>
       <ContactDetailModal
