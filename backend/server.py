@@ -1091,6 +1091,7 @@ async def track_lead(data: LeadCreate, request: Request):
         now = datetime.now(timezone.utc)
         ip  = get_client_ip(request)
         await _upsert_contact({'contact_id': data.contact_id, 'session_id': data.session_id, 'email': data.email, 'phone': data.phone, 'name': data.name, 'first_name': data.first_name, 'last_name': data.last_name, 'attribution': data.attribution}, now, ip)
+        await _session_auto_stitch(data.contact_id, data.session_id, now)
         await _ip_auto_stitch(data.contact_id, ip, now)
         return {"status": "ok", "contact_id": data.contact_id}
     except Exception as e:
@@ -1106,6 +1107,7 @@ async def track_registration(data: RegistrationCreate, request: Request):
         await _upsert_contact({'contact_id': data.contact_id, 'session_id': data.session_id, 'email': data.email, 'phone': data.phone, 'name': data.name, 'first_name': data.first_name, 'last_name': data.last_name, 'attribution': data.attribution}, now, ip)
         if data.current_url:
             await _log_visit(data.contact_id, data.session_id, data.current_url, data.referrer_url, data.page_title or "Registration", data.attribution, now, ip)
+        await _session_auto_stitch(data.contact_id, data.session_id, now)
         await _ip_auto_stitch(data.contact_id, ip, now)
         return {"status": "ok", "contact_id": data.contact_id}
     except Exception as e:
