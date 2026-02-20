@@ -121,7 +121,7 @@ const UrlVisitItem = ({ visit, index }) => {
       <div
         className="absolute left-0 top-2 w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center"
         style={{
-          backgroundColor: 'var(--bg-elev-2)',
+          backgroundColor: '#ffffff',
           borderColor: index === 0 ? 'var(--primary-cyan)' : 'var(--stroke)',
         }}
       >
@@ -130,7 +130,7 @@ const UrlVisitItem = ({ visit, index }) => {
         />
       </div>
 
-      <div className="rounded-lg p-3 border min-w-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-elev-2)', borderColor: 'var(--stroke)' }}>
+      <div className="rounded-lg p-3 border min-w-0 overflow-hidden" style={{ backgroundColor: '#ffffff', borderColor: 'var(--stroke)' }}>
         {/* Timestamp + title */}
         <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
           <div className="flex items-center gap-1.5 shrink-0">
@@ -447,7 +447,7 @@ export const ContactDetailModal = ({ contactId, open, onClose, onDelete }) => {
                         {(contact.attribution?.utm_source || contact.attribution?.utm_medium || contact.attribution?.utm_campaign || contact.attribution?.utm_term || contact.attribution?.utm_content || contact.attribution?.utm_id) && (
                           <div>
                             <p className="text-xs font-semibold uppercase tracking-widest mb-2 px-1" style={{ color: 'var(--text-dim)' }}>UTM Parameters</p>
-                            <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--bg-elev-2)' }}>
+                            <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff' }}>
                               <AttrRow label="utm_source"   value={contact.attribution?.utm_source} />
                               <AttrRow label="utm_medium"   value={contact.attribution?.utm_medium} />
                               <AttrRow label="utm_campaign" value={contact.attribution?.utm_campaign} />
@@ -462,7 +462,7 @@ export const ContactDetailModal = ({ contactId, open, onClose, onDelete }) => {
                         {(contact.attribution?.campaign_id || contact.attribution?.adset_id || contact.attribution?.ad_id || contact.attribution?.fb_ad_set_id || contact.attribution?.google_campaign_id) && (
                           <div>
                             <p className="text-xs font-semibold uppercase tracking-widest mb-2 px-1" style={{ color: 'var(--text-dim)' }}>Ad Platform IDs</p>
-                            <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--bg-elev-2)' }}>
+                            <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff' }}>
                               <AttrRow label="campaign_id"        value={contact.attribution?.campaign_id} />
                               <AttrRow label="adset_id"           value={contact.attribution?.adset_id} />
                               <AttrRow label="ad_id"              value={contact.attribution?.ad_id} />
@@ -476,7 +476,7 @@ export const ContactDetailModal = ({ contactId, open, onClose, onDelete }) => {
                         {(contact.attribution?.fbclid || contact.attribution?.gclid || contact.attribution?.ttclid || contact.attribution?.source_link_tag) && (
                           <div>
                             <p className="text-xs font-semibold uppercase tracking-widest mb-2 px-1" style={{ color: 'var(--text-dim)' }}>Click IDs</p>
-                            <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--bg-elev-2)' }}>
+                            <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff' }}>
                               <AttrRow label="fbclid"          value={contact.attribution?.fbclid} />
                               <AttrRow label="gclid"           value={contact.attribution?.gclid} />
                               <AttrRow label="ttclid"          value={contact.attribution?.ttclid} />
@@ -489,7 +489,7 @@ export const ContactDetailModal = ({ contactId, open, onClose, onDelete }) => {
                         {contact.attribution?.extra && Object.keys(contact.attribution.extra).length > 0 && (
                           <div>
                             <p className="text-xs font-semibold uppercase tracking-widest mb-2 px-1" style={{ color: 'var(--text-dim)' }}>Other Parameters</p>
-                            <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--bg-elev-2)' }}>
+                            <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff' }}>
                               {Object.entries(contact.attribution.extra).map(([k, v]) => (
                                 <AttrRow key={k} label={k} value={v} />
                               ))}
