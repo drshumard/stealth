@@ -395,16 +395,21 @@ async def _do_stitch(parent_id: str, child_id: str, now: datetime) -> dict:
             # Parent has no attribution — set the whole child attribution at once
             built = safe_attribution(child_attr)
             if built:
-                built_dict = built.model_dump()
-                parent_update['attribution'] = {k: v for k, v in built_dict.items() if v is not None}
+                parent_update['attribution'] = strip_nulls(built.model_dump())
         else:
             # Parent already has attribution — patch missing fields individually
             for k, v in child_attr.items():
                 if k == 'extra' and isinstance(v, dict):
-                    existing_extra = parent_attr.get('extra') or {}
-                    for ek, ev in v.items():
-                        if ev and not existing_extra.get(ek):
-                            parent_update[f'attribution.extra.{ek}'] = str(ev)[:500]
+                    existing_extra = parent_attr.get('extra')
+                    new_extra = {ek: str(ev)[:500] for ek, ev in v.items()
+                                 if ev and (not isinstance(existing_extra, dict) or not existing_extra.get(ek))}
+                    if new_extra:
+                        if not isinstance(existing_extra, dict):
+                            # extra is null — set whole object, not individual sub-fields
+                            parent_update['attribution.extra'] = new_extra
+                        else:
+                            for ek, ev in new_extra.items():
+                                parent_update[f'attribution.extra.{ek}'] = ev
                 elif v and not parent_attr.get(k):
                     parent_update[f'attribution.{k}'] = v
 
