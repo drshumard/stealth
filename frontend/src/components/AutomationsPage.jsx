@@ -141,6 +141,24 @@ function AutomationCard({ auto, onEdit, onDelete, onToggle, onViewRuns }) {
           <Button
             size="sm"
             variant="outline"
+            onClick={() => onViewRuns(auto)}
+            className="gap-1.5 h-9 px-3 text-sm font-semibold"
+            style={{ borderColor: '#d2d8ef', color: '#030352' }}
+            title="View run history"
+          >
+            <History size={13} />
+            Runs
+            {auto.trigger_count > 0 && (
+              <span className="text-xs font-bold tabular-nums px-1.5 py-0.5 rounded-full ml-0.5"
+                style={{ backgroundColor: 'rgba(3,3,82,0.1)', color: '#030352' }}>
+                {auto.trigger_count}
+              </span>
+            )}
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
             onClick={() => onEdit(auto)}
             className="flex-1 h-9 gap-2 text-sm font-semibold"
             style={{ borderColor: 'var(--brand-navy)', color: 'var(--brand-navy)' }}
