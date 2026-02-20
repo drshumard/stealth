@@ -57,7 +57,7 @@ export default function VisitorsPage({
             <RefreshCw size={13} />
           </Button>
           <Button
-            data-testid="copy-script-header-button"
+            data-testid="visitors-copy-script-button"
             size="sm"
             className="h-7 gap-1.5 text-xs"
             onClick={handleCopyScript}
