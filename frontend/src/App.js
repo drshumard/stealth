@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import '@/App.css';
+import { BrowserRouter, useNavigate, useSearchParams } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import { TopNav } from '@/components/TopNav';
 import { ScriptEmbedCard } from '@/components/ScriptEmbedCard';
@@ -10,12 +11,15 @@ import { toast } from 'sonner';
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
 const API = `${BACKEND_URL}/api`;
 
-export default function App() {
+function Dashboard() {
   const [contacts, setContacts] = useState([]);
   const [stats, setStats] = useState({ total_contacts: 0, total_visits: 0, today_visits: 0 });
   const [loading, setLoading] = useState(true);
-  const [selectedContactId, setSelectedContactId] = useState(null);
-  const [modalOpen, setModalOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  const selectedContactId = searchParams.get('contact');
+  const modalOpen = !!selectedContactId;
 
   const fetchContacts = useCallback(async (showToast = false) => {
     setLoading(true);
@@ -44,8 +48,6 @@ export default function App() {
   useEffect(() => {
     fetchContacts();
     fetchStats();
-
-    // Poll every 15s for live feel
     const interval = setInterval(() => {
       fetchContacts();
       fetchStats();
@@ -59,13 +61,15 @@ export default function App() {
   };
 
   const handleSelectContact = (contactId) => {
-    setSelectedContactId(contactId);
-    setModalOpen(true);
+    setSearchParams({ contact: contactId });
+  };
+
+  const handleCloseModal = () => {
+    setSearchParams({});
   };
 
   const handleCopyScript = () => {
-    const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
-    const scriptTag = `<script src="${backendUrl}/api/tracker.js"></script>`;
+    const scriptTag = `<script src="${BACKEND_URL}/api/tracker.js"></script>`;
     navigator.clipboard.writeText(scriptTag).then(() => {
       toast.success('Script tag copied!', {
         description: 'Paste it in the <head> of your webinar page.',
@@ -88,7 +92,6 @@ export default function App() {
         }}
       />
 
-      {/* Top Nav */}
       <TopNav
         onRefresh={handleRefresh}
         loading={loading}
@@ -96,13 +99,9 @@ export default function App() {
         todayVisits={stats.today_visits}
       />
 
-      {/* Main Content */}
       <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-
-        {/* Script Embed Card */}
         <ScriptEmbedCard />
 
-        {/* Contacts Section */}
         <div>
           <div className="flex items-center gap-2 mb-4">
             <h2
@@ -131,12 +130,19 @@ export default function App() {
         </div>
       </main>
 
-      {/* Contact Detail Modal */}
       <ContactDetailModal
         contactId={selectedContactId}
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={handleCloseModal}
       />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Dashboard />
+    </BrowserRouter>
   );
 }
