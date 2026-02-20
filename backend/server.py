@@ -931,7 +931,14 @@ def build_tracker_js(backend_url: str) -> str:
     bindForms();
     bindLooseInputs();
     watchDOM();
-    logger('🚀 Shumard initialized | contact: ' + store.config.contactId.substring(0,8) + '… | session: ' + store.config.sessionId.substring(0,8) + '… | isIframe: ' + store.config.isIframe);
+    /* ─── Init ─── */
+  function init() {
+    store.config.contactId = getContactId();
+    store.config.sessionId = initSessionId();
+    captureAttribution();
+    bindForms();
+    bindLooseInputs();
+    watchDOM();
     sendPageview();
     /* Parent page: start broadcasting identity to iframes */
     if (!store.config.isIframe) {
