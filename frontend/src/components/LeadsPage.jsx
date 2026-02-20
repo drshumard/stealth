@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { RefreshCw, Copy, Filter, X, Download } from 'lucide-react';
+import { RefreshCw, Copy, Filter, X, Download, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -54,40 +54,50 @@ export default function LeadsPage({ contacts, loading, initialLoad, stats, onRef
 
   return (
     <div className="p-8 md:p-10">
-      {/* Page header */}
-      <div className="flex items-start justify-between mb-8">
-        <div>
-          <h1 className="text-4xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--brand-navy)', letterSpacing: '-0.02em' }}>
-            Leads
-          </h1>
-          <p className="text-base mt-1 font-medium" style={{ color: 'var(--text-muted)' }}>
-            {identified.length} identified contact{identified.length !== 1 ? 's' : ''}
-          </p>
-        </div>
-        <div className="flex items-center gap-3 mt-1">
-          <Button
-            variant="outline" size="sm"
-            className="gap-2 h-10 px-5 text-sm font-semibold"
-            style={{ borderColor: 'var(--brand-navy)', color: 'var(--brand-navy)' }}
-          >
-            <Download size={14} /> Export
-          </Button>
-          <Button
-            data-testid="leads-copy-script-button"
-            size="sm"
-            className="gap-2 h-10 px-5 text-sm font-semibold text-white"
-            style={{ backgroundColor: 'var(--brand-red)' }}
-            onClick={handleCopyScript}
-          >
-            <Copy size={14} /> Copy Script
-          </Button>
+      {/* Tinted page header */}
+      <div
+        className="rounded-2xl px-8 py-7 mb-8 relative overflow-hidden"
+        style={{
+          background: 'linear-gradient(135deg, #e8ebf5 0%, #f2f3f9 50%, #f9f8f5 100%)',
+          border: '1.5px solid #d2d8ef',
+        }}
+      >
+        {/* Faint decorative icon */}
+        <Users size={140} className="absolute -right-6 -bottom-6 opacity-[0.05] pointer-events-none" color="#030352" aria-hidden />
+        <div className="relative z-10 flex items-start justify-between">
+          <div>
+            <h1 className="text-4xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--brand-navy)', letterSpacing: '-0.02em' }}>Leads</h1>
+            <p className="text-base mt-1 font-semibold" style={{ color: 'var(--brand-navy)', opacity: 0.6 }}>
+              {identified.length} identified contact{identified.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button variant="outline" size="sm" className="gap-2 h-10 px-5 text-sm font-semibold"
+              style={{ borderColor: 'var(--brand-navy)', color: 'var(--brand-navy)', backgroundColor: 'rgba(255,255,255,0.7)' }}>
+              <Download size={14} /> Export
+            </Button>
+            <Button
+              data-testid="leads-copy-script-button"
+              size="sm" className="gap-2 h-10 px-5 text-sm font-semibold text-white"
+              style={{ backgroundColor: 'var(--brand-red)' }}
+              onClick={handleCopyScript}
+            >
+              <Copy size={14} /> Copy Script
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* Table card */}
-      <div className="rounded-2xl border" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff', boxShadow: 'var(--shadow-soft)' }}>
-        {/* Toolbar */}
-        <div className="flex items-center gap-3 px-6 py-5 border-b flex-wrap" style={{ borderColor: 'var(--stroke)' }}>
+      <div className="rounded-2xl border" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff', boxShadow: '0 4px 20px rgba(3,3,82,0.06)' }}>
+        {/* Toolbar — warm tint */}
+        <div
+          className="flex items-center gap-3 px-6 py-5 border-b flex-wrap"
+          style={{
+            borderColor: 'var(--stroke)',
+            background: 'linear-gradient(to bottom, #f7f6f2, #ffffff)',
+          }}
+        >
           <div className="relative flex-1 min-w-[200px] max-w-sm">
             <Filter size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-dim)' }} />
             <Input
@@ -95,13 +105,13 @@ export default function LeadsPage({ contacts, loading, initialLoad, stats, onRef
               placeholder="Search name, email, phone…"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="pl-10 h-10 text-sm font-medium"
-              style={{ borderColor: 'var(--stroke)', backgroundColor: '#faf9f7', color: 'var(--text)' }}
+              className="pl-10 h-10 text-sm font-medium bg-white"
+              style={{ borderColor: 'var(--stroke)', color: 'var(--text)' }}
             />
           </div>
 
           <Select value={srcFilter} onValueChange={setSrc}>
-            <SelectTrigger data-testid="leads-filter-source-select" className="h-10 text-sm w-40 font-medium" style={{ borderColor: 'var(--stroke)' }}>
+            <SelectTrigger data-testid="leads-filter-source-select" className="h-10 text-sm w-40 font-medium bg-white" style={{ borderColor: 'var(--stroke)' }}>
               <SelectValue placeholder="All sources" />
             </SelectTrigger>
             <SelectContent>
@@ -111,7 +121,7 @@ export default function LeadsPage({ contacts, loading, initialLoad, stats, onRef
           </Select>
 
           <Select value={dateFilter} onValueChange={setDate}>
-            <SelectTrigger data-testid="leads-filter-date-range" className="h-10 text-sm w-36 font-medium" style={{ borderColor: 'var(--stroke)' }}>
+            <SelectTrigger data-testid="leads-filter-date-range" className="h-10 text-sm w-36 font-medium bg-white" style={{ borderColor: 'var(--stroke)' }}>
               <SelectValue placeholder="All time" />
             </SelectTrigger>
             <SelectContent>
@@ -122,7 +132,7 @@ export default function LeadsPage({ contacts, loading, initialLoad, stats, onRef
           {(activeFilters > 0 || search) && (
             <button
               onClick={() => { setSrc('all'); setDate('all'); setSearch(''); }}
-              className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border transition-colors font-medium"
+              className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border transition-colors font-medium bg-white"
               style={{ color: 'var(--text-muted)', borderColor: 'var(--stroke)' }}
             >
               <X size={13} /> Clear
@@ -133,14 +143,16 @@ export default function LeadsPage({ contacts, loading, initialLoad, stats, onRef
             <Button variant="ghost" size="sm" onClick={onRefresh} className="h-9 w-9 p-0 rounded-lg" style={{ color: 'var(--text-dim)' }}>
               <RefreshCw size={14} />
             </Button>
-            <span className="text-sm font-bold tabular-nums" style={{ color: 'var(--brand-navy)' }}>
+            <span
+              className="text-sm font-bold tabular-nums px-3 py-1 rounded-lg"
+              style={{ backgroundColor: 'rgba(3,3,82,0.06)', color: 'var(--brand-navy)' }}
+            >
               {filtered.length} results
             </span>
           </div>
         </div>
 
-        {/* Table */}
-        <div className="px-6 py-4">
+        <div className="px-6 py-5">
           <ContactsTable
             contacts={filtered}
             loading={loading}
