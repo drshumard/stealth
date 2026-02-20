@@ -298,9 +298,29 @@ async def _do_stitch(parent_id: str, child_id: str, now: datetime) -> dict:
     if not parent or not child:
         return {"status": "not_found"}
 
-    # Already merged
-    if child.get('merged_into'):
-        return {"status": "already_merged", "merged_into": child['merged_into']}
+    # Already merged into the CORRECT parent — idempotent
+    if child.get('merged_into') == parent_id:
+        return {"status": "already_merged", "merged_into": parent_id}
+
+    # Already merged into a DIFFERENT parent — un-merge first, then re-merge
+    if child.get('merged_into') and child.get('merged_into') != parent_id:
+        old_parent_id = child['merged_into']
+        logger.info(f"Re-stitching: removing {child_id} from {old_parent_id}, adding to {parent_id}")
+        # Remove child from old parent's merged_children list
+        await db.contacts.update_one(
+            {"contact_id": old_parent_id},
+            {"$pull": {"merged_children": child_id}}
+        )
+        # Re-assign visits back to child temporarily (will be moved to new parent below)
+        await db.page_visits.update_many(
+            {"contact_id": old_parent_id, "original_contact_id": child_id},
+            {"$set": {"contact_id": child_id}}
+        )
+        # Clear merged_into so _do_stitch can proceed
+        await db.contacts.update_one(
+            {"contact_id": child_id},
+            {"$unset": {"merged_into": ""}}
+        )
 
     now_str = dt_to_str(now)
 
