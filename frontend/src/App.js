@@ -150,6 +150,7 @@ function Dashboard() {
         contactId={selectedContactId}
         open={modalOpen}
         onClose={handleCloseModal}
+        onDelete={handleDeleteContact}
       />
     </div>
   );
