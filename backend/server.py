@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Response
+from fastapi import FastAPI, APIRouter, HTTPException, Request
 from fastapi.responses import PlainTextResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -9,7 +9,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 
 ROOT_DIR = Path(__file__).parent
@@ -48,6 +48,7 @@ class PageVisit(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     contact_id: str
     session_id: Optional[str] = None
+    client_ip: Optional[str] = None
     current_url: str
     referrer_url: Optional[str] = None
     page_title: Optional[str] = None
@@ -60,12 +61,15 @@ class Contact(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     contact_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     session_id: Optional[str] = None
+    client_ip: Optional[str] = None
     name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     attribution: Optional[Attribution] = None
+    merged_into: Optional[str] = None   # contact_id this was merged into
+    merged_children: Optional[List[str]] = None  # child contact_ids merged into this
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -94,7 +98,6 @@ class RegistrationCreate(BaseModel):
 
 
 class LeadCreate(BaseModel):
-    """Called when a lead field is captured via change event (like Hyros)"""
     contact_id: str
     session_id: Optional[str] = None
     email: Optional[str] = None
@@ -108,17 +111,27 @@ class LeadCreate(BaseModel):
     attribution: Optional[Dict[str, Any]] = None
 
 
+class StitchRequest(BaseModel):
+    """Merge child_contact_id into parent_contact_id"""
+    parent_contact_id: str
+    child_contact_id: str
+    session_id: Optional[str] = None
+
+
 class ContactWithStats(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
     contact_id: str
     session_id: Optional[str] = None
+    client_ip: Optional[str] = None
     name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     attribution: Optional[Attribution] = None
+    merged_into: Optional[str] = None
+    merged_children: Optional[List[str]] = None
     created_at: datetime
     updated_at: datetime
     visit_count: int = 0
@@ -129,12 +142,15 @@ class ContactDetail(BaseModel):
     id: str
     contact_id: str
     session_id: Optional[str] = None
+    client_ip: Optional[str] = None
     name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     attribution: Optional[Attribution] = None
+    merged_into: Optional[str] = None
+    merged_children: Optional[List[str]] = None
     created_at: datetime
     updated_at: datetime
     visits: List[PageVisit] = []
@@ -157,11 +173,24 @@ def str_to_dt(s):
     return s
 
 
+def get_client_ip(request: Request) -> Optional[str]:
+    """Extract real client IP, respecting reverse proxy headers."""
+    # X-Forwarded-For may contain comma-separated list; take first (original client)
+    xff = request.headers.get('x-forwarded-for')
+    if xff:
+        return xff.split(',')[0].strip()
+    real_ip = request.headers.get('x-real-ip')
+    if real_ip:
+        return real_ip.strip()
+    if request.client:
+        return request.client.host
+    return None
+
+
 def safe_attribution(raw: Optional[dict]) -> Optional[Attribution]:
     if not raw:
         return None
     try:
-        # Only keep known fields in Attribution, put rest in extra
         known = {'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
                  'fbclid', 'gclid', 'ttclid', 'source_link_tag', 'fb_ad_set_id', 'google_campaign_id'}
         attrs = {k: str(v)[:500] for k, v in raw.items() if k in known and v}
@@ -173,13 +202,208 @@ def safe_attribution(raw: Optional[dict]) -> Optional[Attribution]:
         return None
 
 
+def fix_contact_doc(c: dict) -> dict:
+    c['created_at'] = str_to_dt(c.get('created_at'))
+    c['updated_at'] = str_to_dt(c.get('updated_at'))
+    if isinstance(c.get('attribution'), dict):
+        c['attribution'] = Attribution(**{k: v for k, v in c['attribution'].items() if v})
+    return c
+
+
+def fix_visit_doc(v: dict) -> dict:
+    v['timestamp'] = str_to_dt(v.get('timestamp'))
+    if isinstance(v.get('attribution'), dict):
+        v['attribution'] = Attribution(**{k: val for k, val in v['attribution'].items() if val})
+    return v
+
+
+async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = None) -> None:
+    cid = data.get('contact_id')
+    if not cid:
+        return
+
+    existing = await db.contacts.find_one({"contact_id": cid}, {"_id": 0})
+    now_str = dt_to_str(now)
+
+    if existing:
+        update = {"updated_at": now_str}
+        for field in ['name', 'email', 'phone', 'first_name', 'last_name', 'session_id']:
+            if data.get(field):
+                update[field] = data[field]
+        if client_ip and not existing.get('client_ip'):
+            update['client_ip'] = client_ip
+        if data.get('attribution'):
+            for k, v in data['attribution'].items():
+                if v and not (existing.get('attribution') or {}).get(k):
+                    update[f'attribution.{k}'] = v
+        await db.contacts.update_one({"contact_id": cid}, {"$set": update})
+    else:
+        contact = Contact(
+            contact_id=cid,
+            session_id=data.get('session_id'),
+            client_ip=client_ip,
+            name=data.get('name'),
+            email=data.get('email'),
+            phone=data.get('phone'),
+            first_name=data.get('first_name'),
+            last_name=data.get('last_name'),
+            attribution=safe_attribution(data.get('attribution')),
+            created_at=now,
+            updated_at=now
+        )
+        cdoc = contact.model_dump()
+        cdoc['created_at'] = dt_to_str(cdoc['created_at'])
+        cdoc['updated_at'] = dt_to_str(cdoc['updated_at'])
+        if cdoc.get('attribution') and hasattr(cdoc['attribution'], 'model_dump'):
+            cdoc['attribution'] = cdoc['attribution'].model_dump()
+        await db.contacts.insert_one(cdoc)
+
+
+async def _log_visit(contact_id: str, session_id: Optional[str],
+                     current_url: str, referrer_url: Optional[str],
+                     page_title: Optional[str], attribution: Optional[dict],
+                     now: datetime, client_ip: Optional[str] = None) -> str:
+    visit = PageVisit(
+        contact_id=contact_id,
+        session_id=session_id,
+        client_ip=client_ip,
+        current_url=current_url,
+        referrer_url=referrer_url,
+        page_title=page_title,
+        attribution=safe_attribution(attribution),
+        timestamp=now
+    )
+    vdoc = visit.model_dump()
+    vdoc['timestamp'] = dt_to_str(vdoc['timestamp'])
+    if vdoc.get('attribution') and hasattr(vdoc['attribution'], 'model_dump'):
+        vdoc['attribution'] = vdoc['attribution'].model_dump()
+    await db.page_visits.insert_one(vdoc)
+    return visit.id
+
+
+async def _do_stitch(parent_id: str, child_id: str, now: datetime) -> dict:
+    """
+    Merge child_contact into parent_contact:
+    1. Copy email/phone/name from child → parent (if parent missing them)
+    2. Reassign all child page_visits → parent contact_id
+    3. Copy child attribution → parent (if parent missing it)
+    4. Mark child as merged_into parent
+    """
+    if parent_id == child_id:
+        return {"status": "same", "contact_id": parent_id}
+
+    parent = await db.contacts.find_one({"contact_id": parent_id}, {"_id": 0})
+    child  = await db.contacts.find_one({"contact_id": child_id},  {"_id": 0})
+
+    if not parent or not child:
+        return {"status": "not_found"}
+
+    # Already merged
+    if child.get('merged_into'):
+        return {"status": "already_merged", "merged_into": child['merged_into']}
+
+    now_str = dt_to_str(now)
+
+    # Build update for parent: pull fields from child where parent is empty
+    parent_update: dict = {"updated_at": now_str}
+    for field in ['name', 'email', 'phone', 'first_name', 'last_name', 'session_id', 'client_ip']:
+        if child.get(field) and not parent.get(field):
+            parent_update[field] = child[field]
+
+    # Merge attribution: copy child attrs where parent attrs are empty
+    child_attr  = child.get('attribution') or {}
+    parent_attr = parent.get('attribution') or {}
+    if isinstance(child_attr, dict):
+        for k, v in child_attr.items():
+            if v and not parent_attr.get(k):
+                parent_update[f'attribution.{k}'] = v
+
+    # Track merged children
+    existing_children = parent.get('merged_children') or []
+    if child_id not in existing_children:
+        existing_children.append(child_id)
+    parent_update['merged_children'] = existing_children
+
+    await db.contacts.update_one({"contact_id": parent_id}, {"$set": parent_update})
+
+    # Reassign all child visits → parent
+    await db.page_visits.update_many(
+        {"contact_id": child_id},
+        {"$set": {"contact_id": parent_id, "original_contact_id": child_id}}
+    )
+
+    # Mark child as merged
+    await db.contacts.update_one(
+        {"contact_id": child_id},
+        {"$set": {"merged_into": parent_id, "updated_at": now_str}}
+    )
+
+    logger.info(f"Stitched {child_id} → {parent_id}")
+    return {"status": "stitched", "parent_contact_id": parent_id, "child_contact_id": child_id}
+
+
+async def _ip_auto_stitch(contact_id: str, client_ip: Optional[str], now: datetime) -> None:
+    """
+    Auto-stitch by IP: if same IP created another contact within 5 minutes,
+    and one has email but not attribution, and the other has attribution but no email,
+    stitch them (email-holder becomes child, attribution-holder becomes parent).
+    """
+    if not client_ip:
+        return
+
+    window_start = dt_to_str(now - timedelta(minutes=5))
+    # Find other contacts with same IP, not already merged, within the last 5 min
+    candidates = await db.contacts.find({
+        "client_ip": client_ip,
+        "contact_id": {"$ne": contact_id},
+        "merged_into": None,
+        "created_at": {"$gte": window_start}
+    }, {"_id": 0}).to_list(10)
+
+    if not candidates:
+        return
+
+    current = await db.contacts.find_one({"contact_id": contact_id}, {"_id": 0})
+    if not current or current.get('merged_into'):
+        return
+
+    for candidate in candidates:
+        c_attr   = bool(current.get('attribution') and
+                        any(v for k, v in (current.get('attribution') or {}).items()
+                            if k not in ('extra',) and v))
+        cand_attr = bool(candidate.get('attribution') and
+                         any(v for k, v in (candidate.get('attribution') or {}).items()
+                             if k not in ('extra',) and v))
+        c_email    = bool(current.get('email'))
+        cand_email = bool(candidate.get('email'))
+
+        # Decide who is parent (attribution-rich) and who is child (email-rich)
+        if c_attr and cand_email and not c_email:
+            # current has attribution, candidate has email → candidate is child
+            await _do_stitch(contact_id, candidate['contact_id'], now)
+            break
+        elif cand_attr and c_email and not cand_email:
+            # candidate has attribution, current has email → current is child
+            await _do_stitch(candidate['contact_id'], contact_id, now)
+            break
+        elif not c_email and not cand_email:
+            # Neither has email yet — stitch by time (earlier = parent)
+            current_ts   = str_to_dt(current.get('created_at'))
+            candidate_ts = str_to_dt(candidate.get('created_at'))
+            if isinstance(current_ts, datetime) and isinstance(candidate_ts, datetime):
+                if current_ts <= candidate_ts:
+                    await _do_stitch(contact_id, candidate['contact_id'], now)
+                else:
+                    await _do_stitch(candidate['contact_id'], contact_id, now)
+            break
+
+
 # ─────────────────────────── Tracker JS ───────────────────────────
 
 def build_tracker_js(backend_url: str) -> str:
     return r"""/**
- * StealthTrack - Lead Attribution Script
- * Mimics Hyros tracking architecture
- * Include in <head>: <script src="BACKEND_URL/api/tracker.js"></script>
+ * StealthTrack - Lead Attribution & Cross-Frame Identity Script
+ * Architecture: Hyros-style field capture + postMessage cross-frame stitching
  */
 (function () {
   'use strict';
@@ -187,57 +411,37 @@ def build_tracker_js(backend_url: str) -> str:
   var BACKEND_URL = '""" + backend_url + r"""';
   var API_BASE    = BACKEND_URL + '/api';
 
-  /* ── Central data store (mirrors Hyros's `f` object) ── */
+  /* ─── Central store ─── */
   var store = {
-    lead: {
-      email:      '',
-      phone:      '',
-      firstName:  '',
-      lastName:   '',
-      name:       ''
-    },
+    lead: { email: '', phone: '', firstName: '', lastName: '', name: '' },
     source: {
-      utm_source:        '',
-      utm_medium:        '',
-      utm_campaign:      '',
-      utm_term:          '',
-      utm_content:       '',
-      fbclid:            '',
-      gclid:             '',
-      ttclid:            '',
-      source_link_tag:   '',
-      fb_ad_set_id:      '',
-      google_campaign_id: ''
+      utm_source: '', utm_medium: '', utm_campaign: '', utm_term: '', utm_content: '',
+      fbclid: '', gclid: '', ttclid: '', source_link_tag: '', fb_ad_set_id: '', google_campaign_id: ''
     },
     config: {
-      contactId:  '',
-      sessionId:  '',
-      prevUrl:    document.referrer || '',
-      currentUrl: window.location.href,
-      pageTitle:  document.title || ''
+      contactId:      '',
+      sessionId:      '',
+      parentContactId: '',   // set when running inside an iframe and parent sends its ID
+      isIframe:       false,
+      prevUrl:        document.referrer || '',
+      currentUrl:     window.location.href,
+      pageTitle:      document.title || ''
     },
-    processedData: {
-      emailSent:   false,
-      phoneSent:   false,
-      pageSent:    false
-    }
+    processedData: { emailSent: false, phoneSent: false, pageSent: false }
   };
 
-  /* ── LocalStorage / Cookie helpers ── */
-  var LS_KEY     = 'st_contact_id';
-  var SESS_KEY   = 'st_session_id';
-  var ATTR_KEY   = 'st_attribution';
-  var COOKIE_TTL = 365; // days
+  /* ─── Detect iframe context ─── */
+  try { store.config.isIframe = window.self !== window.top; } catch (e) { store.config.isIframe = true; }
+
+  /* ─── Storage helpers ─── */
+  var LS_KEY   = 'st_contact_id';
+  var SESS_KEY = 'st_session_id';
+  var ATTR_KEY = 'st_attribution';
 
   function setCookie(name, value, days) {
     try {
-      var expires = '';
-      if (days) {
-        var d = new Date();
-        d.setTime(d.getTime() + days * 864e5);
-        expires = '; expires=' + d.toUTCString();
-      }
-      document.cookie = name + '=' + encodeURIComponent(value) + expires + '; path=/; SameSite=Lax';
+      var exp = new Date(Date.now() + days * 864e5).toUTCString();
+      document.cookie = name + '=' + encodeURIComponent(value) + '; expires=' + exp + '; path=/; SameSite=None; Secure';
     } catch (e) {}
   }
 
@@ -249,17 +453,23 @@ def build_tracker_js(backend_url: str) -> str:
   }
 
   function lsGet(key) {
-    try { return localStorage.getItem(key); } catch (e) { return getCookie(key); }
+    try { return localStorage.getItem(key) || getCookie(key); } catch (e) { return getCookie(key); }
   }
 
   function lsSet(key, value) {
-    try {
-      localStorage.setItem(key, value);
-    } catch (e) {}
-    setCookie(key, value, COOKIE_TTL);
+    try { localStorage.setItem(key, value); } catch (e) {}
+    setCookie(key, value, 365);
   }
 
-  /* ── UUID generator ── */
+  function ssGet(key) {
+    try { return sessionStorage.getItem(key); } catch (e) { return null; }
+  }
+
+  function ssSet(key, value) {
+    try { sessionStorage.setItem(key, value); } catch (e) {}
+  }
+
+  /* ─── UUID ─── */
   function genUUID() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
       var r = Math.random() * 16 | 0;
@@ -267,379 +477,347 @@ def build_tracker_js(backend_url: str) -> str:
     });
   }
 
-  /* ── Contact ID management (persisted across sessions) ── */
+  /* ─── contact_id: persistent per-device per-domain ─── */
   function getContactId() {
     var id = lsGet(LS_KEY);
-    if (!id) {
-      id = genUUID();
-      lsSet(LS_KEY, id);
-    }
+    if (!id) { id = genUUID(); lsSet(LS_KEY, id); }
     return id;
   }
 
-  /* ── URL parameter parser ── */
+  /*
+   * ─── session_id: shared across parent + iframe within ONE tab ───
+   *
+   * Strategy:
+   *  • Parent creates session_id and stores in sessionStorage
+   *  • Parent broadcasts it to all child iframes via postMessage
+   *  • iframe receives and uses the SAME session_id
+   *  • Backend can stitch contacts sharing the same session_id
+   */
+  function initSessionId() {
+    // If iframe, wait for parent to send us the session_id via postMessage
+    // Fallback: generate our own (will be replaced when postMessage arrives)
+    var sid = ssGet(SESS_KEY) || lsGet(SESS_KEY);
+    if (!sid) { sid = genUUID(); }
+    ssSet(SESS_KEY, sid);
+    return sid;
+  }
+
+  /* ─── URL param parser ─── */
   function getUrlParams(url) {
     try {
       var search = (url || window.location.href).split('?')[1] || '';
       var result = {};
-      search.split('&').forEach(function (pair) {
+      search.replace(/#.*$/, '').split('&').forEach(function (pair) {
         var kv = pair.split('=');
-        if (kv[0]) result[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || '');
+        if (kv[0]) result[decodeURIComponent(kv[0])] = decodeURIComponent((kv[1] || '').replace(/\+/g, ' '));
       });
       return result;
     } catch (e) { return {}; }
   }
 
-  /* ── Attribution capture from URL ── */
+  /* ─── Attribution capture ─── */
   function captureAttribution() {
     var cached = lsGet(ATTR_KEY);
-    if (cached) {
-      try { Object.assign(store.source, JSON.parse(cached)); return; } catch (e) {}
-    }
-
+    if (cached) { try { Object.assign(store.source, JSON.parse(cached)); return; } catch (e) {} }
     var p = getUrlParams();
-
     var map = {
-      utm_source:         ['utm_source'],
-      utm_medium:         ['utm_medium'],
-      utm_campaign:       ['utm_campaign'],
-      utm_term:           ['utm_term'],
-      utm_content:        ['utm_content'],
-      fbclid:             ['fbclid', 'fb_cl_id'],
-      gclid:              ['gclid', 'g_cl_id'],
-      ttclid:             ['ttclid'],
+      utm_source: ['utm_source'], utm_medium: ['utm_medium'],
+      utm_campaign: ['utm_campaign'], utm_term: ['utm_term'], utm_content: ['utm_content'],
+      fbclid: ['fbclid', 'fb_cl_id'],
+      gclid:  ['gclid', 'g_cl_id'],
+      ttclid: ['ttclid'],
       source_link_tag:    ['sl'],
-      fb_ad_set_id:       ['fbc_id', 'h_ad_id'],
+      fb_ad_set_id:       ['fbc_id', 'h_ad_id', 'fbadid'],
       google_campaign_id: ['gc_id', 'h_campaign_id']
     };
-
     var found = false;
     Object.keys(map).forEach(function (key) {
       map[key].forEach(function (param) {
         if (p[param]) { store.source[key] = p[param]; found = true; }
       });
     });
-
-    if (found) {
-      lsSet(ATTR_KEY, JSON.stringify(store.source));
-    }
+    if (found) { lsSet(ATTR_KEY, JSON.stringify(store.source)); }
   }
 
-  /* ── Network: send via fetch with keepalive, XHR fallback ── */
+  /* ─── Network ─── */
   function send(endpoint, payload) {
     var url  = API_BASE + endpoint;
     var body = JSON.stringify(payload);
-    var headers = { 'Content-Type': 'application/json' };
-
+    var hdrs = { 'Content-Type': 'application/json' };
     if (typeof fetch !== 'undefined') {
-      try {
-        fetch(url, { method: 'POST', headers: headers, body: body, keepalive: true })
-          .catch(function () { xhrSend(url, body); });
-        return;
-      } catch (e) {}
+      try { fetch(url, { method: 'POST', headers: hdrs, body: body, keepalive: true }).catch(function () { xhrSend(url, body); }); return; }
+      catch (e) {}
     }
     xhrSend(url, body);
   }
 
   function xhrSend(url, body) {
-    try {
-      var xhr = new XMLHttpRequest();
-      xhr.open('POST', url, true);
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.send(body);
-    } catch (e) {}
+    try { var x = new XMLHttpRequest(); x.open('POST', url, true); x.setRequestHeader('Content-Type', 'application/json'); x.send(body); }
+    catch (e) {}
   }
 
-  /* ── Build common payload ── */
+  /* ─── Common payload ─── */
   function buildPayload(extra) {
-    var base = {
+    return Object.assign({
       contact_id:   store.config.contactId,
       session_id:   store.config.sessionId || null,
       current_url:  window.location.href,
       referrer_url: store.config.prevUrl || null,
       page_title:   document.title || null,
       attribution:  store.source
-    };
-    return Object.assign(base, extra || {});
+    }, extra || {});
   }
 
-  /* ── Page view ── */
+  /* ─── Tracking calls ─── */
   function sendPageview() {
     if (store.processedData.pageSent) return;
     store.processedData.pageSent = true;
     send('/track/pageview', buildPayload());
   }
 
-  /* ── Lead (email/phone captured via change event — Hyros style) ── */
-  function sendLead(fields) {
-    var payload = buildPayload(fields);
-    send('/track/lead', payload);
+  function sendLead(fields)         { send('/track/lead',         buildPayload(fields)); }
+  function sendRegistration(fields) { send('/track/registration', buildPayload(fields)); }
+
+  /* ─── Stitch two contacts together ─── */
+  function sendStitch(parentCid, childCid) {
+    if (!parentCid || !childCid || parentCid === childCid) return;
+    send('/track/stitch', {
+      parent_contact_id: parentCid,
+      child_contact_id:  childCid,
+      session_id:        store.config.sessionId || null
+    });
+    logger('[stitch] ' + childCid + ' → ' + parentCid);
   }
 
-  /* ── Registration (form submit with all fields) ── */
-  function sendRegistration(fields) {
-    var payload = buildPayload(fields);
-    send('/track/registration', payload);
+  function logger(msg) {
+    try { if (window.__ST_DEBUG) console.log('[StealthTrack]', msg); } catch(e) {}
   }
 
-  /* ─────────────────────────────────────────────────────
-     Field extraction — mirrors Hyros's class + attribute strategy
-     ───────────────────────────────────────────────────── */
+  /* ═══════════════════════════════════════════════════════════════
+     CROSS-FRAME IDENTITY STITCHING (postMessage bridge)
+     ═══════════════════════════════════════════════════════════════
 
-  /* Special classes (use st-* or hyros-* for compatibility) */
+     HOW IT WORKS:
+     1. Parent page broadcasts {type:'st_parent_id', contactId, sessionId} to ALL iframes
+     2. iframe receives this, records parentContactId, updates its session_id,
+        fires stitch API, and replies with its own contactId
+     3. Parent receives child reply and fires stitch API as a double-confirm
+
+     This ensures BOTH ends initiate the stitch even if one message is dropped.
+  */
+
+  /* ─── Parent: broadcast identity to all child iframes ─── */
+  function broadcastToIframes() {
+    if (store.config.isIframe) return; // don't re-broadcast from iframes
+    var frames = document.querySelectorAll('iframe');
+    if (!frames.length) return;
+    var msg = {
+      type:      'st_parent_id',
+      contactId: store.config.contactId,
+      sessionId: store.config.sessionId,
+      version:   '2'
+    };
+    frames.forEach(function (f) {
+      try { f.contentWindow.postMessage(msg, '*'); } catch (e) {}
+    });
+  }
+
+  /* ─── Handle incoming postMessages ─── */
+  window.addEventListener('message', function (e) {
+    if (!e.data || typeof e.data !== 'object') return;
+
+    /* iframe receives parent identity */
+    if (e.data.type === 'st_parent_id' && store.config.isIframe) {
+      var parentCid  = e.data.contactId;
+      var parentSess = e.data.sessionId;
+
+      if (parentCid && parentCid !== store.config.contactId) {
+        logger('received parent id: ' + parentCid);
+        store.config.parentContactId = parentCid;
+
+        // Adopt parent's session_id
+        if (parentSess) {
+          store.config.sessionId = parentSess;
+          ssSet(SESS_KEY, parentSess);
+        }
+
+        // Stitch: we (iframe/child) merge into parent
+        sendStitch(parentCid, store.config.contactId);
+
+        // Reply so parent can also confirm stitch
+        try {
+          e.source.postMessage({
+            type:      'st_child_id',
+            contactId: store.config.contactId,
+            sessionId: store.config.sessionId
+          }, e.origin || '*');
+        } catch (err) {}
+      }
+    }
+
+    /* Parent receives child (iframe) identity */
+    if (e.data.type === 'st_child_id' && !store.config.isIframe) {
+      var childCid = e.data.contactId;
+      if (childCid && childCid !== store.config.contactId) {
+        logger('received child id: ' + childCid);
+        sendStitch(store.config.contactId, childCid);
+      }
+    }
+
+    /* Legacy / future webinar platform events — capture form data from iframe postMessages */
+    if (e.data.type === 'registration' || e.data.type === 'webinar_registration') {
+      var d = e.data.data || e.data;
+      if (d.email) sendLead({ email: d.email, name: d.name || null, phone: d.phone || null });
+    }
+  });
+
+  /* ─── Field detection ─── */
   var CLASSES = {
     email:     ['st-email', 'hyros-email'],
     firstName: ['st-first-name', 'hyros-first-name'],
     lastName:  ['st-last-name', 'hyros-last-name'],
     phone:     ['st-phone', 'hyros-phone', 'st-telephone']
   };
-
-  /* Common attribute names */
   var ATTR_NAMES = {
-    email:     ['email', 'Email', 'EMAIL', 'user_email', 'subscriber_email', 'attendee_email',
-                 'email_address', 'emailaddress', 'your-email', 'contact_email'],
+    email:     ['email', 'Email', 'EMAIL', 'user_email', 'subscriber_email', 'attendee_email', 'email_address', 'emailaddress', 'your-email', 'contact_email'],
     firstName: ['first_name', 'firstname', 'fname', 'first-name', 'FirstName'],
     lastName:  ['last_name', 'lastname', 'lname', 'last-name', 'LastName'],
-    name:      ['full_name', 'fullname', 'name', 'Name', 'contact_name', 'your-name',
-                 'attendee_name', 'participant_name'],
-    phone:     ['phone', 'Phone', 'PHONE', 'telephone', 'mobile', 'cell',
-                 'phone_number', 'attendee_phone', 'phonenumber', 'your-phone',
-                 'contact_phone', 'mobilephone']
+    name:      ['full_name', 'fullname', 'name', 'Name', 'contact_name', 'your-name', 'attendee_name', 'participant_name'],
+    phone:     ['phone', 'Phone', 'PHONE', 'telephone', 'mobile', 'cell', 'phone_number', 'attendee_phone', 'phonenumber', 'your-phone', 'contact_phone', 'mobilephone']
   };
 
-  function hasClass(el, classes) {
-    for (var i = 0; i < classes.length; i++) {
-      if (el.classList && el.classList.contains(classes[i])) return true;
-    }
+  function hasClass(el, cls) { for (var i = 0; i < cls.length; i++) { if (el.classList && el.classList.contains(cls[i])) return true; } return false; }
+  function matchAttr(el, names) {
+    var n = (el.name||'').toLowerCase(), id = (el.id||'').toLowerCase(), ph = (el.placeholder||'').toLowerCase(), da = (el.getAttribute('data-field')||'').toLowerCase();
+    for (var i = 0; i < names.length; i++) { var nm = names[i].toLowerCase(); if (n===nm||id===nm||ph.indexOf(nm)!==-1||da===nm) return true; }
     return false;
   }
-
-  function matchesAttr(el, names) {
-    var elName = (el.name || '').toLowerCase();
-    var elId   = (el.id   || '').toLowerCase();
-    var elPh   = (el.placeholder || '').toLowerCase();
-    var elData = (el.getAttribute('data-field') || '').toLowerCase();
-    for (var i = 0; i < names.length; i++) {
-      var n = names[i].toLowerCase();
-      if (elName === n || elId === n || elPh.indexOf(n) !== -1 || elData === n) return true;
-    }
-    return false;
-  }
-
   function classifyInput(el) {
     if (!el || !el.tagName) return null;
-    var tag   = el.tagName.toUpperCase();
-    var type  = (el.type || '').toLowerCase();
-    var imode = (el.getAttribute('inputmode') || '').toLowerCase();
-
-    if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') return null;
-
-    // Priority 1: explicit class
+    var tag = el.tagName.toUpperCase(), type = (el.type||'').toLowerCase(), im = (el.getAttribute('inputmode')||'').toLowerCase();
+    if (tag!=='INPUT'&&tag!=='TEXTAREA'&&tag!=='SELECT') return null;
     if (hasClass(el, CLASSES.email))     return 'email';
     if (hasClass(el, CLASSES.firstName)) return 'firstName';
     if (hasClass(el, CLASSES.lastName))  return 'lastName';
     if (hasClass(el, CLASSES.phone))     return 'phone';
-
-    // Priority 2: input type
-    if (type === 'email') return 'email';
-    if (type === 'tel' || imode === 'tel' || imode === 'numeric') return 'phone';
-
-    // Priority 3: name/id/placeholder
-    if (matchesAttr(el, ATTR_NAMES.email))     return 'email';
-    if (matchesAttr(el, ATTR_NAMES.phone))     return 'phone';
-    if (matchesAttr(el, ATTR_NAMES.firstName)) return 'firstName';
-    if (matchesAttr(el, ATTR_NAMES.lastName))  return 'lastName';
-    if (matchesAttr(el, ATTR_NAMES.name))      return 'name';
-
+    if (type==='email') return 'email';
+    if (type==='tel'||im==='tel'||im==='numeric') return 'phone';
+    if (matchAttr(el, ATTR_NAMES.email))     return 'email';
+    if (matchAttr(el, ATTR_NAMES.phone))     return 'phone';
+    if (matchAttr(el, ATTR_NAMES.firstName)) return 'firstName';
+    if (matchAttr(el, ATTR_NAMES.lastName))  return 'lastName';
+    if (matchAttr(el, ATTR_NAMES.name))      return 'name';
     return null;
   }
 
-  /* ── Email validator (simple) ── */
-  function isEmail(v) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test((v || '').trim());
-  }
+  function isEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test((v||'').trim()); }
+  function isPhone(v) { return /^[+\d][\d\s\-().]{6,19}$/.test((v||'').trim()); }
 
-  /* ── Phone validator (loose) ── */
-  function isPhone(v) {
-    return /^[+\d][\d\s\-().]{6,19}$/.test((v || '').trim());
-  }
-
-  /* ─────────────────────────────────────────────────────
-     Change event handler — fires on EACH field (Hyros style)
-     Not just on form submit
-     ───────────────────────────────────────────────────── */
+  /* ─── Field change handler ─── */
   function handleFieldChange(el) {
-    var fieldType = classifyInput(el);
-    if (!fieldType) return;
-
-    var value = (el.value || '').trim();
-    if (!value) return;
-
-    var changed = false;
-
-    if (fieldType === 'email' && isEmail(value) && value !== store.lead.email) {
-      store.lead.email = value;
-      changed = true;
-      sendLead({ email: value });
-    }
-    else if (fieldType === 'phone' && isPhone(value) && value !== store.lead.phone) {
-      store.lead.phone = value;
-      changed = true;
-      sendLead({ phone: value });
-    }
-    else if (fieldType === 'firstName' && value !== store.lead.firstName) {
-      store.lead.firstName = value;
-      changed = true;
-    }
-    else if (fieldType === 'lastName' && value !== store.lead.lastName) {
-      store.lead.lastName = value;
-      changed = true;
-    }
-    else if (fieldType === 'name' && value !== store.lead.name) {
-      store.lead.name = value;
-      changed = true;
-    }
+    var ft = classifyInput(el); if (!ft) return;
+    var val = (el.value||'').trim(); if (!val) return;
+    if (ft==='email' && isEmail(val) && val!==store.lead.email) { store.lead.email=val; sendLead({email:val}); }
+    else if (ft==='phone' && isPhone(val) && val!==store.lead.phone) { store.lead.phone=val; sendLead({phone:val}); }
+    else if (ft==='firstName') store.lead.firstName=val;
+    else if (ft==='lastName')  store.lead.lastName=val;
+    else if (ft==='name')      store.lead.name=val;
   }
 
-  /* ─────────────────────────────────────────────────────
-     Form submit handler — sends ALL collected fields
-     ───────────────────────────────────────────────────── */
+  /* ─── Form submit ─── */
   function handleFormSubmit(form) {
-    // Scrape all inputs one last time
-    var inputs = form.querySelectorAll('input, textarea, select');
-    inputs.forEach(function (el) {
-      var fieldType = classifyInput(el);
-      var value     = (el.value || '').trim();
-      if (!fieldType || !value) return;
-      if (fieldType === 'email'     && isEmail(value)) store.lead.email     = value;
-      if (fieldType === 'phone'     && isPhone(value)) store.lead.phone     = value;
-      if (fieldType === 'firstName')                   store.lead.firstName = value;
-      if (fieldType === 'lastName')                    store.lead.lastName  = value;
-      if (fieldType === 'name')                        store.lead.name      = value;
+    form.querySelectorAll('input, textarea, select').forEach(function (el) {
+      var ft=classifyInput(el), v=(el.value||'').trim(); if (!ft||!v) return;
+      if (ft==='email'&&isEmail(v))     store.lead.email=v;
+      if (ft==='phone'&&isPhone(v))     store.lead.phone=v;
+      if (ft==='firstName')             store.lead.firstName=v;
+      if (ft==='lastName')              store.lead.lastName=v;
+      if (ft==='name')                  store.lead.name=v;
     });
-
     if (!store.lead.email && !store.lead.phone) return;
-
-    // Build name
-    var fullName = store.lead.name ||
-      ((store.lead.firstName + ' ' + store.lead.lastName).trim()) || null;
-
-    sendRegistration({
-      email:      store.lead.email || null,
-      phone:      store.lead.phone || null,
-      name:       fullName,
-      first_name: store.lead.firstName || null,
-      last_name:  store.lead.lastName  || null
-    });
+    var fullName = store.lead.name || ((store.lead.firstName+' '+store.lead.lastName).trim()) || null;
+    sendRegistration({ email:store.lead.email||null, phone:store.lead.phone||null, name:fullName, first_name:store.lead.firstName||null, last_name:store.lead.lastName||null });
   }
 
-  /* ── Bind change listeners to a form's inputs ── */
+  /* ─── Form binding ─── */
   function bindInputListeners(form) {
-    if (!form || form._st_inputs_bound) return;
-    form._st_inputs_bound = true;
-
-    var inputs = form.querySelectorAll('input, textarea, select');
-    inputs.forEach(function (el) {
-      if (el._st_bound) return;
-      el._st_bound = true;
-
-      // 'change' fires when user leaves field — Hyros pattern
-      el.addEventListener('change', function () { handleFieldChange(el); }, true);
-      // 'blur' catches tab-away
-      el.addEventListener('blur',   function () { handleFieldChange(el); }, true);
+    if (!form||form._st_inputs_bound) return; form._st_inputs_bound=true;
+    form.querySelectorAll('input, textarea, select').forEach(function (el) {
+      if (el._st_bound) return; el._st_bound=true;
+      el.addEventListener('change', function(){handleFieldChange(el);}, true);
+      el.addEventListener('blur',   function(){handleFieldChange(el);}, true);
     });
   }
-
-  /* ── Bind submit listener to a form ── */
   function bindSubmitListener(form) {
-    if (!form || form._st_submit_bound) return;
-    form._st_submit_bound = true;
-    form.addEventListener('submit', function () {
-      setTimeout(function () { handleFormSubmit(form); }, 0);
-    }, true);
+    if (!form||form._st_submit_bound) return; form._st_submit_bound=true;
+    form.addEventListener('submit', function(){setTimeout(function(){handleFormSubmit(form);},0);}, true);
   }
-
-  /* ── Bind all forms ── */
-  function bindForms() {
-    var forms = document.querySelectorAll('form');
-    forms.forEach(function (form) {
-      bindInputListeners(form);
-      bindSubmitListener(form);
-    });
-  }
-
-  /* ── Also capture isolated inputs not in a <form> ── */
+  function bindForms() { document.querySelectorAll('form').forEach(function(f){bindInputListeners(f);bindSubmitListener(f);}); }
   function bindLooseInputs() {
-    var inputs = document.querySelectorAll('input, textarea');
-    inputs.forEach(function (el) {
-      if (el.form || el._st_bound) return;
-      el._st_bound = true;
-      el.addEventListener('change', function () { handleFieldChange(el); }, true);
-      el.addEventListener('blur',   function () { handleFieldChange(el); }, true);
+    document.querySelectorAll('input, textarea').forEach(function(el){
+      if (el.form||el._st_bound) return; el._st_bound=true;
+      el.addEventListener('change', function(){handleFieldChange(el);}, true);
+      el.addEventListener('blur',   function(){handleFieldChange(el);}, true);
     });
   }
 
-  /* ── Catch submit-button clicks (SPA / custom forms) ── */
-  document.addEventListener('click', function (e) {
-    var el = e.target;
-    for (var i = 0; i < 5 && el; i++, el = el.parentElement) {
-      var tag  = el.tagName && el.tagName.toUpperCase();
-      var type = (el.type || '').toLowerCase();
-      if ((tag === 'BUTTON' && (type === 'submit' || !el.type || type === 'button')) ||
-          (tag === 'INPUT'  && type === 'submit')) {
-        var form = el.closest('form');
-        if (form) { setTimeout(function () { handleFormSubmit(form); }, 100); }
-        break;
+  /* ─── Click capture for SPA submit buttons ─── */
+  document.addEventListener('click', function(e) {
+    var el=e.target;
+    for (var i=0;i<5&&el;i++,el=el.parentElement) {
+      var tag=(el.tagName||'').toUpperCase(), type=(el.type||'').toLowerCase();
+      if ((tag==='BUTTON'&&(type==='submit'||!el.type||type==='button'))||(tag==='INPUT'&&type==='submit')) {
+        var form=el.closest('form');
+        if (form) { setTimeout(function(){handleFormSubmit(form);},100); } break;
       }
     }
-  }, { capture: true, passive: true });
+  }, {capture:true, passive:true});
 
-  /* ── MutationObserver — watch for iframes / lazy-rendered forms ── */
-  var _observer = null;
+  /* ─── MutationObserver ─── */
+  var _obs=null;
   function watchDOM() {
-    if (_observer || !window.MutationObserver) return;
-    _observer = new MutationObserver(function () {
-      bindForms();
-      bindLooseInputs();
-    });
-    _observer.observe(document.body, { childList: true, subtree: true });
+    if (_obs||!window.MutationObserver) return;
+    _obs=new MutationObserver(function(){bindForms();bindLooseInputs();});
+    _obs.observe(document.body,{childList:true,subtree:true});
   }
 
-  /* ── Listen for custom event (SPA / manual integration) ── */
-  window.addEventListener('stealthtrack_email', function (e) {
-    var email = e.detail && e.detail.email;
-    if (email && isEmail(email) && email !== store.lead.email) {
-      store.lead.email = email;
-      sendLead({ email: email });
-    }
+  /* ─── Custom event ─── */
+  window.addEventListener('stealthtrack_email', function(e){
+    var em=e.detail&&e.detail.email;
+    if (em&&isEmail(em)&&em!==store.lead.email){store.lead.email=em;sendLead({email:em});}
   });
 
-  /* ── SPA navigation — detect URL change ── */
-  (function () {
-    var lastUrl = window.location.href;
-    setInterval(function () {
-      var cur = window.location.href;
-      if (cur !== lastUrl) {
-        lastUrl = cur;
-        store.config.prevUrl    = store.config.currentUrl;
-        store.config.currentUrl = cur;
-        store.config.pageTitle  = document.title || '';
-        store.processedData.pageSent = false;
-        sendPageview();
-        bindForms();
-        bindLooseInputs();
+  /* ─── SPA URL change detection ─── */
+  (function(){
+    var lastUrl=window.location.href;
+    setInterval(function(){
+      var cur=window.location.href;
+      if (cur!==lastUrl){
+        lastUrl=cur; store.config.prevUrl=store.config.currentUrl; store.config.currentUrl=cur;
+        store.processedData.pageSent=false; sendPageview(); bindForms(); bindLooseInputs();
       }
     }, 800);
   })();
 
-  /* ── Init ── */
+  /* ─── Init ─── */
   function init() {
     store.config.contactId = getContactId();
+    store.config.sessionId = initSessionId();
     captureAttribution();
     bindForms();
     bindLooseInputs();
     watchDOM();
     sendPageview();
+
+    /* Parent page: start broadcasting identity to iframes */
+    if (!store.config.isIframe) {
+      /* Broadcast immediately after DOM ready, then periodically for 30s to catch lazy iframes */
+      var broadcastCount = 0;
+      var broadcastInterval = setInterval(function () {
+        broadcastToIframes();
+        if (++broadcastCount >= 30) clearInterval(broadcastInterval);
+      }, 1000);
+    }
   }
 
   if (document.readyState === 'loading') {
@@ -648,17 +826,17 @@ def build_tracker_js(backend_url: str) -> str:
     init();
   }
 
-  /* ── Public API (window.StealthTrack) ── */
+  /* ─── Public API ─── */
   window.StealthTrack = {
-    getContactId: getContactId,
-    identify: function (fields) {
-      if (fields.email && isEmail(fields.email)) {
-        store.lead.email = fields.email;
-        sendLead(fields);
-      }
+    getContactId:  getContactId,
+    getSessionId:  function(){ return store.config.sessionId; },
+    identify: function(fields){
+      if (fields.email && isEmail(fields.email)){ store.lead.email=fields.email; sendLead(fields); }
     },
+    stitch:    sendStitch,
     trackEvent: sendLead,
-    store: store
+    store:     store,
+    debug:     function(){ window.__ST_DEBUG=true; }
   };
 
 })();
@@ -675,165 +853,110 @@ async def root():
 @api_router.get("/tracker.js", response_class=PlainTextResponse)
 async def get_tracker_js():
     backend_url = os.environ.get('REACT_APP_BACKEND_URL', '')
-    js_content = build_tracker_js(backend_url)
     return PlainTextResponse(
-        content=js_content,
+        content=build_tracker_js(backend_url),
         media_type="application/javascript",
-        headers={
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Access-Control-Allow-Origin": "*",
-        }
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Access-Control-Allow-Origin": "*"}
     )
 
 
-async def _upsert_contact(data: dict, now: datetime) -> None:
-    """Upsert a contact by contact_id, merging non-null fields."""
-    cid = data.get('contact_id')
-    if not cid:
-        return
-
-    existing = await db.contacts.find_one({"contact_id": cid}, {"_id": 0})
-    now_str = dt_to_str(now)
-
-    if existing:
-        update = {"updated_at": now_str}
-        for field in ['name', 'email', 'phone', 'first_name', 'last_name', 'session_id']:
-            if data.get(field):
-                update[field] = data[field]
-        # Merge attribution
-        if data.get('attribution'):
-            for k, v in data['attribution'].items():
-                if v and not existing.get('attribution', {}).get(k):
-                    update[f'attribution.{k}'] = v
-        await db.contacts.update_one({"contact_id": cid}, {"$set": update})
-    else:
-        contact = Contact(
-            contact_id=cid,
-            session_id=data.get('session_id'),
-            name=data.get('name'),
-            email=data.get('email'),
-            phone=data.get('phone'),
-            first_name=data.get('first_name'),
-            last_name=data.get('last_name'),
-            attribution=safe_attribution(data.get('attribution')),
-            created_at=now,
-            updated_at=now
-        )
-        cdoc = contact.model_dump()
-        cdoc['created_at'] = dt_to_str(cdoc['created_at'])
-        cdoc['updated_at'] = dt_to_str(cdoc['updated_at'])
-        if cdoc.get('attribution'):
-            cdoc['attribution'] = cdoc['attribution'].model_dump() if hasattr(cdoc['attribution'], 'model_dump') else cdoc['attribution']
-        await db.contacts.insert_one(cdoc)
-
-
-async def _log_visit(contact_id: str, session_id: Optional[str],
-                     current_url: str, referrer_url: Optional[str],
-                     page_title: Optional[str], attribution: Optional[dict],
-                     now: datetime) -> str:
-    visit = PageVisit(
-        contact_id=contact_id,
-        session_id=session_id,
-        current_url=current_url,
-        referrer_url=referrer_url,
-        page_title=page_title,
-        attribution=safe_attribution(attribution),
-        timestamp=now
-    )
-    vdoc = visit.model_dump()
-    vdoc['timestamp'] = dt_to_str(vdoc['timestamp'])
-    if vdoc.get('attribution'):
-        vdoc['attribution'] = vdoc['attribution'].model_dump() if hasattr(vdoc['attribution'], 'model_dump') else vdoc['attribution']
-    await db.page_visits.insert_one(vdoc)
-    return visit.id
-
-
-# Track page view
 @api_router.post("/track/pageview")
-async def track_pageview(data: PageViewCreate):
+async def track_pageview(data: PageViewCreate, request: Request):
     try:
         now = datetime.now(timezone.utc)
-        await _upsert_contact({'contact_id': data.contact_id, 'session_id': data.session_id,
-                                'attribution': data.attribution}, now)
-        visit_id = await _log_visit(
-            data.contact_id, data.session_id,
-            data.current_url, data.referrer_url, data.page_title,
-            data.attribution, now
-        )
-        return {"status": "ok", "visit_id": visit_id, "contact_id": data.contact_id}
+        ip  = get_client_ip(request)
+        await _upsert_contact({'contact_id': data.contact_id, 'session_id': data.session_id, 'attribution': data.attribution}, now, ip)
+        vid = await _log_visit(data.contact_id, data.session_id, data.current_url, data.referrer_url, data.page_title, data.attribution, now, ip)
+        await _ip_auto_stitch(data.contact_id, ip, now)
+        return {"status": "ok", "visit_id": vid, "contact_id": data.contact_id}
     except Exception as e:
         logger.error(f"Error tracking pageview: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# Track lead field capture (Hyros-style change event)
 @api_router.post("/track/lead")
-async def track_lead(data: LeadCreate):
+async def track_lead(data: LeadCreate, request: Request):
     try:
         now = datetime.now(timezone.utc)
-        await _upsert_contact({
-            'contact_id': data.contact_id,
-            'session_id': data.session_id,
-            'email':      data.email,
-            'phone':      data.phone,
-            'name':       data.name,
-            'first_name': data.first_name,
-            'last_name':  data.last_name,
-            'attribution': data.attribution
-        }, now)
+        ip  = get_client_ip(request)
+        await _upsert_contact({'contact_id': data.contact_id, 'session_id': data.session_id, 'email': data.email, 'phone': data.phone, 'name': data.name, 'first_name': data.first_name, 'last_name': data.last_name, 'attribution': data.attribution}, now, ip)
+        await _ip_auto_stitch(data.contact_id, ip, now)
         return {"status": "ok", "contact_id": data.contact_id}
     except Exception as e:
         logger.error(f"Error tracking lead: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# Track form registration (full submission)
 @api_router.post("/track/registration")
-async def track_registration(data: RegistrationCreate):
+async def track_registration(data: RegistrationCreate, request: Request):
     try:
         now = datetime.now(timezone.utc)
-        await _upsert_contact({
-            'contact_id': data.contact_id,
-            'session_id': data.session_id,
-            'email':      data.email,
-            'phone':      data.phone,
-            'name':       data.name,
-            'first_name': data.first_name,
-            'last_name':  data.last_name,
-            'attribution': data.attribution
-        }, now)
+        ip  = get_client_ip(request)
+        await _upsert_contact({'contact_id': data.contact_id, 'session_id': data.session_id, 'email': data.email, 'phone': data.phone, 'name': data.name, 'first_name': data.first_name, 'last_name': data.last_name, 'attribution': data.attribution}, now, ip)
         if data.current_url:
-            await _log_visit(
-                data.contact_id, data.session_id,
-                data.current_url, data.referrer_url, data.page_title or "Registration",
-                data.attribution, now
-            )
+            await _log_visit(data.contact_id, data.session_id, data.current_url, data.referrer_url, data.page_title or "Registration", data.attribution, now, ip)
+        await _ip_auto_stitch(data.contact_id, ip, now)
         return {"status": "ok", "contact_id": data.contact_id}
     except Exception as e:
         logger.error(f"Error tracking registration: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# Get all contacts
-@api_router.get("/contacts", response_model=List[ContactWithStats])
-async def get_contacts(search: Optional[str] = None):
+@api_router.post("/track/stitch")
+async def track_stitch(data: StitchRequest, request: Request):
+    """
+    Merge child contact into parent contact.
+    Called by tracker.js when postMessage bridge identifies both sides of a session.
+    """
     try:
-        query = {}
+        now = datetime.now(timezone.utc)
+        result = await _do_stitch(data.parent_contact_id, data.child_contact_id, now)
+        return result
+    except Exception as e:
+        logger.error(f"Error stitching: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/track/stitch/by-session")
+async def stitch_by_session(session_id: str):
+    """Stitch all contacts sharing the same session_id."""
+    try:
+        now = datetime.now(timezone.utc)
+        contacts = await db.contacts.find({"session_id": session_id, "merged_into": None}, {"_id": 0}).sort("created_at", 1).to_list(20)
+        if len(contacts) < 2:
+            return {"status": "nothing_to_stitch", "count": len(contacts)}
+
+        # First contact becomes the parent (earliest created_at)
+        parent = contacts[0]
+        results = []
+        for child in contacts[1:]:
+            r = await _do_stitch(parent['contact_id'], child['contact_id'], now)
+            results.append(r)
+
+        return {"status": "ok", "parent_contact_id": parent['contact_id'], "stitched": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/contacts", response_model=List[ContactWithStats])
+async def get_contacts(search: Optional[str] = None, include_merged: bool = False):
+    try:
+        query: dict = {}
+        if not include_merged:
+            query["merged_into"] = None   # hide merged (child) contacts
         if search:
-            query = {"$or": [
+            search_filter = {"$or": [
                 {"name":  {"$regex": search, "$options": "i"}},
                 {"email": {"$regex": search, "$options": "i"}},
                 {"phone": {"$regex": search, "$options": "i"}}
             ]}
+            query = {"$and": [query, search_filter]} if query else search_filter
+
         contacts_raw = await db.contacts.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
         result = []
         for c in contacts_raw:
-            c['created_at'] = str_to_dt(c.get('created_at'))
-            c['updated_at'] = str_to_dt(c.get('updated_at'))
-            if isinstance(c.get('attribution'), dict):
-                c['attribution'] = Attribution(**{k: v for k, v in c['attribution'].items() if v})
-            visit_count = await db.page_visits.count_documents({"contact_id": c['contact_id']})
-            c['visit_count'] = visit_count
+            fix_contact_doc(c)
+            c['visit_count'] = await db.page_visits.count_documents({"contact_id": c['contact_id']})
             result.append(ContactWithStats(**c))
         return result
     except Exception as e:
@@ -841,27 +964,15 @@ async def get_contacts(search: Optional[str] = None):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# Get contact detail
 @api_router.get("/contacts/{contact_id}", response_model=ContactDetail)
 async def get_contact_detail(contact_id: str):
     try:
         contact = await db.contacts.find_one({"contact_id": contact_id}, {"_id": 0})
         if not contact:
             raise HTTPException(status_code=404, detail="Contact not found")
-        contact['created_at'] = str_to_dt(contact.get('created_at'))
-        contact['updated_at'] = str_to_dt(contact.get('updated_at'))
-        if isinstance(contact.get('attribution'), dict):
-            contact['attribution'] = Attribution(**{k: v for k, v in contact['attribution'].items() if v})
-        visits_raw = await db.page_visits.find(
-            {"contact_id": contact_id}, {"_id": 0}
-        ).sort("timestamp", 1).to_list(500)
-        visits = []
-        for v in visits_raw:
-            v['timestamp'] = str_to_dt(v.get('timestamp'))
-            if isinstance(v.get('attribution'), dict):
-                v['attribution'] = Attribution(**{k: val for k, val in v['attribution'].items() if val})
-            visits.append(PageVisit(**v))
-        contact['visits'] = visits
+        fix_contact_doc(contact)
+        visits_raw = await db.page_visits.find({"contact_id": contact_id}, {"_id": 0}).sort("timestamp", 1).to_list(500)
+        contact['visits'] = [PageVisit(**fix_visit_doc(v)) for v in visits_raw]
         return ContactDetail(**contact)
     except HTTPException:
         raise
@@ -870,17 +981,36 @@ async def get_contact_detail(contact_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# Stats
 @api_router.get("/stats")
 async def get_stats():
     try:
-        total_contacts = await db.contacts.count_documents({})
+        total_contacts = await db.contacts.count_documents({"merged_into": None})
         total_visits   = await db.page_visits.count_documents({})
         today_start    = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         today_visits   = await db.page_visits.count_documents({"timestamp": {"$gte": dt_to_str(today_start)}})
         return {"total_contacts": total_contacts, "total_visits": total_visits, "today_visits": today_visits}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─────────────────────────── Startup: create indexes ───────────────────────────
+
+@app.on_event("startup")
+async def create_indexes():
+    try:
+        await db.contacts.create_index("contact_id",  unique=True, sparse=True)
+        await db.contacts.create_index("email",        sparse=True)
+        await db.contacts.create_index("session_id",   sparse=True)
+        await db.contacts.create_index("client_ip",    sparse=True)
+        await db.contacts.create_index("merged_into",  sparse=True)
+        await db.contacts.create_index("created_at")
+        await db.page_visits.create_index("contact_id")
+        await db.page_visits.create_index("session_id", sparse=True)
+        await db.page_visits.create_index("timestamp")
+        await db.page_visits.create_index([("contact_id", 1), ("timestamp", 1)])
+        logger.info("MongoDB indexes created/verified")
+    except Exception as e:
+        logger.warning(f"Index creation warning: {e}")
 
 
 app.include_router(api_router)
