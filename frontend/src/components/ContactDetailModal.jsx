@@ -331,18 +331,18 @@ export const ContactDetailModal = ({ contactId, open, onClose, onDelete }) => {
                     </button>
                   </AlertDialogTrigger>
                   <AlertDialogContent
-                    style={{ backgroundColor: 'var(--bg-elev-1)', borderColor: 'var(--stroke)', color: 'var(--text)' }}
+                    style={{ backgroundColor: '#ffffff', borderColor: 'var(--stroke)', color: 'var(--text)' }}
                   >
                     <AlertDialogHeader>
                       <AlertDialogTitle style={{ color: 'var(--text)' }}>Delete Contact</AlertDialogTitle>
-                      <AlertDialogDescription style={{ color: 'var(--text-dim)' }}>
+                      <AlertDialogDescription style={{ color: 'var(--text-muted)' }}>
                         Are you sure you want to delete <strong style={{ color: 'var(--text)' }}>{contact.name || contact.email || 'this contact'}</strong>?
                         This will permanently remove the contact and all their visit history.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel
-                        style={{ backgroundColor: 'var(--bg-elev-2)', borderColor: 'var(--stroke)', color: 'var(--text)' }}
+                        style={{ backgroundColor: '#ffffff', borderColor: 'var(--stroke)', color: 'var(--text)' }}
                       >
                         Cancel
                       </AlertDialogCancel>
