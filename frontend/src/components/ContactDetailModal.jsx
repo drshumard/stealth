@@ -305,8 +305,27 @@ export const ContactDetailModal = ({ contactId, open, onClose }) => {
                     <InfoRow icon={Mail}     label="Email"      value={contact.email} copyable />
                     <InfoRow icon={Phone}    label="Phone"      value={contact.phone} />
                     <InfoRow icon={Hash}     label="Contact ID" value={contact.contact_id} mono copyable />
+                    <InfoRow icon={Wifi}     label="IP Address" value={contact.client_ip} mono />
+                    <InfoRow icon={Layers}   label="Session ID" value={contact.session_id} mono copyable />
                     <InfoRow icon={Calendar} label="First Seen" value={formatDateTime(contact.created_at)} />
                     <InfoRow icon={Calendar} label="Last Updated" value={formatDateTime(contact.updated_at)} />
+                    {contact.merged_children && contact.merged_children.length > 0 && (
+                      <div className="flex items-start gap-3 py-2.5 px-4">
+                        <div className="mt-0.5 shrink-0"><GitMerge size={14} style={{ color: 'var(--mint-success)' }} /></div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs mb-1" style={{ color: 'var(--text-dim)' }}>
+                            Stitched Identities ({contact.merged_children.length})
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            {contact.merged_children.map(cid => (
+                              <span key={cid} className="text-xs font-mono break-all"
+                                style={{ color: 'var(--mint-success)', fontFamily: 'IBM Plex Mono, monospace' }}
+                              >{cid}</span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : null}
               </TabsContent>
