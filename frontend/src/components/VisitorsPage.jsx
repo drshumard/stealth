@@ -30,7 +30,7 @@ export default function VisitorsPage({
             className="text-sm font-semibold"
             style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--text)' }}
           >
-            Leads
+            Visitors
           </h1>
           <Badge
             variant="secondary"
