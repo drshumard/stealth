@@ -337,7 +337,7 @@ export const ContactsTable = ({
                       />
                     </TableCell>
 
-                    <TableCell className="py-3 pl-3">
+                    <TableCell className="py-4 pl-3">
                       <div>
                         <div
                           className="text-sm font-semibold"
@@ -351,7 +351,7 @@ export const ContactsTable = ({
                       </div>
                     </TableCell>
 
-                    <TableCell className="py-3">
+                    <TableCell className="py-4">
                       <span className="text-sm" style={{ color: contact.email ? 'var(--text-muted)' : 'var(--text-dim)', fontStyle: contact.email ? 'normal' : 'italic' }}>
                         {contact.email || '—'}
                       </span>
@@ -377,7 +377,7 @@ export const ContactsTable = ({
                       )}
                     </TableCell>
 
-                    <TableCell className="py-3 pr-6 text-right">
+                    <TableCell className="py-4 pr-6 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {contact.merged_children?.length > 0 && (
                           <span className="hidden sm:inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full border"
@@ -395,7 +395,7 @@ export const ContactsTable = ({
                       </div>
                     </TableCell>
 
-                    <TableCell className="py-3 pr-4 text-right" onClick={e => e.stopPropagation()}>
+                    <TableCell className="py-4 pr-4 text-right" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
                         <button
                           className="p-1.5 rounded-lg transition-colors duration-120"
