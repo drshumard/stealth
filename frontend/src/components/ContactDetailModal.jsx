@@ -297,7 +297,7 @@ export const ContactDetailModal = ({ contactId, open, onClose, onDelete }) => {
           boxShadow: 'var(--shadow)',
         }}
       >
-        <DialogHeader className="px-6 pt-5 pb-0">
+        <DialogHeader className="px-6 pt-5 pb-0" style={{ backgroundColor: '#fafaf8', borderBottom: '1px solid var(--stroke)' }}>
           <div className="flex items-start justify-between gap-4">
             <div>
               <DialogTitle
