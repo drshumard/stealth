@@ -750,7 +750,6 @@ def build_tracker_js(backend_url: str) -> str:
       var parentSess = e.data.sessionId;
 
       if (parentCid && parentCid !== store.config.contactId) {
-        logger('📨 [iframe] Received parent contact ID: ' + parentCid.substring(0,8) + '…');
         store.config.parentContactId = parentCid;
 
         // Adopt parent's session_id
