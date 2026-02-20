@@ -9,10 +9,10 @@
   },
   {
     "content": "Add new explicit fields + extra params display to Attribution tab in modal",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Screenshot and verify end-to-end",
-    "status": "pending"
+    "status": "completed"
   }
 ]
