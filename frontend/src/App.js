@@ -34,6 +34,7 @@ function Dashboard() {
       toast.error('Failed to load contacts');
     } finally {
       setLoading(false);
+      setInitialLoad(false); // first load done — never show skeletons again
     }
   }, []);
 
