@@ -8,7 +8,7 @@ export const ScriptEmbedCard = () => {
   const [copied, setCopied] = useState(false);
 
   const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
-  const scriptTag = `<script src="${backendUrl}/api/tracker.js"></script>`;
+  const scriptTag = `<script src="${backendUrl}/api/shumard.js"></script>`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(scriptTag).then(() => {
