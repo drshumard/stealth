@@ -1,85 +1,70 @@
-import { RefreshCw, Copy } from 'lucide-react';
+import { RefreshCw, Copy, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { ScriptEmbedCard } from '@/components/ScriptEmbedCard';
 import { ContactsTable } from '@/components/ContactsTable';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
 
-export default function VisitorsPage({
-  contacts, loading, initialLoad, stats,
-  onRefresh, onSelectContact, onDeleteContact, onBulkDelete,
-}) {
+export default function VisitorsPage({ contacts, loading, initialLoad, stats, onRefresh, onSelectContact, onDeleteContact, onBulkDelete }) {
   const handleCopyScript = () => {
-    const tag = `<script src="${BACKEND_URL}/api/shumard.js"></script>`;
-    navigator.clipboard.writeText(tag).then(() =>
-      toast.success('Script tag copied!', { description: 'Paste it in the <head> of your page.', duration: 3000 })
-    );
+    navigator.clipboard.writeText(`<script src="${BACKEND_URL}/api/shumard.js"></script>`)
+      .then(() => toast.success('Script copied!', { description: 'Paste in your page <head>' }));
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div
-        className="flex items-center justify-between px-6 py-4 border-b shrink-0"
-        style={{ borderColor: 'var(--stroke)' }}
-      >
-        <div className="flex items-center gap-2">
-          <h1
-            className="text-sm font-semibold"
-            style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--text)' }}
-          >
-            Visitors
-          </h1>
-          <Badge
-            variant="secondary"
-            className="text-xs font-mono px-2"
-            style={{
-              backgroundColor: 'rgba(21,184,200,0.1)',
-              color: 'var(--primary-cyan)',
-              border: '1px solid rgba(21,184,200,0.2)',
-            }}
-          >
-            {stats.total_contacts}
-          </Badge>
+    <div className="p-6 md:p-8">
+      {/* Page header */}
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--text)' }}>Visitors</h1>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            {contacts.length} total visitor{contacts.length !== 1 ? 's' : ''} tracked
+          </p>
         </div>
-
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 mt-1">
           <Button
-            data-testid="refresh-button"
-            variant="outline"
-            size="sm"
-            onClick={onRefresh}
-            className="h-7 w-7 p-0"
-            style={{ backgroundColor: 'var(--bg-elev-2)', borderColor: 'var(--stroke)', color: 'var(--text-muted)' }}
+            variant="outline" size="sm"
+            className="gap-1.5 h-9 text-sm"
+            style={{ borderColor: 'var(--stroke)', color: 'var(--text-muted)' }}
           >
-            <RefreshCw size={13} />
+            <Download size={14} /> Export
           </Button>
           <Button
             data-testid="visitors-copy-script-button"
             size="sm"
-            className="h-7 gap-1.5 text-xs"
+            className="gap-1.5 h-9 text-sm text-white"
+            style={{ backgroundColor: 'var(--primary-orange)' }}
             onClick={handleCopyScript}
-            style={{ backgroundColor: 'var(--primary-cyan)', color: 'var(--bg)' }}
           >
-            <Copy size={12} />
-            Copy Script
+            <Copy size={14} /> Copy Script
           </Button>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-auto px-6 py-5 space-y-5">
+      {/* Embed card */}
+      <div className="mb-6">
         <ScriptEmbedCard />
-        <ContactsTable
-          contacts={contacts}
-          loading={loading}
-          initialLoad={initialLoad}
-          onSelectContact={onSelectContact}
-          onCopyScript={handleCopyScript}
-          onBulkDelete={onBulkDelete}
-        />
+      </div>
+
+      {/* Table card */}
+      <div className="rounded-2xl border" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff', boxShadow: 'var(--shadow-soft)' }}>
+        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--stroke)' }}>
+          <span className="text-sm font-semibold" style={{ color: 'var(--text)', fontFamily: 'Space Grotesk, sans-serif' }}>All Visitors</span>
+          <Button variant="ghost" size="sm" onClick={onRefresh} className="h-8 w-8 p-0" style={{ color: 'var(--text-dim)' }}>
+            <RefreshCw size={13} />
+          </Button>
+        </div>
+        <div className="p-4 pt-3">
+          <ContactsTable
+            contacts={contacts}
+            loading={loading}
+            initialLoad={initialLoad}
+            onSelectContact={onSelectContact}
+            onCopyScript={handleCopyScript}
+            onBulkDelete={onBulkDelete}
+          />
+        </div>
       </div>
     </div>
   );

@@ -1,15 +1,9 @@
 import { useState, useMemo } from 'react';
-import { RefreshCw, Copy, Filter, X } from 'lucide-react';
+import { RefreshCw, Copy, Filter, X, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { ContactsTable } from '@/components/ContactsTable';
 
@@ -22,213 +16,146 @@ const DATE_OPTIONS = [
   { value: '30d',   label: 'Last 30 days' },
 ];
 
-function passesDate(contact, range) {
+function passesDate(c, range) {
   if (range === 'all') return true;
-  const d = new Date(contact.updated_at);
-  const now = Date.now();
-  if (range === 'today') {
-    const start = new Date(); start.setHours(0, 0, 0, 0);
-    return d >= start;
-  }
+  const d = new Date(c.updated_at), now = Date.now();
+  if (range === 'today') { const s = new Date(); s.setHours(0,0,0,0); return d >= s; }
   if (range === '7d')  return d >= new Date(now - 7  * 864e5);
   if (range === '30d') return d >= new Date(now - 30 * 864e5);
   return true;
 }
 
-export default function LeadsPage({
-  contacts, loading, initialLoad, stats,
-  onRefresh, onSelectContact, onDeleteContact, onBulkDelete,
-}) {
-  const [search, setSearch]       = useState('');
-  const [sourceFilter, setSource] = useState('all');
-  const [dateFilter, setDate]     = useState('all');
+export default function LeadsPage({ contacts, loading, initialLoad, stats, onRefresh, onSelectContact, onDeleteContact, onBulkDelete }) {
+  const [search,   setSearch]  = useState('');
+  const [srcFilter, setSrc]    = useState('all');
+  const [dateFilter, setDate]  = useState('all');
 
   const handleCopyScript = () => {
-    const tag = `<script src="${BACKEND_URL}/api/shumard.js"></script>`;
-    navigator.clipboard.writeText(tag).then(() =>
-      toast.success('Script tag copied!', { description: 'Paste it in the <head> of your page.', duration: 3000 })
-    );
+    navigator.clipboard.writeText(`<script src="${BACKEND_URL}/api/shumard.js"></script>`)
+      .then(() => toast.success('Script copied!', { description: 'Paste in your page <head>' }));
   };
 
-  // Only identified contacts
-  const identified = useMemo(
-    () => contacts.filter(c => c.email || c.phone || c.name),
-    [contacts]
-  );
-
-  // Derive unique sources from identified contacts
-  const sources = useMemo(() => {
+  const identified = useMemo(() => contacts.filter(c => c.email || c.phone || c.name), [contacts]);
+  const sources    = useMemo(() => {
     const s = new Set(identified.map(c => c.attribution?.utm_source).filter(Boolean));
     return Array.from(s).sort();
   }, [identified]);
 
-  // Apply source + date + search filters
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return identified.filter(c => {
-      if (sourceFilter !== 'all' && c.attribution?.utm_source !== sourceFilter) return false;
+      if (srcFilter !== 'all' && c.attribution?.utm_source !== srcFilter) return false;
       if (!passesDate(c, dateFilter)) return false;
-      if (q) {
-        return (
-          (c.name  && c.name.toLowerCase().includes(q))  ||
-          (c.email && c.email.toLowerCase().includes(q)) ||
-          (c.phone && c.phone.toLowerCase().includes(q))
-        );
-      }
+      if (q) return (c.name?.toLowerCase().includes(q)) || (c.email?.toLowerCase().includes(q)) || (c.phone?.toLowerCase().includes(q));
       return true;
     });
-  }, [identified, sourceFilter, dateFilter, search]);
+  }, [identified, srcFilter, dateFilter, search]);
 
-  const activeFilters = (sourceFilter !== 'all' ? 1 : 0) + (dateFilter !== 'all' ? 1 : 0);
-  const clearFilters  = () => { setSource('all'); setDate('all'); setSearch(''); };
+  const activeFilters = (srcFilter !== 'all' ? 1 : 0) + (dateFilter !== 'all' ? 1 : 0);
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div
-        className="flex items-center justify-between px-6 py-4 border-b shrink-0"
-        style={{ borderColor: 'var(--stroke)' }}
-      >
-        <div className="flex items-center gap-2">
-          <h1
-            className="text-sm font-semibold"
-            style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--text)' }}
-          >
-            Leads
-          </h1>
-          <Badge
-            className="text-xs font-mono px-2"
-            style={{
-              backgroundColor: 'rgba(21,184,200,0.1)',
-              color: 'var(--primary-cyan)',
-              border: '1px solid rgba(21,184,200,0.2)',
-            }}
-          >
-            {identified.length}
-          </Badge>
+    <div className="p-6 md:p-8">
+      {/* Page header */}
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--text)' }}>Leads</h1>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            {identified.length} identified contact{identified.length !== 1 ? 's' : ''}
+          </p>
         </div>
-
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 mt-1">
           <Button
-            data-testid="leads-refresh-button"
-            variant="outline"
-            size="sm"
-            onClick={onRefresh}
-            className="h-7 w-7 p-0"
-            style={{ backgroundColor: 'var(--bg-elev-2)', borderColor: 'var(--stroke)', color: 'var(--text-muted)' }}
+            variant="outline" size="sm"
+            className="gap-1.5 h-9 text-sm"
+            style={{ borderColor: 'var(--stroke)', color: 'var(--text-muted)' }}
           >
-            <RefreshCw size={13} />
+            <Download size={14} /> Export
           </Button>
           <Button
             data-testid="leads-copy-script-button"
             size="sm"
-            className="h-7 gap-1.5 text-xs"
+            className="gap-1.5 h-9 text-sm text-white"
+            style={{ backgroundColor: 'var(--primary-orange)' }}
             onClick={handleCopyScript}
-            style={{ backgroundColor: 'var(--primary-cyan)', color: 'var(--bg)' }}
           >
-            <Copy size={12} />
-            Copy Script
+            <Copy size={14} /> Copy Script
           </Button>
         </div>
       </div>
 
-      {/* Filter bar */}
-      <div
-        className="flex items-center gap-3 px-6 py-3 border-b shrink-0 flex-wrap"
-        style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--bg-elev-1)' }}
-      >
-        <div className="flex items-center gap-1.5 shrink-0" style={{ color: 'var(--text-dim)' }}>
-          <Filter size={13} />
-          <span className="text-xs">Filters</span>
-          {activeFilters > 0 && (
-            <Badge
-              className="text-xs px-1.5 h-4 font-mono"
-              style={{ backgroundColor: 'rgba(21,184,200,0.15)', color: 'var(--primary-cyan)', border: 'none' }}
+      {/* Table card */}
+      <div className="rounded-2xl border" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff', boxShadow: 'var(--shadow-soft)' }}>
+        {/* Toolbar */}
+        <div className="flex items-center gap-3 px-5 py-4 border-b flex-wrap" style={{ borderColor: 'var(--stroke)' }}>
+          <div className="relative flex-1 min-w-[160px] max-w-xs">
+            <Filter size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-dim)' }} />
+            <Input
+              data-testid="leads-filter-search-input"
+              placeholder="Search name, email, phone…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-9 h-8 text-xs"
+              style={{ borderColor: 'var(--stroke)', backgroundColor: '#fafaf8', color: 'var(--text)' }}
+            />
+          </div>
+
+          <Select value={srcFilter} onValueChange={setSrc}>
+            <SelectTrigger data-testid="leads-filter-source-select" className="h-8 text-xs w-36" style={{ borderColor: 'var(--stroke)' }}>
+              <SelectValue placeholder="All sources" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-xs">All sources</SelectItem>
+              {sources.map(s => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}
+            </SelectContent>
+          </Select>
+
+          <Select value={dateFilter} onValueChange={setDate}>
+            <SelectTrigger data-testid="leads-filter-date-range" className="h-8 text-xs w-28" style={{ borderColor: 'var(--stroke)' }}>
+              <SelectValue placeholder="All time" />
+            </SelectTrigger>
+            <SelectContent>
+              {DATE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+
+          {(activeFilters > 0 || search) && (
+            <button
+              onClick={() => { setSrc('all'); setDate('all'); setSearch(''); }}
+              className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg border transition-colors"
+              style={{ color: 'var(--text-muted)', borderColor: 'var(--stroke)' }}
             >
-              {activeFilters}
-            </Badge>
+              <X size={11} /> Clear
+            </button>
           )}
+
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="ghost" size="sm"
+              onClick={onRefresh}
+              className="h-8 w-8 p-0"
+              style={{ color: 'var(--text-dim)' }}
+            ><RefreshCw size={13} /></Button>
+            <Badge
+              className="text-xs font-mono px-2 h-6"
+              style={{ backgroundColor: '#fff7ed', color: 'var(--primary-orange)', border: '1px solid #fed7aa' }}
+            >
+              {filtered.length}
+            </Badge>
+          </div>
         </div>
 
-        {/* Search */}
-        <div className="relative flex-1 min-w-[160px] max-w-xs">
-          <Input
-            data-testid="leads-search-input"
-            placeholder="Search name, email, phone…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="h-7 text-xs pl-3"
-            style={{ backgroundColor: 'var(--bg-elev-2)', borderColor: 'var(--stroke)', color: 'var(--text)' }}
+        {/* Table */}
+        <div className="p-4 pt-3">
+          <ContactsTable
+            contacts={filtered}
+            loading={loading}
+            initialLoad={initialLoad}
+            onSelectContact={onSelectContact}
+            onCopyScript={handleCopyScript}
+            onBulkDelete={onBulkDelete}
+            hideSearch
           />
         </div>
-
-        {/* Source filter */}
-        <Select value={sourceFilter} onValueChange={setSource}>
-          <SelectTrigger
-            data-testid="leads-source-filter"
-            className="h-7 text-xs w-36 shrink-0"
-            style={{ backgroundColor: 'var(--bg-elev-2)', borderColor: 'var(--stroke)', color: 'var(--text-muted)' }}
-          >
-            <SelectValue placeholder="All sources" />
-          </SelectTrigger>
-          <SelectContent style={{ backgroundColor: 'var(--bg-elev-2)', borderColor: 'var(--stroke)' }}>
-            <SelectItem value="all" className="text-xs">All sources</SelectItem>
-            {sources.map(src => (
-              <SelectItem key={src} value={src} className="text-xs">{src}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {/* Date range */}
-        <Select value={dateFilter} onValueChange={setDate}>
-          <SelectTrigger
-            data-testid="leads-date-filter"
-            className="h-7 text-xs w-32 shrink-0"
-            style={{ backgroundColor: 'var(--bg-elev-2)', borderColor: 'var(--stroke)', color: 'var(--text-muted)' }}
-          >
-            <SelectValue placeholder="All time" />
-          </SelectTrigger>
-          <SelectContent style={{ backgroundColor: 'var(--bg-elev-2)', borderColor: 'var(--stroke)' }}>
-            {DATE_OPTIONS.map(o => (
-              <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {/* Clear */}
-        {(activeFilters > 0 || search) && (
-          <button
-            onClick={clearFilters}
-            className="flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors duration-150 shrink-0"
-            style={{ color: 'var(--text-dim)', border: '1px solid var(--stroke)', backgroundColor: 'transparent' }}
-          >
-            <X size={11} />
-            Clear
-          </button>
-        )}
-
-        <div className="ml-auto shrink-0">
-          <Badge
-            variant="secondary"
-            className="text-xs font-mono px-2"
-            style={{ backgroundColor: 'var(--bg-elev-2)', border: '1px solid var(--stroke)', color: 'var(--text-muted)' }}
-          >
-            {filtered.length} result{filtered.length !== 1 ? 's' : ''}
-          </Badge>
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="flex-1 overflow-auto px-6 py-5">
-        <ContactsTable
-          contacts={filtered}
-          loading={loading}
-          initialLoad={initialLoad}
-          onSelectContact={onSelectContact}
-          onCopyScript={handleCopyScript}
-          onBulkDelete={onBulkDelete}
-          hideSearch
-        />
       </div>
     </div>
   );
