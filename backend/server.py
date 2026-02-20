@@ -1252,6 +1252,7 @@ async def track_lead(data: LeadCreate, request: Request):
         }, now, ip)
         await _session_auto_stitch(eid, data.session_id, now)
         await _ip_auto_stitch(eid, ip, now)
+        asyncio.create_task(_run_automations(eid))
         return {"status": "ok", "contact_id": data.contact_id}
     except Exception as e:
         logger.error(f"Error tracking lead: {e}")
@@ -1274,6 +1275,7 @@ async def track_registration(data: RegistrationCreate, request: Request):
             await _log_visit(eid, data.session_id, data.current_url, data.referrer_url, data.page_title or "Registration", data.attribution, now, ip)
         await _session_auto_stitch(eid, data.session_id, now)
         await _ip_auto_stitch(eid, ip, now)
+        asyncio.create_task(_run_automations(eid))
         return {"status": "ok", "contact_id": data.contact_id}
     except Exception as e:
         logger.error(f"Error tracking registration: {e}")
