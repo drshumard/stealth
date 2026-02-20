@@ -3,7 +3,7 @@ import '@/App.css';
 import { BrowserRouter, Routes, Route, useSearchParams } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
-import { Sidebar } from '@/components/Sidebar';
+import { TopNav } from '@/components/TopNav';
 import AnalyticsPage from '@/components/AnalyticsPage';
 import LeadsPage from '@/components/LeadsPage';
 import VisitorsPage from '@/components/VisitorsPage';
@@ -51,73 +51,58 @@ function AppShell() {
     return () => clearInterval(t);
   }, [fetchContacts, fetchStats]);
 
-  const handleRefresh        = () => { fetchContacts(); fetchStats(); };
-  const handleSelectContact  = (id) => setSearchParams({ contact: id });
-  const handleCloseModal     = () => setSearchParams({});
+  const handleRefresh       = () => { fetchContacts(); fetchStats(); };
+  const handleSelectContact = (id) => setSearchParams({ contact: id });
+  const handleCloseModal    = () => setSearchParams({});
 
   const handleDeleteContact = async (contactId) => {
     try {
       const res = await fetch(`${API}/contacts/${contactId}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Delete failed');
+      if (!res.ok) throw new Error();
       setContacts(prev => prev.filter(c => c.contact_id !== contactId));
       fetchStats();
       toast.success('Contact deleted');
-    } catch {
-      toast.error('Failed to delete contact');
-    }
+    } catch { toast.error('Failed to delete contact'); }
   };
 
-  const handleBulkDelete = async (contactIds) => {
-    if (!contactIds?.length) return;
+  const handleBulkDelete = async (ids) => {
+    if (!ids?.length) return;
     try {
       const results = await Promise.allSettled(
-        contactIds.map(id => fetch(`${API}/contacts/${id}`, { method: 'DELETE' }))
+        ids.map(id => fetch(`${API}/contacts/${id}`, { method: 'DELETE' }))
       );
       const ok = results.filter(r => r.status === 'fulfilled' && r.value.ok).length;
-      setContacts(prev => prev.filter(c => !contactIds.includes(c.contact_id)));
+      setContacts(prev => prev.filter(c => !ids.includes(c.contact_id)));
       fetchStats();
       toast.success(`${ok} contact${ok !== 1 ? 's' : ''} deleted`);
-    } catch {
-      toast.error('Bulk delete failed');
-    }
+    } catch { toast.error('Bulk delete failed'); }
   };
 
-  const sharedProps = {
-    contacts, loading, initialLoad, stats,
-    onRefresh: handleRefresh,
-    onSelectContact: handleSelectContact,
-    onDeleteContact: handleDeleteContact,
-    onBulkDelete: handleBulkDelete,
-  };
+  const shared = { contacts, loading, initialLoad, stats, onRefresh: handleRefresh, onSelectContact: handleSelectContact, onDeleteContact: handleDeleteContact, onBulkDelete: handleBulkDelete };
 
   return (
-    <div
-      className="flex h-screen overflow-hidden noise-overlay"
-      style={{ backgroundColor: 'var(--bg)' }}
-    >
+    <div className="app-canvas">
       <Toaster
         position="top-right"
         toastOptions={{
           style: {
-            backgroundColor: 'var(--bg-elev-2)',
-            border: '1px solid var(--stroke)',
-            color: 'var(--text)',
+            backgroundColor: '#ffffff',
+            border: '1px solid #e5e7eb',
+            color: '#111827',
             fontFamily: 'Work Sans, sans-serif',
+            boxShadow: '0 4px 12px rgba(17,24,39,0.1)',
           },
         }}
       />
-
-      <Sidebar />
-
-      <div className="flex-1 overflow-hidden">
+      <div className="main-card">
+        <TopNav stats={stats} />
         <Routes>
-          <Route path="/"          element={<LeadsPage    {...sharedProps} />} />
-          <Route path="/visitors"  element={<VisitorsPage {...sharedProps} />} />
+          <Route path="/"          element={<LeadsPage    {...shared} />} />
+          <Route path="/visitors"  element={<VisitorsPage {...shared} />} />
           <Route path="/analytics" element={<AnalyticsPage stats={stats} contacts={contacts} />} />
           <Route path="/logs"      element={<LogsPage />} />
         </Routes>
       </div>
-
       <ContactDetailModal
         contactId={selectedContactId}
         open={modalOpen}

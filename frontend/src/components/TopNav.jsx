@@ -1,145 +1,112 @@
-import { useState } from 'react';
-import { RefreshCw, Radio, Copy, Check, Zap } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Users, Globe, BarChart3, List, Search, Bell, ChevronDown, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { toast } from 'sonner';
 
-export const TopNav = ({ onRefresh, loading, contactCount, todayVisits }) => {
-  const [copied, setCopied] = useState(false);
+const NAV_TABS = [
+  { id: 'leads',     label: 'Leads',     icon: Users,     path: '/' },
+  { id: 'visitors',  label: 'Visitors',  icon: Globe,     path: '/visitors' },
+  { id: 'analytics', label: 'Analytics', icon: BarChart3, path: '/analytics' },
+  { id: 'logs',      label: 'Logs',      icon: List,      path: '/logs' },
+];
 
-  const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
-  const scriptTag = `<script src="${backendUrl}/api/tracker.js"><\/script>`;
+export const TopNav = ({ stats }) => {
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  const handleCopyScript = () => {
-    navigator.clipboard.writeText(scriptTag).then(() => {
-      setCopied(true);
-      toast.success('Script tag copied!', {
-        description: 'Paste it in the <head> of your webinar page.',
-        duration: 3000,
-      });
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
+  const active =
+    location.pathname === '/analytics' ? 'analytics' :
+    location.pathname === '/visitors'  ? 'visitors'  :
+    location.pathname === '/logs'      ? 'logs'      : 'leads';
 
   return (
     <header
       data-testid="top-nav"
-      className="sticky top-0 z-50 border-b"
-      style={{
-        backgroundColor: 'var(--bg-elev-1)',
-        borderColor: 'var(--stroke)',
-        backdropFilter: 'blur(12px)',
-      }}
+      className="flex items-center justify-between px-6 py-3 border-b"
+      style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff' }}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-4">
-          {/* Brand */}
-          <div className="flex items-center gap-3">
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center"
-              style={{ backgroundColor: 'var(--primary-cyan)', color: 'var(--bg)' }}
-            >
-              <Zap size={16} strokeWidth={2.5} />
-            </div>
-            <div>
-              <h1
-                className="text-sm font-semibold tracking-tight"
-                style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--text)' }}
-              >
-                StealthTrack
-              </h1>
-              <p className="text-xs" style={{ color: 'var(--text-dim)' }}>Lead Attribution</p>
-            </div>
+      {/* Left: brand + tabs */}
+      <div className="flex items-center gap-6">
+        {/* Brand */}
+        <div className="flex items-center gap-2 shrink-0 mr-2">
+          <div
+            className="w-7 h-7 rounded-lg flex items-center justify-center"
+            style={{ backgroundColor: 'var(--primary-orange)' }}
+          >
+            <Zap size={13} className="text-white" />
           </div>
-
-          {/* Center stats */}
-          <div className="hidden md:flex items-center gap-6">
-            <div className="text-center">
-              <div
-                className="text-lg font-semibold [font-variant-numeric:tabular-nums]"
-                style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--text)' }}
-              >
-                {contactCount}
-              </div>
-              <div className="text-xs" style={{ color: 'var(--text-dim)' }}>Contacts</div>
-            </div>
-            <div
-              className="w-px h-8"
-              style={{ backgroundColor: 'var(--stroke)' }}
-            />
-            <div className="text-center">
-              <div
-                className="text-lg font-semibold [font-variant-numeric:tabular-nums]"
-                style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--text)' }}
-              >
-                {todayVisits}
-              </div>
-              <div className="text-xs" style={{ color: 'var(--text-dim)' }}>Today's Events</div>
-            </div>
-          </div>
-
-          {/* Right actions */}
-          <div className="flex items-center gap-2">
-            {/* Live status pill */}
-            <div
-              data-testid="live-status-pill"
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium"
-              style={{
-                backgroundColor: 'rgba(69, 209, 156, 0.1)',
-                border: '1px solid rgba(69, 209, 156, 0.2)',
-                color: 'var(--mint-success)',
-              }}
-            >
-              <span
-                data-testid="live-event-pulse"
-                className="inline-block w-1.5 h-1.5 rounded-full pulse-dot"
-                style={{ backgroundColor: 'var(--mint-success)' }}
-              />
-              Active
-            </div>
-
-            {/* Refresh */}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    data-testid="refresh-contacts-button"
-                    variant="outline"
-                    size="sm"
-                    onClick={onRefresh}
-                    disabled={loading}
-                    className="h-8 w-8 p-0"
-                    style={{
-                      backgroundColor: 'var(--bg-elev-2)',
-                      borderColor: 'var(--stroke)',
-                      color: 'var(--text-muted)',
-                    }}
-                    aria-label="Refresh contacts"
-                  >
-                    <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Refresh contacts</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            {/* Copy Script */}
-            <Button
-              data-testid="copy-script-button"
-              size="sm"
-              onClick={handleCopyScript}
-              className="h-8 gap-1.5 text-xs font-medium transition-colors duration-200"
-              style={{
-                backgroundColor: copied ? 'var(--mint-success)' : 'var(--primary-cyan)',
-                color: 'var(--bg)',
-              }}
-            >
-              {copied ? <Check size={13} /> : <Copy size={13} />}
-              {copied ? 'Copied' : 'Copy Script'}
-            </Button>
-          </div>
+          <span
+            className="text-sm font-bold tracking-tight hidden sm:block"
+            style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--text)' }}
+          >
+            Shumard
+          </span>
         </div>
+
+        {/* Tabs */}
+        <nav className="flex items-center gap-1 overflow-x-auto">
+          {NAV_TABS.map(({ id, label, icon: Icon, path }) => {
+            const isActive = active === id;
+            return (
+              <button
+                key={id}
+                data-testid={`top-nav-tab-${id}`}
+                onClick={() => navigate(path)}
+                className={`flex items-center gap-2 px-4 py-1.5 text-sm whitespace-nowrap transition-all duration-150 ${
+                  isActive ? 'nav-tab-active' : 'nav-tab-inactive'
+                }`}
+                style={{ fontFamily: 'Work Sans, sans-serif' }}
+              >
+                <Icon size={14} />
+                {label}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
+      {/* Right: actions + user */}
+      <div className="flex items-center gap-2 shrink-0">
+        <Button
+          data-testid="top-nav-search-button"
+          variant="ghost" size="sm"
+          className="w-8 h-8 p-0 rounded-full"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          <Search size={16} />
+        </Button>
+        <Button
+          data-testid="top-nav-notifications-button"
+          variant="ghost" size="sm"
+          className="w-8 h-8 p-0 rounded-full relative"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          <Bell size={16} />
+          {stats?.today_visits > 0 && (
+            <span
+              className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full"
+              style={{ backgroundColor: 'var(--primary-orange)' }}
+            />
+          )}
+        </Button>
+
+        {/* User section */}
+        <button
+          data-testid="top-nav-user-menu"
+          className="flex items-center gap-2.5 ml-1 px-2 py-1.5 rounded-xl transition-colors duration-150"
+          style={{ color: 'var(--text)' }}
+        >
+          <div
+            className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+            style={{ backgroundColor: 'var(--primary-orange)' }}
+          >
+            S
+          </div>
+          <div className="text-left hidden md:block">
+            <div className="text-xs font-semibold leading-tight" style={{ color: 'var(--text)' }}>Shumard</div>
+            <div className="text-xs leading-tight" style={{ color: 'var(--text-muted)' }}>Lead Tracking</div>
+          </div>
+          <ChevronDown size={14} style={{ color: 'var(--text-dim)' }} />
+        </button>
       </div>
     </header>
   );
