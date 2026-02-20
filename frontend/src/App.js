@@ -70,6 +70,19 @@ function Dashboard() {
     setSearchParams({});
   };
 
+  const handleDeleteContact = async (contactId) => {
+    try {
+      const res = await fetch(`${API}/contacts/${contactId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Delete failed');
+      // Remove from local state immediately (optimistic)
+      setContacts(prev => prev.filter(c => c.contact_id !== contactId));
+      fetchStats();
+      toast.success('Contact deleted');
+    } catch {
+      toast.error('Failed to delete contact');
+    }
+  };
+
   const handleCopyScript = () => {
     const scriptTag = `<script src="${BACKEND_URL}/api/tracker.js"></script>`;
     navigator.clipboard.writeText(scriptTag).then(() => {
