@@ -1,74 +1,58 @@
 import { useState, useEffect, useCallback } from 'react';
 import '@/App.css';
-import { BrowserRouter, useNavigate, useSearchParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useSearchParams } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
-import { TopNav } from '@/components/TopNav';
-import { ScriptEmbedCard } from '@/components/ScriptEmbedCard';
-import { ContactsTable } from '@/components/ContactsTable';
-import { ContactDetailModal } from '@/components/ContactDetailModal';
 import { toast } from 'sonner';
+import { Sidebar } from '@/components/Sidebar';
+import AnalyticsPage from '@/components/AnalyticsPage';
+import LeadsPage from '@/components/LeadsPage';
+import LogsPage from '@/components/LogsPage';
+import { ContactDetailModal } from '@/components/ContactDetailModal';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
 const API = `${BACKEND_URL}/api`;
 
-function Dashboard() {
+function AppShell() {
   const [contacts, setContacts] = useState([]);
   const [stats, setStats] = useState({ total_contacts: 0, total_visits: 0, today_visits: 0 });
-  const [initialLoad, setInitialLoad] = useState(true); // true only until first fetch completes
-  const [loading, setLoading] = useState(false); // background refresh indicator
+  const [initialLoad, setInitialLoad] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
 
   const selectedContactId = searchParams.get('contact');
   const modalOpen = !!selectedContactId;
 
-  const fetchContacts = useCallback(async (showToast = false) => {
+  const fetchContacts = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`${API}/contacts`);
-      if (!res.ok) throw new Error('Failed to fetch contacts');
-      const data = await res.json();
-      setContacts(data);
-      if (showToast) toast.success('Contacts refreshed');
-    } catch (e) {
+      if (!res.ok) throw new Error('Failed');
+      setContacts(await res.json());
+    } catch {
       toast.error('Failed to load contacts');
     } finally {
       setLoading(false);
-      setInitialLoad(false); // first load done — never show skeletons again
+      setInitialLoad(false);
     }
   }, []);
 
   const fetchStats = useCallback(async () => {
     try {
       const res = await fetch(`${API}/stats`);
-      if (!res.ok) return;
-      const data = await res.json();
-      setStats(data);
+      if (res.ok) setStats(await res.json());
     } catch {}
   }, []);
 
   useEffect(() => {
     fetchContacts();
     fetchStats();
-    const interval = setInterval(() => {
-      fetchContacts();
-      fetchStats();
-    }, 15000);
-    return () => clearInterval(interval);
+    const t = setInterval(() => { fetchContacts(); fetchStats(); }, 15000);
+    return () => clearInterval(t);
   }, [fetchContacts, fetchStats]);
 
-  const handleRefresh = () => {
-    fetchContacts(true);
-    fetchStats();
-  };
-
-  const handleSelectContact = (contactId) => {
-    setSearchParams({ contact: contactId });
-  };
-
-  const handleCloseModal = () => {
-    setSearchParams({});
-  };
+  const handleRefresh = () => { fetchContacts(); fetchStats(); };
+  const handleSelectContact = (id) => setSearchParams({ contact: id });
+  const handleCloseModal   = () => setSearchParams({});
 
   const handleDeleteContact = async (contactId) => {
     try {
@@ -83,39 +67,25 @@ function Dashboard() {
   };
 
   const handleBulkDelete = async (contactIds) => {
-    if (!contactIds || contactIds.length === 0) return;
+    if (!contactIds?.length) return;
     try {
-      // Fire all deletes in parallel
       const results = await Promise.allSettled(
         contactIds.map(id => fetch(`${API}/contacts/${id}`, { method: 'DELETE' }))
       );
-      const succeeded = results.filter(r => r.status === 'fulfilled' && r.value.ok).length;
-      const failed = contactIds.length - succeeded;
-      // Optimistic: remove all targeted from state
+      const ok = results.filter(r => r.status === 'fulfilled' && r.value.ok).length;
       setContacts(prev => prev.filter(c => !contactIds.includes(c.contact_id)));
       fetchStats();
-      if (failed === 0) {
-        toast.success(`${succeeded} contact${succeeded !== 1 ? 's' : ''} deleted`);
-      } else {
-        toast.warning(`${succeeded} deleted, ${failed} failed`);
-      }
+      toast.success(`${ok} contact${ok !== 1 ? 's' : ''} deleted`);
     } catch {
       toast.error('Bulk delete failed');
     }
   };
 
-  const handleCopyScript = () => {
-    const scriptTag = `<script src="${BACKEND_URL}/api/shumard.js"></script>`;
-    navigator.clipboard.writeText(scriptTag).then(() => {
-      toast.success('Script tag copied!', {
-        description: 'Paste it in the <head> of your webinar page.',
-        duration: 3000,
-      });
-    });
-  };
-
   return (
-    <div className="App ambient-glow noise-overlay" style={{ minHeight: '100vh', backgroundColor: 'var(--bg)' }}>
+    <div
+      className="flex h-screen overflow-hidden noise-overlay"
+      style={{ backgroundColor: 'var(--bg)' }}
+    >
       <Toaster
         position="top-right"
         toastOptions={{
@@ -128,45 +98,32 @@ function Dashboard() {
         }}
       />
 
-      <TopNav
-        onRefresh={handleRefresh}
-        loading={loading}
-        contactCount={stats.total_contacts}
-        todayVisits={stats.today_visits}
-      />
+      <Sidebar />
 
-      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        <ScriptEmbedCard />
-
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <h2
-              className="text-base font-semibold"
-              style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--text)' }}
-            >
-              Contacts
-            </h2>
-            <span
-              className="text-xs px-2 py-0.5 rounded-full font-mono"
-              style={{
-                backgroundColor: 'rgba(21,184,200,0.1)',
-                color: 'var(--primary-cyan)',
-                border: '1px solid rgba(21,184,200,0.2)',
-              }}
-            >
-              {contacts.length}
-            </span>
-          </div>
-          <ContactsTable
-            contacts={contacts}
-            loading={loading}
-            initialLoad={initialLoad}
-            onSelectContact={handleSelectContact}
-            onCopyScript={handleCopyScript}
-            onBulkDelete={handleBulkDelete}
+      <div className="flex-1 overflow-hidden">
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <LeadsPage
+                contacts={contacts}
+                loading={loading}
+                initialLoad={initialLoad}
+                stats={stats}
+                onRefresh={handleRefresh}
+                onSelectContact={handleSelectContact}
+                onDeleteContact={handleDeleteContact}
+                onBulkDelete={handleBulkDelete}
+              />
+            }
           />
-        </div>
-      </main>
+          <Route
+            path="/analytics"
+            element={<AnalyticsPage stats={stats} contacts={contacts} />}
+          />
+          <Route path="/logs" element={<LogsPage />} />
+        </Routes>
+      </div>
 
       <ContactDetailModal
         contactId={selectedContactId}
@@ -181,7 +138,7 @@ function Dashboard() {
 export default function App() {
   return (
     <BrowserRouter>
-      <Dashboard />
+      <AppShell />
     </BrowserRouter>
   );
 }
