@@ -1443,6 +1443,118 @@ async def get_logs(limit: int = 200):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
+# ─────────────────────────── Automations CRUD ───────────────────────────
+
+@api_router.get("/automations", response_model=List[AutomationOut])
+async def list_automations():
+    try:
+        docs = await db.automations.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
+        result = []
+        for d in docs:
+            d['created_at'] = str_to_dt(d.get('created_at'))
+            d['updated_at'] = str_to_dt(d.get('updated_at'))
+            if d.get('last_triggered_at'):
+                d['last_triggered_at'] = str_to_dt(d['last_triggered_at'])
+            result.append(AutomationOut(**d))
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/automations", response_model=AutomationOut, status_code=201)
+async def create_automation(data: AutomationCreate):
+    try:
+        now = datetime.now(timezone.utc)
+        doc = {
+            "id": str(uuid.uuid4()),
+            "name": data.name,
+            "enabled": data.enabled,
+            "webhook_url": data.webhook_url,
+            "filters": [f.model_dump() for f in data.filters],
+            "field_map": [m.model_dump() for m in data.field_map],
+            "custom_headers": data.custom_headers or {},
+            "created_at": dt_to_str(now),
+            "updated_at": dt_to_str(now),
+            "last_triggered_at": None,
+            "trigger_count": 0,
+        }
+        await db.automations.insert_one(doc)
+        doc['created_at'] = now
+        doc['updated_at'] = now
+        return AutomationOut(**doc)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/automations/{auto_id}", response_model=AutomationOut)
+async def update_automation(auto_id: str, data: AutomationUpdate):
+    try:
+        existing = await db.automations.find_one({"id": auto_id}, {"_id": 0})
+        if not existing:
+            raise HTTPException(status_code=404, detail="Automation not found")
+        now = datetime.now(timezone.utc)
+        update: dict = {"updated_at": dt_to_str(now)}
+        if data.name        is not None: update["name"]           = data.name
+        if data.enabled     is not None: update["enabled"]        = data.enabled
+        if data.webhook_url is not None: update["webhook_url"]    = data.webhook_url
+        if data.filters     is not None: update["filters"]        = [f.model_dump() for f in data.filters]
+        if data.field_map   is not None: update["field_map"]      = [m.model_dump() for m in data.field_map]
+        if data.custom_headers is not None: update["custom_headers"] = data.custom_headers
+        await db.automations.update_one({"id": auto_id}, {"$set": update})
+        doc = await db.automations.find_one({"id": auto_id}, {"_id": 0})
+        doc['created_at'] = str_to_dt(doc['created_at'])
+        doc['updated_at'] = str_to_dt(doc['updated_at'])
+        if doc.get('last_triggered_at'):
+            doc['last_triggered_at'] = str_to_dt(doc['last_triggered_at'])
+        return AutomationOut(**doc)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.delete("/automations/{auto_id}", status_code=204)
+async def delete_automation(auto_id: str):
+    result = await db.automations.delete_one({"id": auto_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Automation not found")
+
+
+@api_router.post("/automations/{auto_id}/test")
+async def test_automation(auto_id: str):
+    """Send a test payload using the latest identified contact."""
+    auto = await db.automations.find_one({"id": auto_id}, {"_id": 0})
+    if not auto:
+        raise HTTPException(status_code=404, detail="Automation not found")
+    # Find the most recent identified contact to use as test data
+    contact = await db.contacts.find_one(
+        {"merged_into": None, "$or": [{"email": {"$exists": True, "$ne": None}},
+                                      {"phone": {"$exists": True, "$ne": None}}]},
+        {"_id": 0}
+    )
+    if not contact:
+        # Use a synthetic sample
+        contact = {
+            "contact_id": "test-" + str(uuid.uuid4())[:8],
+            "email": "test@example.com", "name": "Test Lead",
+            "phone": "+1-555-0100",
+            "attribution": {"utm_source": "facebook", "utm_campaign": "test"},
+            "created_at": dt_to_str(datetime.now(timezone.utc)),
+        }
+    payload = _build_webhook_payload(contact, auto.get('field_map', []))
+    payload['_tether_test'] = True
+    hdrs = {"Content-Type": "application/json"}
+    if auto.get('custom_headers'):
+        hdrs.update(auto['custom_headers'])
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(auto['webhook_url'], json=payload, headers=hdrs)
+        return {"status": "ok", "http_status": resp.status_code, "payload": payload}
+    except Exception as e:
+        return {"status": "error", "error": str(e), "payload": payload}
+
+
 # ─────────────────────────── Startup: create indexes ───────────────────────────
 
 @app.on_event("startup")
