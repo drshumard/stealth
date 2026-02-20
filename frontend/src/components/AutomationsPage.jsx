@@ -367,6 +367,13 @@ export default function AutomationsPage() {
         onClose={() => { setBuilderOpen(false); setEditingAuto(null); }}
         onSave={handleSave}
       />
+
+      {/* Runs sheet */}
+      <AutomationRuns
+        open={!!runsAuto}
+        automation={runsAuto}
+        onClose={() => setRunsAuto(null)}
+      />
     </div>
   );
 }
