@@ -416,28 +416,71 @@ export function AutomationBuilder({ open, automation, onClose, onSave }) {
           {/* Test result */}
           {testResult && (
             <div
-              className="rounded-2xl border p-4 mb-4"
+              className="rounded-2xl border overflow-hidden mb-4"
               style={{
-                backgroundColor: testResult.status === 'ok' ? '#ecfdf5' : '#fef2f2',
-                borderColor: testResult.status === 'ok' ? '#a7f3d0' : '#fecaca',
+                backgroundColor: testResult.success ? '#ecfdf5' : '#fef2f2',
+                borderColor:     testResult.success ? '#a7f3d0' : '#fecaca',
               }}
             >
-              <div className="flex items-center gap-2 mb-2">
-                {testResult.status === 'ok'
+              {/* Result header */}
+              <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: `1px solid ${testResult.success ? '#a7f3d0' : '#fecaca'}` }}>
+                {testResult.success
                   ? <CheckCircle2 size={16} style={{ color: '#059669' }} />
                   : <AlertTriangle size={16} style={{ color: '#dc2626' }} />}
-                <span className="text-sm font-bold" style={{ color: testResult.status === 'ok' ? '#065f46' : '#991b1b' }}>
-                  {testResult.status === 'ok' ? `Test sent → HTTP ${testResult.http_status}` : `Error: ${testResult.error}`}
+                <span className="text-sm font-bold flex-1" style={{ color: testResult.success ? '#065f46' : '#991b1b' }}>
+                  {testResult.success ? `Test sent successfully` : `Test failed`}
                 </span>
+                {testResult.http_status && (
+                  <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ backgroundColor: testResult.success ? '#d1fae5' : '#fee2e2', color: testResult.success ? '#065f46' : '#991b1b' }}>
+                    HTTP {testResult.http_status}
+                  </span>
+                )}
+                {testResult.duration_ms !== undefined && (
+                  <span className="text-xs" style={{ color: testResult.success ? '#065f46' : '#991b1b', opacity: 0.7 }}>
+                    {testResult.duration_ms}ms
+                  </span>
+                )}
               </div>
-              {testResult.payload && (
-                <pre
-                  className="text-xs overflow-auto rounded-lg p-3 max-h-48"
-                  style={{ backgroundColor: 'rgba(0,0,0,0.05)', fontFamily: 'IBM Plex Mono, monospace', color: testResult.status === 'ok' ? '#065f46' : '#991b1b' }}
-                >
-                  {JSON.stringify(testResult.payload, null, 2)}
-                </pre>
+
+              {/* Error */}
+              {testResult.error && (
+                <div className="px-4 py-3" style={{ borderBottom: '1px solid #fecaca' }}>
+                  <p className="text-xs font-bold mb-1" style={{ color: '#991b1b' }}>Error</p>
+                  <code className="text-xs" style={{ fontFamily: 'IBM Plex Mono, monospace', color: '#991b1b' }}>{testResult.error}</code>
+                </div>
               )}
+
+              {/* Two columns: payload + response */}
+              <div className="grid grid-cols-2 gap-0 divide-x" style={{ borderColor: testResult.success ? '#a7f3d0' : '#fecaca' }}>
+                <div className="p-4">
+                  <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: testResult.success ? '#065f46' : '#991b1b', opacity: 0.7 }}>
+                    Payload Sent
+                  </p>
+                  <pre
+                    className="text-xs overflow-auto rounded-lg p-2.5 max-h-40"
+                    style={{ backgroundColor: 'rgba(0,0,0,0.06)', fontFamily: 'IBM Plex Mono, monospace', color: testResult.success ? '#065f46' : '#991b1b', lineHeight: 1.5 }}
+                  >
+                    {JSON.stringify(testResult.payload, null, 2)}
+                  </pre>
+                </div>
+                <div className="p-4">
+                  <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: testResult.success ? '#065f46' : '#991b1b', opacity: 0.7 }}>
+                    Response
+                  </p>
+                  {testResult.response_body ? (
+                    <pre
+                      className="text-xs overflow-auto rounded-lg p-2.5 max-h-40"
+                      style={{ backgroundColor: 'rgba(0,0,0,0.06)', fontFamily: 'IBM Plex Mono, monospace', color: testResult.success ? '#065f46' : '#991b1b', lineHeight: 1.5 }}
+                    >
+                      {(() => { try { return JSON.stringify(JSON.parse(testResult.response_body), null, 2); } catch { return testResult.response_body; } })()}
+                    </pre>
+                  ) : (
+                    <div className="rounded-lg p-2.5 text-xs" style={{ backgroundColor: 'rgba(0,0,0,0.06)', color: testResult.success ? '#065f46' : '#991b1b', opacity: 0.6 }}>
+                      Empty response body
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>
