@@ -372,7 +372,7 @@ async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = 
         await db.contacts.update_one({"contact_id": cid}, {"$set": update})
     else:
         # Only create a new contact if it has identity OR meaningful attribution.
-        # Pure anonymous page loads (no UTMs, no email) are skipped — their visits
+        # Pure anonymous page loads (no UTMs, no email) are skipped -- their visits
         # are still logged in page_visits and will be attached once identified.
         has_identity = any(data.get(f) for f in ['name', 'email', 'phone', 'first_name', 'last_name'])
         raw_attr = data.get('attribution') or {}
@@ -445,11 +445,11 @@ async def _do_stitch(parent_id: str, child_id: str, now: datetime) -> dict:
     if not parent or not child:
         return {"status": "not_found"}
 
-    # Already merged into the CORRECT parent — idempotent
+    # Already merged into the CORRECT parent -- idempotent
     if child.get('merged_into') == parent_id:
         return {"status": "already_merged", "merged_into": parent_id}
 
-    # Already merged into a DIFFERENT parent — un-merge first, then re-merge
+    # Already merged into a DIFFERENT parent -- un-merge first, then re-merge
     if child.get('merged_into') and child.get('merged_into') != parent_id:
         old_parent_id = child['merged_into']
         logger.info(f"Re-stitching: removing {child_id} from {old_parent_id}, adding to {parent_id}")
@@ -482,12 +482,12 @@ async def _do_stitch(parent_id: str, child_id: str, now: datetime) -> dict:
     parent_attr = parent.get('attribution') or {}
     if isinstance(child_attr, dict) and child_attr:
         if not parent_attr or not isinstance(parent_attr, dict):
-            # Parent has no attribution — set the whole child attribution at once
+            # Parent has no attribution -- set the whole child attribution at once
             built = safe_attribution(child_attr)
             if built:
                 parent_update['attribution'] = strip_nulls(built.model_dump())
         else:
-            # Parent already has attribution — patch missing fields individually
+            # Parent already has attribution -- patch missing fields individually
             for k, v in child_attr.items():
                 if k == 'extra' and isinstance(v, dict):
                     existing_extra = parent_attr.get('extra')
@@ -495,7 +495,7 @@ async def _do_stitch(parent_id: str, child_id: str, now: datetime) -> dict:
                                  if ev and (not isinstance(existing_extra, dict) or not existing_extra.get(ek))}
                     if new_extra:
                         if not isinstance(existing_extra, dict):
-                            # extra is null — set whole object, not individual sub-fields
+                            # extra is null -- set whole object, not individual sub-fields
                             parent_update['attribution.extra'] = new_extra
                         else:
                             for ek, ev in new_extra.items():
@@ -568,12 +568,12 @@ async def _session_auto_stitch(contact_id: str, session_id: Optional[str], now: 
         elif cand_attr and not c_attr:
             await _do_stitch(candidate['contact_id'], contact_id, now)
         elif c_ident and not cand_ident:
-            # current has identity, candidate doesn't — current is parent
+            # current has identity, candidate doesn't -- current is parent
             await _do_stitch(contact_id, candidate['contact_id'], now)
         elif cand_ident and not c_ident:
             await _do_stitch(candidate['contact_id'], contact_id, now)
         else:
-            # Both have similar data — merge newer into older
+            # Both have similar data -- merge newer into older
             c_time   = current.get('created_at') or ''
             cand_time = candidate.get('created_at') or ''
             if c_time <= cand_time:
@@ -595,12 +595,12 @@ async def _ip_auto_stitch(contact_id: str, client_ip: Optional[str], now: dateti
     Auto-stitch contacts that share the same IP within a 30-minute window.
 
     Two stitching rules (in priority order):
-    1. Identity cross-match  — one side has attribution AND the other has email/phone.
-    2. Iframe companion rule — one side has REAL attribution (UTMs/click-IDs) AND the
+    1. Identity cross-match  -- one side has attribution AND the other has email/phone.
+    2. Iframe companion rule -- one side has REAL attribution (UTMs/click-IDs) AND the
        other is completely anonymous (no real attribution, no identity).
        This handles the common pattern where drshumardworkshop.com/register (landing page
-       with FB attribution) loads joinnow.live/embed/… as an iframe.  The iframe contact
-       has no UTMs (only possibly an extra param like ?layout=…) but is provably the same
+       with FB attribution) loads joinnow.live/embed/... as an iframe.  The iframe contact
+       has no UTMs (only possibly an extra param like ?layout=...) but is provably the same
        person because (a) joinnow is only reachable as an iframe on drshumardworkshop, and
        (b) they share the same IP with sub-minute timing.
     """
@@ -645,7 +645,7 @@ async def _ip_auto_stitch(contact_id: str, client_ip: Optional[str], now: dateti
             await _do_stitch(candidate['contact_id'], contact_id, now)
             break
 
-        # ── Rule 2: iframe companion — attribution-rich + completely anonymous ──
+        # ── Rule 2: iframe companion -- attribution-rich + completely anonymous ──
         # The anonymous side has no real UTMs and no identity (likely an iframe
         # companion).  Since joinnow.live is only accessible as an iframe on the
         # landing page, sharing an IP is definitive proof they're the same person.
@@ -1011,7 +1011,7 @@ def build_tracker_js(backend_url: str) -> str:
       var parts = [];
       if (email) parts.push('email: ' + email);
       if (phone) parts.push('phone: ' + phone);
-      logger('Contact captured — ' + parts.join(' | '));
+      logger('Contact captured -- ' + parts.join(' | '));
     }
     send('/track/lead', buildPayload(fields));
   }
@@ -1021,11 +1021,11 @@ def build_tracker_js(backend_url: str) -> str:
     if (fields && fields.email) parts.push('email: ' + fields.email);
     if (fields && fields.phone) parts.push('phone: ' + fields.phone);
     if (fields && fields.name)  parts.push('name: ' + fields.name);
-    if (parts.length) logger('Contact captured — ' + parts.join(' | '));
+    if (parts.length) logger('Contact captured -- ' + parts.join(' | '));
     send('/track/registration', buildPayload(fields));
   }
 
-  /* ─── Stitch is now backend-only — function kept as no-op for public API compat ─── */
+  /* ─── Stitch is now backend-only -- function kept as no-op for public API compat ─── */
   function sendStitch() { /* backend handles all stitching via session_id */ }
 
   function logger(msg, data) {
@@ -1072,7 +1072,7 @@ def build_tracker_js(backend_url: str) -> str:
     if (!e.data || typeof e.data !== 'object') return;
 
     /*
-     * iframe receives parent session_id — adopt it so the backend can stitch
+     * iframe receives parent session_id -- adopt it so the backend can stitch
      * the two contacts together via _session_auto_stitch when a lead/registration
      * comes in.  No HTTP request is made here; stitching is purely backend-driven.
      */
