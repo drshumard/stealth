@@ -1,14 +1,14 @@
 [
   {
     "content": "Rebuild tracker.js mimicking Hyros architecture (IIFE, session-ID, change events, UTM/attribution, cookie persistence, special class names)",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Update backend to support session-ID header, attribution fields (UTM params, fbclid, gclid), richer data model",
-    "status": "pending"
+    "status": "completed"
   },
   {
-    "content": "Fix frontend modal click issue & re-test",
-    "status": "pending"
+    "content": "Update frontend: attribution tab in modal, fix modal click using URL routing",
+    "status": "in_progress"
   }
 ]
