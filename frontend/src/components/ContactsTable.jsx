@@ -100,25 +100,27 @@ export const ContactsTable = ({ contacts, loading, initialLoad, onSelectContact,
 
   return (
     <div>
-      {/* Controls */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-dim)' }} />
-          <Input
-            data-testid="contacts-table-search-input"
-            placeholder="Search by name, email or phone…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-9 h-9 text-sm border"
-            style={{ backgroundColor: 'var(--bg-elev-2)', borderColor: 'var(--stroke)', color: 'var(--text)' }}
-          />
+      {/* Controls — hidden when parent provides its own filters */}
+      {!hideSearch && (
+        <div className="flex items-center gap-3 mb-4">
+          <div className="relative flex-1 max-w-sm">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-dim)' }} />
+            <Input
+              data-testid="contacts-table-search-input"
+              placeholder="Search by name, email or phone…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-9 h-9 text-sm border"
+              style={{ backgroundColor: 'var(--bg-elev-2)', borderColor: 'var(--stroke)', color: 'var(--text)' }}
+            />
+          </div>
+          <Badge variant="secondary" className="text-xs px-2 py-1 font-mono"
+            style={{ backgroundColor: 'var(--bg-elev-2)', borderColor: 'var(--stroke)', color: 'var(--text-muted)', border: '1px solid' }}
+          >
+            {filtered.length} contact{filtered.length !== 1 ? 's' : ''}
+          </Badge>
         </div>
-        <Badge variant="secondary" className="text-xs px-2 py-1 font-mono"
-          style={{ backgroundColor: 'var(--bg-elev-2)', borderColor: 'var(--stroke)', color: 'var(--text-muted)', border: '1px solid' }}
-        >
-          {filtered.length} contact{filtered.length !== 1 ? 's' : ''}
-        </Badge>
-      </div>
+      )}
 
       {/* Bulk action bar — slides in when items are selected */}
       {selectedCount > 0 && (
