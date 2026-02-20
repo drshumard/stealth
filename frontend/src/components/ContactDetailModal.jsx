@@ -111,7 +111,7 @@ const UrlVisitItem = ({ visit, index }) => {
   const { base: refBase, params: refParams } = parseUrlParams(visit.referrer_url || '');
 
   return (
-    <div data-testid="contact-url-row" className="relative pl-6 pb-5">
+    <div data-testid="contact-url-row" className="relative pl-6 pb-5 min-w-0">
       {/* Timeline dot */}
       <div
         className="absolute left-0 top-2 w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center"
@@ -125,15 +125,15 @@ const UrlVisitItem = ({ visit, index }) => {
         />
       </div>
 
-      <div className="rounded-lg p-3 border" style={{ backgroundColor: 'var(--bg-elev-2)', borderColor: 'var(--stroke)' }}>
+      <div className="rounded-lg p-3 border min-w-0 overflow-hidden" style={{ backgroundColor: 'var(--bg-elev-2)', borderColor: 'var(--stroke)' }}>
         {/* Timestamp + title */}
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <div className="flex items-center gap-1.5">
+        <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             <Clock size={11} style={{ color: 'var(--text-dim)' }} />
             <span className="text-xs" style={{ color: 'var(--text-dim)' }}>{formatDateTime(visit.timestamp)}</span>
           </div>
           {visit.page_title && (
-            <Badge variant="secondary" className="text-xs px-2 py-0 max-w-[160px] truncate"
+            <Badge variant="secondary" className="text-xs px-2 py-0 max-w-[160px] truncate shrink-0"
               style={{ backgroundColor: 'rgba(21,184,200,0.08)', color: 'var(--primary-cyan)', border: '1px solid rgba(21,184,200,0.15)' }}
             >
               {visit.page_title}
@@ -142,20 +142,36 @@ const UrlVisitItem = ({ visit, index }) => {
         </div>
 
         {/* Current URL */}
-        <div className="mb-2">
+        <div className="mb-2 min-w-0">
           <div className="flex items-center gap-1.5 mb-1">
-            <Globe size={11} style={{ color: 'var(--primary-cyan)' }} />
-            <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Current URL</span>
+            <Globe size={11} className="shrink-0" style={{ color: 'var(--primary-cyan)' }} />
+            <span className="text-xs font-medium shrink-0" style={{ color: 'var(--text-muted)' }}>Current URL</span>
             <CopyButton text={visit.current_url} label="Copy URL" />
           </div>
-          <div className="text-xs break-all font-mono" style={{ color: 'var(--text)', fontFamily: 'IBM Plex Mono, monospace' }}>
+          <div
+            className="text-xs font-mono"
+            style={{
+              color: 'var(--text)',
+              fontFamily: 'IBM Plex Mono, monospace',
+              wordBreak: 'break-all',
+              overflowWrap: 'anywhere',
+            }}
+          >
             {base}
           </div>
           {params.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1.5">
               {params.map(({ key, val }) => (
-                <Badge key={key} variant="secondary" className="text-xs font-mono px-1.5 py-0"
-                  style={{ backgroundColor: 'rgba(245,158,11,0.1)', color: 'var(--amber-warn)', border: '1px solid rgba(245,158,11,0.2)', fontFamily: 'IBM Plex Mono, monospace' }}
+                <Badge key={key} variant="secondary" className="text-xs font-mono px-1.5 py-0 max-w-full"
+                  style={{
+                    backgroundColor: 'rgba(245,158,11,0.1)',
+                    color: 'var(--amber-warn)',
+                    border: '1px solid rgba(245,158,11,0.2)',
+                    fontFamily: 'IBM Plex Mono, monospace',
+                    wordBreak: 'break-all',
+                    overflowWrap: 'anywhere',
+                    whiteSpace: 'normal',
+                  }}
                 >
                   {key}={val}
                 </Badge>
@@ -166,20 +182,36 @@ const UrlVisitItem = ({ visit, index }) => {
 
         {/* Referrer */}
         {visit.referrer_url && (
-          <div>
+          <div className="min-w-0">
             <Separator className="my-2" style={{ backgroundColor: 'var(--stroke)' }} />
             <div className="flex items-center gap-1.5 mb-1">
-              <ExternalLink size={11} style={{ color: 'var(--text-dim)' }} />
-              <span className="text-xs" style={{ color: 'var(--text-dim)' }}>Referrer</span>
+              <ExternalLink size={11} className="shrink-0" style={{ color: 'var(--text-dim)' }} />
+              <span className="text-xs shrink-0" style={{ color: 'var(--text-dim)' }}>Referrer</span>
             </div>
-            <div className="text-xs break-all font-mono" style={{ color: 'var(--text-muted)', fontFamily: 'IBM Plex Mono, monospace' }}>
+            <div
+              className="text-xs font-mono"
+              style={{
+                color: 'var(--text-muted)',
+                fontFamily: 'IBM Plex Mono, monospace',
+                wordBreak: 'break-all',
+                overflowWrap: 'anywhere',
+              }}
+            >
               {refBase}
             </div>
             {refParams.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-1.5">
                 {refParams.map(({ key, val }) => (
-                  <Badge key={key} variant="secondary" className="text-xs font-mono px-1.5 py-0"
-                    style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: 'var(--text-muted)', border: '1px solid var(--stroke)', fontFamily: 'IBM Plex Mono, monospace' }}
+                  <Badge key={key} variant="secondary" className="text-xs font-mono px-1.5 py-0 max-w-full"
+                    style={{
+                      backgroundColor: 'rgba(255,255,255,0.05)',
+                      color: 'var(--text-muted)',
+                      border: '1px solid var(--stroke)',
+                      fontFamily: 'IBM Plex Mono, monospace',
+                      wordBreak: 'break-all',
+                      overflowWrap: 'anywhere',
+                      whiteSpace: 'normal',
+                    }}
                   >
                     {key}={val}
                   </Badge>
@@ -191,18 +223,26 @@ const UrlVisitItem = ({ visit, index }) => {
 
         {/* Visit-level attribution */}
         {visit.attribution && Object.values(visit.attribution).some(v => v && typeof v !== 'object') && (
-          <div className="mt-2">
+          <div className="mt-2 min-w-0">
             <Separator className="my-2" style={{ backgroundColor: 'var(--stroke)' }} />
             <div className="flex items-center gap-1.5 mb-1.5">
-              <Tag size={11} style={{ color: 'var(--mint-success)' }} />
+              <Tag size={11} className="shrink-0" style={{ color: 'var(--mint-success)' }} />
               <span className="text-xs" style={{ color: 'var(--text-dim)' }}>Attribution (this visit)</span>
             </div>
             <div className="flex flex-wrap gap-1">
               {Object.entries(visit.attribution)
                 .filter(([k, v]) => v && k !== 'extra' && typeof v === 'string')
                 .map(([k, v]) => (
-                  <Badge key={k} variant="secondary" className="text-xs font-mono px-1.5 py-0"
-                    style={{ backgroundColor: 'rgba(69,209,156,0.08)', color: 'var(--mint-success)', border: '1px solid rgba(69,209,156,0.15)', fontFamily: 'IBM Plex Mono, monospace' }}
+                  <Badge key={k} variant="secondary" className="text-xs font-mono px-1.5 py-0 max-w-full"
+                    style={{
+                      backgroundColor: 'rgba(69,209,156,0.08)',
+                      color: 'var(--mint-success)',
+                      border: '1px solid rgba(69,209,156,0.15)',
+                      fontFamily: 'IBM Plex Mono, monospace',
+                      wordBreak: 'break-all',
+                      overflowWrap: 'anywhere',
+                      whiteSpace: 'normal',
+                    }}
                   >
                     {k}={v}
                   </Badge>
