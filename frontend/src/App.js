@@ -84,7 +84,7 @@ function Dashboard() {
   };
 
   const handleCopyScript = () => {
-    const scriptTag = `<script src="${BACKEND_URL}/api/tracker.js"></script>`;
+    const scriptTag = `<script src="${BACKEND_URL}/api/shumard.js"></script>`;
     navigator.clipboard.writeText(scriptTag).then(() => {
       toast.success('Script tag copied!', {
         description: 'Paste it in the <head> of your webinar page.',
