@@ -1,18 +1,22 @@
 [
   {
-    "content": "Add utm_id, campaign_id, adset_id, ad_id to backend Attribution model + safe_attribution known set",
-    "status": "completed"
+    "content": "Fix name not captured: propagate stored name/firstName/lastName when sending email lead",
+    "status": "in_progress"
   },
   {
-    "content": "Update tracker captureAttribution() to catch ALL unknown URL params into extra",
-    "status": "completed"
+    "content": "Remove browser-side HTTP stitch calls, keep only session_id adoption via postMessage",
+    "status": "pending"
   },
   {
-    "content": "Add new explicit fields + extra params display to Attribution tab in modal",
-    "status": "completed"
+    "content": "Add GET /api/logs endpoint (page visits enriched with contact info)",
+    "status": "pending"
   },
   {
-    "content": "Screenshot and verify end-to-end",
-    "status": "completed"
+    "content": "Build sidebar layout + Analytics / Leads / Logs pages",
+    "status": "pending"
+  },
+  {
+    "content": "Test all changes",
+    "status": "pending"
   }
 ]
