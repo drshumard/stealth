@@ -290,10 +290,11 @@ export const ContactDetailModal = ({ contactId, open, onClose, onDelete }) => {
         data-testid="contact-detail-modal"
         className="max-w-3xl p-0 overflow-hidden border"
         style={{
-          backgroundColor: 'var(--bg-elev-1)',
+          backgroundColor: '#ffffff',
           borderColor: 'var(--stroke)',
           color: 'var(--text)',
           maxHeight: '90vh',
+          boxShadow: 'var(--shadow)',
         }}
       >
         <DialogHeader className="px-6 pt-5 pb-0">
