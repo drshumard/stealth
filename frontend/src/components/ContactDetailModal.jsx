@@ -69,14 +69,14 @@ const CopyButton = ({ text, label }) => {
 };
 
 const InfoRow = ({ icon: Icon, label, value, mono, copyable, accent }) => (
-  <div className="flex items-start gap-3 py-2.5 px-4">
+  <div className="flex items-start gap-4 py-4 px-5">
     <div className="mt-0.5 shrink-0">
-      <Icon size={14} style={{ color: accent || 'var(--text-dim)' }} />
+      <Icon size={15} style={{ color: accent || 'var(--text-dim)' }} />
     </div>
     <div className="flex-1 min-w-0">
-      <div className="text-xs mb-0.5" style={{ color: 'var(--text-dim)' }}>{label}</div>
+      <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--text-dim)' }}>{label}</div>
       <div
-        className={`text-sm break-all ${mono ? 'font-mono' : ''}`}
+        className={`text-sm font-medium break-all ${mono ? 'font-mono' : ''}`}
         style={{
           color: value ? 'var(--text)' : 'var(--text-dim)',
           fontFamily: mono ? 'IBM Plex Mono, monospace' : undefined,
