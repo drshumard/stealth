@@ -1694,6 +1694,9 @@ async def create_indexes():
         await db.page_visits.create_index([("contact_id", 1), ("timestamp", 1)])
         await db.automations.create_index("id", unique=True, sparse=True)
         await db.automations.create_index("enabled")
+        await db.automation_runs.create_index("automation_id")
+        await db.automation_runs.create_index("triggered_at")
+        await db.automation_runs.create_index([("automation_id", 1), ("triggered_at", -1)])
         logger.info("MongoDB indexes created/verified")
     except Exception as e:
         logger.warning(f"Index creation warning: {e}")
