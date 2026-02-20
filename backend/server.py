@@ -611,12 +611,12 @@ def build_tracker_js(backend_url: str) -> str:
   /* ─── Stitch two contacts together ─── */
   function sendStitch(parentCid, childCid) {
     if (!parentCid || !childCid || parentCid === childCid) return;
+    logger('🔗 Stitching ' + childCid.substring(0,8) + '… → ' + parentCid.substring(0,8) + '…');
     send('/track/stitch', {
       parent_contact_id: parentCid,
       child_contact_id:  childCid,
       session_id:        store.config.sessionId || null
     });
-    logger('[stitch] ' + childCid + ' → ' + parentCid);
   }
 
   function logger(msg, data) {
