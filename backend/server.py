@@ -310,11 +310,9 @@ async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = 
             created_at=now,
             updated_at=now
         )
-        cdoc = contact.model_dump()
-        cdoc['created_at'] = dt_to_str(cdoc['created_at'])
-        cdoc['updated_at'] = dt_to_str(cdoc['updated_at'])
-        if cdoc.get('attribution') and hasattr(cdoc['attribution'], 'model_dump'):
-            cdoc['attribution'] = cdoc['attribution'].model_dump()
+        cdoc = strip_nulls(contact.model_dump())
+        cdoc['created_at'] = dt_to_str(contact.created_at)
+        cdoc['updated_at'] = dt_to_str(contact.updated_at)
         await db.contacts.insert_one(cdoc)
 
 
