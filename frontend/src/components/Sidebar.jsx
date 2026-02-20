@@ -1,9 +1,10 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { BarChart3, Users, Activity, Zap } from 'lucide-react';
+import { BarChart3, Mail, Globe, Activity, Zap } from 'lucide-react';
 
 const NAV_ITEMS = [
+  { id: 'leads',     label: 'Leads',     icon: Mail,      path: '/' },
+  { id: 'visitors',  label: 'Visitors',  icon: Globe,     path: '/visitors' },
   { id: 'analytics', label: 'Analytics', icon: BarChart3, path: '/analytics' },
-  { id: 'leads',     label: 'Leads',     icon: Users,     path: '/' },
   { id: 'logs',      label: 'Logs',      icon: Activity,  path: '/logs' },
 ];
 
@@ -13,7 +14,8 @@ export const Sidebar = () => {
 
   const currentPage =
     location.pathname === '/analytics' ? 'analytics' :
-    location.pathname === '/logs'       ? 'logs'      : 'leads';
+    location.pathname === '/visitors'  ? 'visitors'  :
+    location.pathname === '/logs'      ? 'logs'      : 'leads';
 
   return (
     <aside

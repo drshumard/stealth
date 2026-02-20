@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Sidebar } from '@/components/Sidebar';
 import AnalyticsPage from '@/components/AnalyticsPage';
 import LeadsPage from '@/components/LeadsPage';
+import VisitorsPage from '@/components/VisitorsPage';
 import LogsPage from '@/components/LogsPage';
 import { ContactDetailModal } from '@/components/ContactDetailModal';
 
@@ -50,9 +51,9 @@ function AppShell() {
     return () => clearInterval(t);
   }, [fetchContacts, fetchStats]);
 
-  const handleRefresh = () => { fetchContacts(); fetchStats(); };
-  const handleSelectContact = (id) => setSearchParams({ contact: id });
-  const handleCloseModal   = () => setSearchParams({});
+  const handleRefresh        = () => { fetchContacts(); fetchStats(); };
+  const handleSelectContact  = (id) => setSearchParams({ contact: id });
+  const handleCloseModal     = () => setSearchParams({});
 
   const handleDeleteContact = async (contactId) => {
     try {
@@ -81,6 +82,14 @@ function AppShell() {
     }
   };
 
+  const sharedProps = {
+    contacts, loading, initialLoad, stats,
+    onRefresh: handleRefresh,
+    onSelectContact: handleSelectContact,
+    onDeleteContact: handleDeleteContact,
+    onBulkDelete: handleBulkDelete,
+  };
+
   return (
     <div
       className="flex h-screen overflow-hidden noise-overlay"
@@ -102,26 +111,10 @@ function AppShell() {
 
       <div className="flex-1 overflow-hidden">
         <Routes>
-          <Route
-            path="/"
-            element={
-              <LeadsPage
-                contacts={contacts}
-                loading={loading}
-                initialLoad={initialLoad}
-                stats={stats}
-                onRefresh={handleRefresh}
-                onSelectContact={handleSelectContact}
-                onDeleteContact={handleDeleteContact}
-                onBulkDelete={handleBulkDelete}
-              />
-            }
-          />
-          <Route
-            path="/analytics"
-            element={<AnalyticsPage stats={stats} contacts={contacts} />}
-          />
-          <Route path="/logs" element={<LogsPage />} />
+          <Route path="/"          element={<LeadsPage    {...sharedProps} />} />
+          <Route path="/visitors"  element={<VisitorsPage {...sharedProps} />} />
+          <Route path="/analytics" element={<AnalyticsPage stats={stats} contacts={contacts} />} />
+          <Route path="/logs"      element={<LogsPage />} />
         </Routes>
       </div>
 
