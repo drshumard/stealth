@@ -34,6 +34,10 @@ class Attribution(BaseModel):
     utm_campaign: Optional[str] = None
     utm_term: Optional[str] = None
     utm_content: Optional[str] = None
+    utm_id: Optional[str] = None
+    campaign_id: Optional[str] = None
+    adset_id: Optional[str] = None
+    ad_id: Optional[str] = None
     fbclid: Optional[str] = None
     gclid: Optional[str] = None
     ttclid: Optional[str] = None
