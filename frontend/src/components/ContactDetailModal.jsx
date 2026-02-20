@@ -378,24 +378,22 @@ export const ContactDetailModal = ({ contactId, open, onClose, onDelete }) => {
             </div>
           ) : (
             <Tabs defaultValue="overview">
-              <TabsList className="h-8 mb-4" style={{ backgroundColor: '#f3f4f6', border: '1px solid var(--stroke)' }}>
-                <TabsTrigger data-testid="contact-overview-tab" value="overview" className="text-xs data-[state=active]:text-white">
+              <TabsList className="h-10 mb-5 gap-1 p-1" style={{ backgroundColor: '#f5f3ef', border: '1px solid var(--stroke)' }}>
+                <TabsTrigger data-testid="contact-overview-tab" value="overview" className="text-sm font-medium px-5">
                   Overview
                 </TabsTrigger>
-                <TabsTrigger data-testid="contact-attribution-tab" value="attribution" className="text-xs data-[state=active]:text-white">
+                <TabsTrigger data-testid="contact-attribution-tab" value="attribution" className="text-sm font-medium px-5">
                   Attribution
                   {hasAttribution && (
-                    <span className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--mint-success)' }} />
+                    <span className="ml-2 inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--mint-success)' }} />
                   )}
                 </TabsTrigger>
-                <TabsTrigger data-testid="contact-urls-tab" value="urls" className="text-xs data-[state=active]:text-white">
+                <TabsTrigger data-testid="contact-urls-tab" value="urls" className="text-sm font-medium px-5">
                   URL History
                   {contact && (
-                    <Badge className="ml-1.5 text-xs px-1.5 py-0 h-4"
-                      style={{ backgroundColor: 'rgba(21,184,200,0.15)', color: 'var(--primary-cyan)', border: 'none' }}
-                    >
+                    <span className="ml-2 inline-flex items-center justify-center text-xs font-bold w-5 h-5 rounded-full" style={{ backgroundColor: 'var(--brand-navy)', color: '#fff' }}>
                       {contact.visits?.length || 0}
-                    </Badge>
+                    </span>
                   )}
                 </TabsTrigger>
               </TabsList>
