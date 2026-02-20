@@ -2,7 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Google Fonts ── */
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 body {
@@ -21,56 +20,63 @@ h1, h2, h3, h4, h5, h6, .font-display {
 }
 
 ::selection {
-  background: rgba(249, 115, 22, 0.25);
-  color: #111827;
+  background: rgba(163, 24, 0, 0.18);
+  color: #030352;
 }
 
 @layer base {
   :root {
-    /* Light theme — matches reference design */
-    --background: 30 22% 96%;
+    /* Light Tether palette */
+    --background: 30 18% 96%;
     --foreground: 222 47% 11%;
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    --primary: 24 95% 53%;
+    /* Primary = Tether crimson */
+    --primary: 10 100% 33%;
     --primary-foreground: 0 0% 100%;
     --secondary: 30 18% 92%;
     --secondary-foreground: 222 47% 11%;
     --muted: 30 14% 93%;
-    --muted-foreground: 215 16% 47%;
+    --muted-foreground: 220 9% 46%;
     --accent: 30 18% 92%;
     --accent-foreground: 222 47% 11%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
     --border: 214 20% 90%;
     --input: 214 20% 90%;
-    --ring: 24 95% 53%;
-    --radius: 1rem;
+    --ring: 10 100% 33%;
+    /* Unified border-radius — matches button radius */
+    --radius: 0.5rem;
 
     /* Semantic tokens */
-    --app-canvas:        #ede9e3;
+    --app-canvas:        #eceae5;
     --surface:           #ffffff;
-    --surface-2:         #fbfaf8;
-    --surface-hover:     #f7f5f2;
-    --bg:                #ede9e3;
+    --surface-2:         #faf9f7;
+    --surface-hover:     #f5f3ef;
+    --bg:                #eceae5;
     --bg-elev-1:         #ffffff;
-    --bg-elev-2:         #f8f7f4;
-    --stroke:            #e5e7eb;
-    --stroke-soft:       #f1f0ed;
-    --text:              #111827;
-    --text-muted:        #6b7280;
-    --text-dim:          #9ca3af;
-    --primary-orange:    #f97316;
-    --primary-orange-hover: #ea580c;
-    /* Keep cyan as secondary accent for badges */
-    --primary-cyan:      #0891b2;
-    --mint-success:      #10b981;
-    --amber-warn:        #d97706;
-    --red-error:         #ef4444;
-    --shadow:            0 10px 30px rgba(17,24,39,0.08);
-    --shadow-soft:       0 4px 12px rgba(17,24,39,0.05);
+    --bg-elev-2:         #f7f6f2;
+    --stroke:            #e3e1dc;
+    --stroke-soft:       #f0ede8;
+    --text:              #0f0f1a;
+    --text-muted:        #5a5a72;
+    --text-dim:          #9898aa;
+    /* Tether brand */
+    --brand-navy:        #030352;
+    --brand-navy-hover:  #020240;
+    --brand-red:         #A31800;
+    --brand-red-hover:   #8a1400;
+    /* Keep for legacy badge refs */
+    --primary-orange:    #A31800;
+    --primary-orange-hover: #8a1400;
+    --primary-cyan:      #0369a1;
+    --mint-success:      #059669;
+    --amber-warn:        #b45309;
+    --red-error:         #dc2626;
+    --shadow:            0 12px 36px rgba(3,3,82,0.10);
+    --shadow-soft:       0 4px 16px rgba(3,3,82,0.06);
   }
 }
 
@@ -83,65 +89,27 @@ h1, h2, h3, h4, h5, h6, .font-display {
   }
 }
 
-/* ── Table row hover ── */
+/* ─ Table row hover (light) ─ */
 .contact-row {
   cursor: pointer;
   transition: background-color 120ms ease;
 }
 .contact-row:hover {
-  background-color: #faf9f7;
+  background-color: #f7f5f0;
 }
 .contact-row:focus-visible {
   outline: none;
-  background-color: #faf9f7;
-  box-shadow: inset 3px 0 0 var(--primary-orange);
+  background-color: #f7f5f0;
+  box-shadow: inset 3px 0 0 var(--brand-navy);
 }
 .contact-row.selected-row {
-  background-color: #fff7ed;
+  background-color: #fff0ee;
 }
 
-/* ── Scrollbar (light) ── */
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
-
-/* ── URL timeline rail ── */
-.url-timeline-rail { position: relative; }
-.url-timeline-rail::before {
-  content: '';
-  position: absolute;
-  left: 7px; top: 12px; bottom: 0;
-  width: 1px;
-  background: var(--stroke);
-}
-
-/* ── Script snippet ── */
-.script-snippet {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 0.75rem;
-  line-height: 1.6;
-  color: #ea580c;
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
-  border-radius: 0.5rem;
-  padding: 1rem;
-  word-break: break-all;
-  white-space: pre-wrap;
-}
-
-/* ── Pulse dot ── */
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(1.3); }
-}
-.pulse-dot { animation: pulse-dot 1.8s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) { .pulse-dot { animation: none; } }
-
-/* ── Nav tab pill ── */
+/* ─ Nav tab pill ─ */
 .nav-tab-active {
-  background-color: var(--primary-orange);
-  color: #ffffff;
+  background-color: var(--brand-navy);
+  color: #ffffff !important;
   border-radius: 9999px;
   font-weight: 600;
 }
@@ -150,6 +118,57 @@ h1, h2, h3, h4, h5, h6, .font-display {
   border-radius: 9999px;
 }
 .nav-tab-inactive:hover {
-  background-color: #f7f5f2;
-  color: #374151;
+  background-color: #f0ede8;
+  color: #030352;
+}
+
+/* ─ Scrollbar ─ */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1cfc8; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #a8a59c; }
+
+/* ─ URL timeline ─ */
+.url-timeline-rail { position: relative; }
+.url-timeline-rail::before {
+  content: '';
+  position: absolute;
+  left: 7px; top: 12px; bottom: 0;
+  width: 1px; background: var(--stroke);
+}
+
+/* ─ Script snippet ─ */
+.script-snippet {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.75rem;
+  line-height: 1.7;
+  color: var(--brand-red);
+  background: #fff8f7;
+  border: 1px solid #fecdc7;
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+/* ─ Pulse ─ */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.3); }
+}
+.pulse-dot { animation: pulse-dot 1.8s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .pulse-dot { animation: none; } }
+
+/* ─ Modal tab override ─ */
+[role="tablist"] [role="tab"]:not([data-state="active"]) {
+  color: var(--text-muted) !important;
+}
+[role="tablist"] [role="tab"]:not([data-state="active"]):hover {
+  background-color: var(--surface-hover);
+  color: var(--text) !important;
+}
+[role="tablist"] [role="tab"][data-state="active"] {
+  background-color: var(--brand-navy);
+  color: #ffffff !important;
+  border-radius: calc(var(--radius) - 2px);
 }

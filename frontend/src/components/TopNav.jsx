@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Users, Globe, BarChart3, List, Search, Bell, ChevronDown, Zap } from 'lucide-react';
+import { Users, Globe, BarChart3, List, Search, Bell, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const NAV_TABS = [
@@ -21,26 +21,22 @@ export const TopNav = ({ stats }) => {
   return (
     <header
       data-testid="top-nav"
-      className="flex items-center justify-between px-6 py-3 border-b"
+      className="flex items-center justify-between px-8 py-4 border-b"
       style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff' }}
     >
       {/* Left: brand + tabs */}
-      <div className="flex items-center gap-6">
-        {/* Brand */}
-        <div className="flex items-center gap-2 shrink-0 mr-2">
-          <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: 'var(--primary-orange)' }}
-          >
-            <Zap size={13} className="text-white" />
-          </div>
-          <span
-            className="text-sm font-bold tracking-tight hidden sm:block"
-            style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--text)' }}
-          >
-            Shumard
-          </span>
-        </div>
+      <div className="flex items-center gap-8">
+        {/* TETHER text logo — no icon */}
+        <span
+          className="text-xl font-bold tracking-tight shrink-0 select-none"
+          style={{
+            fontFamily: 'Space Grotesk, sans-serif',
+            color: 'var(--brand-navy)',
+            letterSpacing: '-0.04em',
+          }}
+        >
+          TETHER
+        </span>
 
         {/* Tabs */}
         <nav className="flex items-center gap-1 overflow-x-auto">
@@ -51,10 +47,9 @@ export const TopNav = ({ stats }) => {
                 key={id}
                 data-testid={`top-nav-tab-${id}`}
                 onClick={() => navigate(path)}
-                className={`flex items-center gap-2 px-4 py-1.5 text-sm whitespace-nowrap transition-all duration-150 ${
+                className={`flex items-center gap-2 px-5 py-2 text-sm font-medium whitespace-nowrap transition-all duration-150 ${
                   isActive ? 'nav-tab-active' : 'nav-tab-inactive'
                 }`}
-                style={{ fontFamily: 'Work Sans, sans-serif' }}
               >
                 <Icon size={14} />
                 {label}
@@ -69,7 +64,7 @@ export const TopNav = ({ stats }) => {
         <Button
           data-testid="top-nav-search-button"
           variant="ghost" size="sm"
-          className="w-8 h-8 p-0 rounded-full"
+          className="w-9 h-9 p-0 rounded-full"
           style={{ color: 'var(--text-muted)' }}
         >
           <Search size={16} />
@@ -77,33 +72,35 @@ export const TopNav = ({ stats }) => {
         <Button
           data-testid="top-nav-notifications-button"
           variant="ghost" size="sm"
-          className="w-8 h-8 p-0 rounded-full relative"
+          className="w-9 h-9 p-0 rounded-full relative"
           style={{ color: 'var(--text-muted)' }}
         >
           <Bell size={16} />
           {stats?.today_visits > 0 && (
             <span
-              className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full"
-              style={{ backgroundColor: 'var(--primary-orange)' }}
+              className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full"
+              style={{ backgroundColor: 'var(--brand-red)' }}
             />
           )}
         </Button>
 
+        {/* Divider */}
+        <div className="w-px h-6 mx-1" style={{ backgroundColor: 'var(--stroke)' }} />
+
         {/* User section */}
         <button
           data-testid="top-nav-user-menu"
-          className="flex items-center gap-2.5 ml-1 px-2 py-1.5 rounded-xl transition-colors duration-150"
-          style={{ color: 'var(--text)' }}
+          className="flex items-center gap-3 px-3 py-2 rounded-lg transition-colors duration-150 hover:bg-[#f5f3ef]"
         >
           <div
             className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-            style={{ backgroundColor: 'var(--primary-orange)' }}
+            style={{ backgroundColor: 'var(--brand-navy)' }}
           >
-            S
+            T
           </div>
           <div className="text-left hidden md:block">
-            <div className="text-xs font-semibold leading-tight" style={{ color: 'var(--text)' }}>Shumard</div>
-            <div className="text-xs leading-tight" style={{ color: 'var(--text-muted)' }}>Lead Tracking</div>
+            <div className="text-sm font-bold leading-tight" style={{ color: 'var(--brand-navy)', fontFamily: 'Space Grotesk, sans-serif' }}>Tether</div>
+            <div className="text-xs leading-tight" style={{ color: 'var(--text-dim)' }}>Lead Tracking</div>
           </div>
           <ChevronDown size={14} style={{ color: 'var(--text-dim)' }} />
         </button>

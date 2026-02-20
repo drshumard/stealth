@@ -1,8 +1,8 @@
-/* App shell — light theme canvas */
+/* App shell — Tether light canvas */
 .app-canvas {
   min-height: 100vh;
   background-color: var(--app-canvas);
-  padding: 24px;
+  padding: 28px;
   box-sizing: border-box;
 }
 
@@ -14,7 +14,7 @@
   background: #ffffff;
   border-radius: 20px;
   box-shadow: var(--shadow);
-  min-height: calc(100vh - 48px);
+  min-height: calc(100vh - 56px);
   overflow: hidden;
   border: 1px solid var(--stroke);
 }
