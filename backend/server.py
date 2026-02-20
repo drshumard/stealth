@@ -996,6 +996,27 @@ async def get_contact_detail(contact_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.delete("/contacts/{contact_id}", status_code=204)
+async def delete_contact(contact_id: str):
+    try:
+        result = await db.contacts.delete_one({"contact_id": contact_id})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Contact not found")
+        # Also remove all page visits associated with this contact
+        await db.page_visits.delete_many({"contact_id": contact_id})
+        # If this contact was merged into a parent, remove it from the parent's merged_children list
+        await db.contacts.update_many(
+            {"merged_children": contact_id},
+            {"$pull": {"merged_children": contact_id}}
+        )
+        logger.info(f"Deleted contact {contact_id}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting contact: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.get("/stats")
 async def get_stats():
     try:
