@@ -1,18 +1,18 @@
 [
   {
-    "content": "Add checkbox column to ContactsTable with select-all header checkbox",
-    "status": "completed"
+    "content": "Add utm_id, campaign_id, adset_id, ad_id to backend Attribution model + safe_attribution known set",
+    "status": "in_progress"
   },
   {
-    "content": "Add selection state management and bulk delete action bar",
-    "status": "completed"
+    "content": "Update tracker captureAttribution() to catch ALL unknown URL params into extra",
+    "status": "pending"
   },
   {
-    "content": "Wire bulk delete to App.js (parallel DELETE calls)",
-    "status": "completed"
+    "content": "Add new explicit fields + extra params display to Attribution tab in modal",
+    "status": "pending"
   },
   {
-    "content": "Test multi-select delete flow visually",
-    "status": "completed"
+    "content": "Screenshot and verify end-to-end",
+    "status": "pending"
   }
 ]
