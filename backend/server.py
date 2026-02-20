@@ -114,102 +114,96 @@ def str_to_dt(s):
 
 # ─────────────────────────── Tracker.js ───────────────────────────
 
-TRACKER_JS_TEMPLATE = """
+def build_tracker_js(backend_url: str) -> str:
+    return r"""
 (function() {
   'use strict';
 
-  var BACKEND_URL = '{BACKEND_URL}';
+  var BACKEND_URL = '""" + backend_url + r"""';
   var LS_KEY = 'st_contact_id';
   var _sent_pageview = false;
 
-  // ── contact_id management ──
-  function getContactId() {{
+  // -- contact_id management --
+  function getContactId() {
     var id = localStorage.getItem(LS_KEY);
-    if (!id) {{
-      id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {{
+    if (!id) {
+      id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
         var r = Math.random() * 16 | 0;
         var v = c === 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
-      }});
+      });
       localStorage.setItem(LS_KEY, id);
-    }}
+    }
     return id;
-  }}
+  }
 
-  // ── HTTP helper – sendBeacon fallback ──
-  function send(endpoint, data) {{
+  // -- HTTP helper: sendBeacon with XHR fallback --
+  function send(endpoint, data) {
     var url = BACKEND_URL + '/api' + endpoint;
     var body = JSON.stringify(data);
-    if (navigator.sendBeacon) {{
-      var blob = new Blob([body], {{ type: 'application/json' }});
+    if (navigator.sendBeacon) {
+      var blob = new Blob([body], { type: 'application/json' });
       navigator.sendBeacon(url, blob);
-    }} else {{
+    } else {
       var xhr = new XMLHttpRequest();
       xhr.open('POST', url, true);
       xhr.setRequestHeader('Content-Type', 'application/json');
       xhr.send(body);
-    }}
-  }}
+    }
+  }
 
-  // ── Send page view ──
-  function sendPageview() {{
+  // -- Send page view --
+  function sendPageview() {
     if (_sent_pageview) return;
     _sent_pageview = true;
     var cid = getContactId();
-    send('/track/pageview', {{
+    send('/track/pageview', {
       contact_id: cid,
       current_url: window.location.href,
       referrer_url: document.referrer || null,
       page_title: document.title || null
-    }});
-  }}
+    });
+  }
 
-  // ── Extract field value by multiple strategies ──
-  function getFieldValue(form, names) {{
-    for (var i = 0; i < names.length; i++) {{
+  // -- Extract field value by name/id/placeholder --
+  function getFieldValue(form, names) {
+    for (var i = 0; i < names.length; i++) {
       var n = names[i];
-      // by name / id attribute
       var el = form.querySelector('[name="' + n + '"], [id="' + n + '"], [placeholder*="' + n + '"]');
       if (el && el.value) return el.value.trim();
-    }}
+    }
     return null;
-  }}
+  }
 
-  // ── Extract visible text label → input association ──
-  function getEmailValue(form) {{
+  function getEmailValue(form) {
     var el = form.querySelector('input[type="email"]');
     if (el && el.value) return el.value.trim();
     return getFieldValue(form, ['email', 'Email', 'EMAIL', 'user_email', 'subscriber_email', 'attendee_email']);
-  }}
+  }
 
-  function getNameValue(form) {{
-    // Try full name first
+  function getNameValue(form) {
     var fullName = getFieldValue(form, ['full_name', 'fullname', 'name', 'Name', 'first_name', 'firstname', 'fname']);
     if (fullName) return fullName;
-    // Compose from first + last
     var first = getFieldValue(form, ['first_name', 'firstname', 'fname']);
     var last = getFieldValue(form, ['last_name', 'lastname', 'lname', 'surname']);
     if (first && last) return (first + ' ' + last).trim();
     return first || last || null;
-  }}
+  }
 
-  function getPhoneValue(form) {{
+  function getPhoneValue(form) {
     var el = form.querySelector('input[type="tel"]');
     if (el && el.value) return el.value.trim();
     return getFieldValue(form, ['phone', 'Phone', 'PHONE', 'telephone', 'mobile', 'cell', 'phone_number', 'attendee_phone']);
-  }}
+  }
 
-  // ── Form submission handler ──
-  function handleFormSubmit(form) {{
+  // -- Form submission handler --
+  function handleFormSubmit(form) {
     var email = getEmailValue(form);
     var name = getNameValue(form);
     var phone = getPhoneValue(form);
-
-    // Require at least email to fire registration
     if (!email) return;
-
     var cid = getContactId();
-    send('/track/registration', {{
+    send('/track/registration', {
       contact_id: cid,
       name: name,
       email: email,
@@ -217,66 +211,62 @@ TRACKER_JS_TEMPLATE = """
       current_url: window.location.href,
       referrer_url: document.referrer || null,
       page_title: document.title || null
-    }});
-  }}
+    });
+  }
 
-  // ── Bind form submit listeners ──
-  function bindForms() {{
+  // -- Bind submit listeners to all forms --
+  function bindForms() {
     var forms = document.querySelectorAll('form');
-    forms.forEach(function(form) {{
+    forms.forEach(function(form) {
       if (form._st_bound) return;
       form._st_bound = true;
-      form.addEventListener('submit', function(e) {{
+      form.addEventListener('submit', function(e) {
         handleFormSubmit(form);
-      }}, {{ capture: true, passive: true }});
-    }});
-  }}
+      }, { capture: true, passive: true });
+    });
+  }
 
-  // ── Watch for dynamically added forms (iframes, lazy renders) ──
+  // -- Watch for dynamically injected forms (iframes, lazy renders) --
   var _observer = null;
-  function watchForForms() {{
+  function watchForForms() {
     if (_observer) return;
-    _observer = new MutationObserver(function() {{
-      bindForms();
-    }});
-    _observer.observe(document.body, {{ childList: true, subtree: true }});
-  }}
+    _observer = new MutationObserver(function() { bindForms(); });
+    _observer.observe(document.body, { childList: true, subtree: true });
+  }
 
-  // ── Also intercept button clicks that might submit StealthWebinar forms ──
-  document.addEventListener('click', function(e) {{
+  // -- Intercept submit button clicks (StealthWebinar SPA pattern) --
+  document.addEventListener('click', function(e) {
     var el = e.target;
-    // Walk up to button
-    while (el && el.tagName !== 'BUTTON' && el.tagName !== 'INPUT' && el.tagName !== 'A') {{
+    while (el && el.tagName !== 'BUTTON' && el.tagName !== 'INPUT' && el.tagName !== 'A') {
       el = el.parentElement;
-    }}
+    }
     if (!el) return;
     var isSubmit = (el.tagName === 'INPUT' && el.type === 'submit') ||
                    (el.tagName === 'BUTTON' && (el.type === 'submit' || !el.type));
     if (!isSubmit) return;
     var form = el.closest('form');
     if (form) handleFormSubmit(form);
-  }}, {{ capture: true, passive: true }});
+  }, { capture: true, passive: true });
 
-  // ── Init ──
-  function init() {{
+  // -- Init --
+  function init() {
     bindForms();
     watchForForms();
     sendPageview();
-  }}
+  }
 
-  if (document.readyState === 'loading') {{
+  if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
-  }} else {{
+  } else {
     init();
-  }}
+  }
 
-  // Expose for manual triggering
-  window.StealthTrack = {{
+  window.StealthTrack = {
     getContactId: getContactId,
     sendPageview: sendPageview
-  }};
+  };
 
-}})();
+})();
 """
 
 
