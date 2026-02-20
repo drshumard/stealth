@@ -579,7 +579,6 @@ def build_tracker_js(backend_url: str) -> str:
       try {
         Object.assign(store.source, JSON.parse(cached));
         var hasCached = Object.keys(store.source).some(function(k){ return k !== 'extra' && !!store.source[k]; });
-        if (hasCached) logger('📌 Attribution loaded from cache', store.source);
         return;
       } catch (e) {}
     }
