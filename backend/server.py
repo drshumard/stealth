@@ -437,16 +437,76 @@ async def _do_stitch(parent_id: str, child_id: str, now: datetime) -> dict:
     return {"status": "stitched", "parent_contact_id": parent_id, "child_contact_id": child_id}
 
 
+async def _session_auto_stitch(contact_id: str, session_id: Optional[str], now: datetime) -> None:
+    """
+    Stitch all contacts sharing the same session_id.
+    Session ID is explicitly shared via postMessage between parent page and iframes,
+    making it the strongest possible signal that two contacts are the same person.
+    """
+    if not session_id:
+        return
+
+    contacts = await db.contacts.find({
+        "session_id": session_id,
+        "contact_id": {"$ne": contact_id},
+        "merged_into": None,
+    }, {"_id": 0}).to_list(20)
+
+    if not contacts:
+        return
+
+    current = await db.contacts.find_one({"contact_id": contact_id}, {"_id": 0})
+    if not current or current.get('merged_into'):
+        return
+
+    def has_attribution(c):
+        attr = c.get('attribution') or {}
+        return any(v for k, v in attr.items() if k not in ('extra',) and v)
+
+    def has_identity(c):
+        return bool(c.get('email') or c.get('phone') or c.get('name'))
+
+    for candidate in contacts:
+        c_attr    = has_attribution(current)
+        cand_attr = has_attribution(candidate)
+        c_ident   = has_identity(current)
+        cand_ident = has_identity(candidate)
+
+        # Determine which is parent (prefer attribution-rich, then identity-rich, then older)
+        if c_attr and not cand_attr:
+            await _do_stitch(contact_id, candidate['contact_id'], now)
+        elif cand_attr and not c_attr:
+            await _do_stitch(candidate['contact_id'], contact_id, now)
+        elif c_ident and not cand_ident:
+            # current has identity, candidate doesn't — current is parent
+            await _do_stitch(contact_id, candidate['contact_id'], now)
+        elif cand_ident and not c_ident:
+            await _do_stitch(candidate['contact_id'], contact_id, now)
+        else:
+            # Both have similar data — merge newer into older
+            c_time   = current.get('created_at') or ''
+            cand_time = candidate.get('created_at') or ''
+            if c_time <= cand_time:
+                await _do_stitch(contact_id, candidate['contact_id'], now)
+            else:
+                await _do_stitch(candidate['contact_id'], contact_id, now)
+
+        # Refresh current after stitch in case it was merged
+        current = await db.contacts.find_one({"contact_id": contact_id}, {"_id": 0})
+        if not current or current.get('merged_into'):
+            break
+
+
 async def _ip_auto_stitch(contact_id: str, client_ip: Optional[str], now: datetime) -> None:
     """
-    Auto-stitch by IP ONLY when one contact clearly has attribution (UTM/fbclid)
+    Auto-stitch by IP when one contact clearly has attribution (UTM/fbclid)
     AND another has email/phone — and neither has both yet.
-    This prevents false-positive stitching of anonymous visitors.
+    Uses a 30-minute window to catch delayed registrations.
     """
     if not client_ip:
         return
 
-    window_start = dt_to_str(now - timedelta(minutes=5))
+    window_start = dt_to_str(now - timedelta(minutes=30))
     candidates = await db.contacts.find({
         "client_ip": client_ip,
         "contact_id": {"$ne": contact_id},
@@ -476,16 +536,12 @@ async def _ip_auto_stitch(contact_id: str, client_ip: Optional[str], now: dateti
         cand_ident = has_identity(candidate)
 
         # Only stitch when EXACTLY one side has attribution AND other has identity
-        # This prevents false positives between anonymous page-only visits
         if c_attr and cand_ident and not c_ident and not cand_attr:
-            # current = landing page (attribution), candidate = iframe (email)
             await _do_stitch(contact_id, candidate['contact_id'], now)
             break
         elif cand_attr and c_ident and not c_attr and not cand_ident:
-            # candidate = landing page (attribution), current = iframe (email)
             await _do_stitch(candidate['contact_id'], contact_id, now)
             break
-        # All other cases: let explicit stitch handle it
 
 
 # ─────────────────────────── Tracker JS ───────────────────────────
