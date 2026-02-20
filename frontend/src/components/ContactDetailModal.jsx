@@ -271,7 +271,12 @@ export const ContactDetailModal = ({ contactId, open, onClose, onDelete }) => {
       .catch(e => { setError(e.message); setLoading(false); });
   }, [open, contactId]);
 
-  const hasAttribution = contact?.attribution && Object.values(contact.attribution).some(v => v && typeof v !== 'object');
+  const hasAttribution = contact?.attribution && (
+    Object.entries(contact.attribution).some(([k, v]) => {
+      if (k === 'extra') return v && typeof v === 'object' && Object.keys(v).length > 0;
+      return v && typeof v !== 'object';
+    })
+  );
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
