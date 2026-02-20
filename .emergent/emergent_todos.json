@@ -1,22 +1,22 @@
 [
   {
     "content": "Add Automation models + CRUD + webhook fire + trigger hook to server.py",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Create AutomationsPage.jsx (list view with cards)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Create AutomationBuilder.jsx (step-by-step sheet builder)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Update TopNav + App.js with /automations route",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Screenshot and verify",
-    "status": "pending"
+    "status": "completed"
   }
 ]
