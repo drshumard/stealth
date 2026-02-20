@@ -301,8 +301,8 @@ export const ContactDetailModal = ({ contactId, open, onClose, onDelete }) => {
           <div className="flex items-start justify-between gap-4">
             <div>
               <DialogTitle
-                className="text-base font-semibold mb-0.5"
-                style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--text)' }}
+                className="text-xl font-bold mb-0.5"
+                style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--brand-navy)', letterSpacing: '-0.02em' }}
               >
                 {loading ? (
                   <Skeleton className="h-5 w-40" style={{ backgroundColor: 'var(--stroke)' }} />
