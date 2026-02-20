@@ -425,8 +425,8 @@ export const ContactDetailModal = ({ contactId, open, onClose, onDelete }) => {
                 {loading ? (
                   <div className="space-y-3">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24 w-full" style={{ backgroundColor: 'var(--stroke)' }} />)}</div>
                 ) : contact?.visits && contact.visits.length > 0 ? (
-                  <ScrollArea className="h-[420px] pr-2">
-                    <div className="url-timeline-rail">
+                  <ScrollArea className="h-[420px]">
+                    <div className="url-timeline-rail pr-4">
                       {contact.visits.map((visit, i) => (
                         <UrlVisitItem key={visit.id} visit={visit} index={i} />
                       ))}
