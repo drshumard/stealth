@@ -36,7 +36,7 @@ function utmSource(contact) {
   return contact?.attribution?.utm_source || null;
 }
 
-export const ContactsTable = ({ contacts, loading, initialLoad, onSelectContact, onCopyScript, onBulkDelete }) => {
+export const ContactsTable = ({ contacts, loading, initialLoad, onSelectContact, onCopyScript, onBulkDelete, hideSearch }) => {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(new Set());
 
