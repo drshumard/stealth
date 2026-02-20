@@ -1,38 +1,38 @@
 [
   {
-    "content": "Update index.css: light theme CSS variables (dark → light)",
+    "content": "Update index.css: light theme CSS variables",
     "status": "completed"
   },
   {
     "content": "Rewrite App.js: new layout with TopNav inside white card on beige canvas",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Create TopNav.jsx: horizontal pill-tab navigation",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Rewrite ContactsTable.jsx: light design + pagination + source badges + sort",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Rewrite LeadsPage + VisitorsPage: new light layout + toolbar",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Rewrite AnalyticsPage + LogsPage: light theme",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Update ContactDetailModal: light theme",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Update ScriptEmbedCard: light theme",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Screenshot and verify",
-    "status": "pending"
+    "status": "completed"
   }
 ]
