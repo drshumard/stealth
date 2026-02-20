@@ -549,28 +549,58 @@ def build_tracker_js(backend_url: str) -> str:
     if (cached) {
       try {
         Object.assign(store.source, JSON.parse(cached));
-        var hasCached = Object.values(store.source).some(function(v){ return !!v; });
+        var hasCached = Object.keys(store.source).some(function(k){ return k !== 'extra' && !!store.source[k]; });
         if (hasCached) logger('📌 Attribution loaded from cache', store.source);
         return;
       } catch (e) {}
     }
     var p = getUrlParams();
+    /* Known field map: target_key → list of URL param names that map to it */
     var map = {
-      utm_source: ['utm_source'], utm_medium: ['utm_medium'],
-      utm_campaign: ['utm_campaign'], utm_term: ['utm_term'], utm_content: ['utm_content'],
-      fbclid: ['fbclid', 'fb_cl_id'],
-      gclid:  ['gclid', 'g_cl_id'],
-      ttclid: ['ttclid'],
+      utm_source:         ['utm_source'],
+      utm_medium:         ['utm_medium'],
+      utm_campaign:       ['utm_campaign'],
+      utm_term:           ['utm_term'],
+      utm_content:        ['utm_content'],
+      utm_id:             ['utm_id'],
+      campaign_id:        ['campaign_id'],
+      adset_id:           ['adset_id'],
+      ad_id:              ['ad_id'],
+      fbclid:             ['fbclid', 'fb_cl_id'],
+      gclid:              ['gclid', 'g_cl_id'],
+      ttclid:             ['ttclid'],
       source_link_tag:    ['sl'],
       fb_ad_set_id:       ['fbc_id', 'h_ad_id', 'fbadid'],
       google_campaign_id: ['gc_id', 'h_campaign_id']
     };
+
+    /* Build a set of ALL URL param names that are already handled by the map */
+    var handledParams = {};
+    Object.keys(map).forEach(function(key) {
+      map[key].forEach(function(param) { handledParams[param] = true; });
+    });
+
     var found = false;
-    Object.keys(map).forEach(function (key) {
-      map[key].forEach(function (param) {
+
+    /* Match known params */
+    Object.keys(map).forEach(function(key) {
+      map[key].forEach(function(param) {
         if (p[param]) { store.source[key] = p[param]; found = true; }
       });
     });
+
+    /* Capture EVERY remaining unknown param into extra */
+    var extra = {};
+    Object.keys(p).forEach(function(param) {
+      if (!handledParams[param] && p[param]) {
+        extra[param] = p[param];
+        found = true;
+      }
+    });
+    if (Object.keys(extra).length > 0) {
+      store.source.extra = extra;
+    }
+
     if (found) {
       lsSet(ATTR_KEY, JSON.stringify(store.source));
       logger('📌 Attribution captured from URL', store.source);
