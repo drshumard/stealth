@@ -1,30 +1,18 @@
 [
   {
-    "content": "P0: Add missing DELETE /contacts/{contact_id} endpoint to server.py",
-    "status": "completed"
+    "content": "Add checkbox column to ContactsTable with select-all header checkbox",
+    "status": "in_progress"
   },
   {
-    "content": "P0: Fix UI flash - show skeletons only when contacts array is empty (initial load)",
-    "status": "completed"
+    "content": "Add selection state management and bulk delete action bar",
+    "status": "pending"
   },
   {
-    "content": "P1: Verify phone capture works end-to-end (already in code, needs test)",
-    "status": "completed"
+    "content": "Wire bulk delete to App.js (parallel DELETE calls)",
+    "status": "pending"
   },
   {
-    "content": "P2: Rename tracker.js → shumard.js (endpoint + all frontend references)",
-    "status": "completed"
-  },
-  {
-    "content": "P2: Add always-on console.log messages for all captured events",
-    "status": "completed"
-  },
-  {
-    "content": "Fix: Add delete button to ContactDetailModal (was missing from UI)",
-    "status": "completed"
-  },
-  {
-    "content": "Run comprehensive testing via testing agent",
-    "status": "completed"
+    "content": "Test multi-select delete flow visually",
+    "status": "pending"
   }
 ]

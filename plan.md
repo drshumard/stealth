@@ -1,7 +1,7 @@
-# StealthTrack (Hyros-like) — Development Plan (MVP → V1) **(Updated v2: Cross-frame Stitching + Indexes)**
+# StealthTrack (Hyros-like) — Development Plan (MVP → V1) **(Updated v3: Shumard Script + Deletion UI + No-Flash Loading + Always-on Logs)**
 
 ## 1) Objectives
-- Capture **page visits + referrer attribution** and **StealthWebinar registration events** via a drop-in script served from this app (`/api/tracker.js`).
+- Capture **page visits + referrer attribution** and **StealthWebinar registration events** via a drop-in script served from this app (**`/api/shumard.js`**).
 - Persist a unified visitor timeline using a stable:
   - **`contact_id`** (device+origin identifier; localStorage + cookie fallback)
   - **`session_id`** (tab/session identifier used to stitch parent + iframe activity)
@@ -24,8 +24,11 @@
   - “Live/Active” indicator
   - Contact detail modal with **Overview / Attribution / URL History**
   - **Stitched identity indicators** (badge count + merged children list)
+  - **Contact deletion** (backend + UI)
+- Provide developer-visibility UX:
+  - **Always-on console logging** when events are captured (pageviews, attribution, lead field capture, registration, stitch messages).
 
-**Current status:** All phases are implemented and verified. Backend endpoints, Hyros-style tracker, cross-frame stitching, MongoDB indexes, and dashboard UI are working. Modal open is driven via **URL-based routing** (`?contact=`).
+**Current status:** All phases and P0/P1/P2 tasks are implemented and verified. Backend endpoints, Hyros-style tracker (now **Shumard**), cross-frame stitching, MongoDB indexes, dashboard UI (including deletion + no-flash loading) are working. Modal open is driven via **URL-based routing** (`?contact=`).
 
 ---
 
@@ -35,7 +38,7 @@
 **Goal:** Prove external JS capture + backend ingest works end-to-end before full UI.
 
 **Delivered (POC outcomes)**
-1. `/api/tracker.js` loads on any page and initializes immediately.
+1. Script loads on any page and initializes immediately.
 2. Pageview events are logged with full URL params + referrer.
 3. Form submissions and field changes can be tied to the same `contact_id`.
 4. Dashboard can be refreshed and new contacts appear.
@@ -46,7 +49,7 @@
 - `POST /api/track/registration`
 - `GET /api/contacts` (with `visit_count`)
 - `GET /api/contacts/{contact_id}` (contact + visits)
-- `GET /api/tracker.js`
+- `GET /api/shumard.js` *(renamed from `/api/tracker.js`)*
 
 **Notes**
 - Early duplicate-brace bug in tracker generation fixed by switching to a proper JS builder.
@@ -61,6 +64,7 @@
 3. Search contacts client-side (name/email/phone).
 4. Open contact details.
 5. Review visited URLs with params in time order and copy IDs/URLs.
+6. Delete contacts from the dashboard UI.
 
 #### Backend (FastAPI + MongoDB) ✅ Completed (Extended)
 
@@ -68,7 +72,7 @@
 - `Contact`
   - `id`, `contact_id`, `session_id?`
   - `client_ip?`
-  - `name`, `email`, `phone`, `first_name`, `last_name`
+  - `name`, `email`, **`phone`**, `first_name`, `last_name`
   - `attribution` (UTM + click IDs)
   - **stitching fields**:
     - `merged_into?` (child pointer)
@@ -102,12 +106,18 @@
     - **Supports re-stitch override**: un-merge from incorrect parent, then re-merge into correct parent
   - `POST /api/track/stitch/by-session` *(admin utility)*
     - Stitches all contacts sharing a `session_id` into the earliest parent
+
+**Contact endpoints (implemented & extended)**
 - `GET /api/contacts`
   - Returns contacts with `visit_count`
   - **Hides merged children by default** (`merged_into=None`)
   - Supports `include_merged=true` if needed
 - `GET /api/contacts/{contact_id}`
   - Returns contact detail + chronological `visits`
+- **`DELETE /api/contacts/{contact_id}`** *(new + verified)*
+  - Deletes the contact
+  - Deletes associated page visits
+  - Removes contact from any parent’s `merged_children` list
 - `GET /api/stats`
   - Returns `total_contacts` (excluding merged children), `total_visits`, `today_visits`
 
@@ -121,7 +131,7 @@
     - neither has both.
   - Prevents false positives for anonymous-only traffic.
 
-**MongoDB indexes (new) ✅ Completed**
+**MongoDB indexes ✅ Completed**
 Created/verified on startup:
 - `contacts.contact_id` (unique)
 - `contacts.email` (sparse)
@@ -134,7 +144,7 @@ Created/verified on startup:
 - `page_visits.timestamp`
 - compound: `page_visits(contact_id, timestamp)`
 
-#### Tracker.js (served from backend) ✅ Completed (Hyros-style + Cross-frame)
+#### Shumard.js (served from backend) ✅ Completed (Hyros-style + Cross-frame + Always-on Logs)
 
 **Key behaviors implemented**
 - IIFE wrapper, minimal globals.
@@ -153,7 +163,7 @@ Created/verified on startup:
     - Type-based detection (`email`, `tel`) + name/id/placeholder heuristics.
   - Sends `POST /track/lead` on **change/blur** for email/phone.
   - Sends `POST /track/registration` on submit/click-submit.
-- Cross-frame stitching (new):
+- Cross-frame stitching:
   - Parent broadcasts `{type:'st_parent_id', contactId, sessionId}` to all iframes for ~30s.
   - iframe receives identity, adopts sessionId, triggers `/track/stitch`, and replies `{type:'st_child_id', contactId}`.
   - Parent confirms stitch on child reply.
@@ -162,15 +172,17 @@ Created/verified on startup:
   - MutationObserver to bind late-rendered forms.
   - Does not block submit.
   - Uses `fetch(keepalive)` with XHR fallback.
-- Public API:
-  - `window.StealthTrack.getContactId()`
-  - `window.StealthTrack.getSessionId()`
-  - `window.StealthTrack.identify()`
-  - `window.StealthTrack.stitch(parentCid, childCid)`
-  - `window.StealthTrack.trackEvent()`
-  - `window.StealthTrack.store`
-  - `window.StealthTrack.debug()`
-  - Custom event listener: `stealthtrack_email`
+- **Always-on console logs (new)**
+  - Logs initialization, attribution capture/cache, pageview send, email/phone field capture, registration send, and stitch messaging.
+  - Uses `[Shumard]` prefix.
+
+**Public API (updated)**
+- `window.Shumard.getContactId()`
+- `window.Shumard.getSessionId()`
+- `window.Shumard.identify()`
+- `window.Shumard.stitch(parentCid, childCid)`
+- `window.Shumard.trackEvent()`
+- `window.Shumard.store`
 
 #### Frontend Dashboard (React + shadcn/ui) ✅ Completed (Extended)
 
@@ -182,16 +194,18 @@ Created/verified on startup:
 - TopNav
   - Brand + Active indicator + Refresh + Copy Script
 - ScriptEmbedCard
-  - Copyable embed snippet for `/api/tracker.js`
+  - Copyable embed snippet for **`/api/shumard.js`** *(updated from tracker.js)*
 - ContactsTable
   - Columns: Name, Email, **Source**, Created, Visits
   - Client-side search (name/email/phone)
   - Empty state CTA to copy script
   - **Stitch indicator badge** (merged children count)
+  - **No-flash loading polish (new/verified):** skeleton rows only appear on first load when table is empty (not on background refresh/polling).
 - ContactDetailModal
   - Tabs: Overview / Attribution / URL History
   - Copy controls for key fields
-  - **Overview now includes:** `client_ip`, `session_id`, and stitched children list
+  - Overview includes: `client_ip`, `session_id`, stitched children list
+  - **Delete button (new/verified):** delete contact via confirm dialog; closes modal and removes contact from list.
 
 **Modal routing implementation (important)**
 - Modal open/close is driven by URL query param:
@@ -201,16 +215,17 @@ Created/verified on startup:
 
 ---
 
-### Phase 3 — Hardening + “Real-time” UX polish (no auth yet) ✅ Completed (core items)
+### Phase 3 — Hardening + “Real-time” UX polish (no auth yet) ✅ Completed
 **Delivered**
 - Live-feel polling (dashboard refresh) via periodic fetch.
 - Duplicate reduction:
-  - Tracker sends pageview once per URL cycle.
+  - Script sends pageview once per URL cycle.
   - Lead events only send when value changes and passes validation.
 - Stitch reliability:
   - postMessage bridge + explicit stitch endpoint
   - conservative IP stitch fallback
   - explicit stitch can override wrong auto-stitch
+- **Deletion hardening (new/verified):** backend cascade deletes visits + removes child reference from merged parent.
 
 **Remaining (optional MVP+)**
 - True real-time transport (SSE/WebSocket).
@@ -256,5 +271,9 @@ Recommended next steps:
   - Overview details (+ session/IP + stitched children)
   - Attribution details (UTMs + click IDs)
   - URLs visited in chronological order with params
+  - **Phone field displayed**
+  - **Delete contact available**
+- Embed snippet uses **`/api/shumard.js`**.
+- Script produces **always-on console logs** with `[Shumard]` prefix for captured events.
 - MongoDB indexes are in place for production-like performance.
 - Auto-stitch does not generate false positives (conservative rules) and explicit stitch can override.
