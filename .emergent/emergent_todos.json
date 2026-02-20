@@ -1,22 +1,22 @@
 [
   {
     "content": "Fix name not captured: propagate stored name/firstName/lastName when sending email lead",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Remove browser-side HTTP stitch calls, keep only session_id adoption via postMessage",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Add GET /api/logs endpoint (page visits enriched with contact info)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Build sidebar layout + Analytics / Leads / Logs pages",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Test all changes",
-    "status": "pending"
+    "status": "completed"
   }
 ]
