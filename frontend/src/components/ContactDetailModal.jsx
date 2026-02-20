@@ -216,7 +216,7 @@ const UrlVisitItem = ({ visit, index }) => {
   );
 };
 
-export const ContactDetailModal = ({ contactId, open, onClose }) => {
+export const ContactDetailModal = ({ contactId, open, onClose, onDelete }) => {
   const [contact, setContact] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
