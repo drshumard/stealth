@@ -1,9 +1,21 @@
-import { useState } from 'react';
-import { Search, Users, ChevronRight, Copy, Tag, GitMerge } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, Users, ChevronRight, Copy, Tag, GitMerge, Trash2, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -24,8 +36,14 @@ function utmSource(contact) {
   return contact?.attribution?.utm_source || null;
 }
 
-export const ContactsTable = ({ contacts, loading, initialLoad, onSelectContact, onCopyScript }) => {
+export const ContactsTable = ({ contacts, loading, initialLoad, onSelectContact, onCopyScript, onBulkDelete }) => {
   const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState(new Set());
+
+  // Clear selection when contacts list changes (e.g. after deletion)
+  useEffect(() => {
+    setSelected(new Set());
+  }, [contacts]);
 
   const filtered = contacts.filter(c => {
     if (!search) return true;
@@ -36,6 +54,47 @@ export const ContactsTable = ({ contacts, loading, initialLoad, onSelectContact,
       (c.phone && c.phone.toLowerCase().includes(q))
     );
   });
+
+  const filteredIds = filtered.map(c => c.contact_id);
+  const allSelected = filteredIds.length > 0 && filteredIds.every(id => selected.has(id));
+  const someSelected = filteredIds.some(id => selected.has(id));
+  const selectedCount = [...selected].filter(id => filteredIds.includes(id)).length;
+
+  const toggleAll = () => {
+    if (allSelected) {
+      // Deselect all visible
+      setSelected(prev => {
+        const next = new Set(prev);
+        filteredIds.forEach(id => next.delete(id));
+        return next;
+      });
+    } else {
+      // Select all visible
+      setSelected(prev => {
+        const next = new Set(prev);
+        filteredIds.forEach(id => next.add(id));
+        return next;
+      });
+    }
+  };
+
+  const toggleOne = (id, e) => {
+    e.stopPropagation();
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelected(new Set());
+
+  const handleBulkDelete = () => {
+    const ids = [...selected].filter(id => filteredIds.includes(id));
+    if (onBulkDelete) onBulkDelete(ids);
+    setSelected(new Set());
+  };
 
   return (
     <div>
@@ -59,12 +118,101 @@ export const ContactsTable = ({ contacts, loading, initialLoad, onSelectContact,
         </Badge>
       </div>
 
+      {/* Bulk action bar — slides in when items are selected */}
+      {selectedCount > 0 && (
+        <div
+          data-testid="bulk-action-bar"
+          className="flex items-center justify-between gap-3 mb-3 px-4 py-2.5 rounded-xl border"
+          style={{
+            backgroundColor: 'rgba(21,184,200,0.06)',
+            borderColor: 'rgba(21,184,200,0.25)',
+          }}
+        >
+          <div className="flex items-center gap-2">
+            <span
+              className="text-sm font-medium"
+              style={{ color: 'var(--primary-cyan)', fontFamily: 'Space Grotesk, sans-serif' }}
+            >
+              {selectedCount} selected
+            </span>
+            <button
+              data-testid="bulk-clear-selection-button"
+              onClick={clearSelection}
+              className="rounded-full p-0.5 hover:bg-white/10 transition-colors duration-150"
+              aria-label="Clear selection"
+              style={{ color: 'var(--text-dim)' }}
+            >
+              <X size={13} />
+            </button>
+          </div>
+
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                data-testid="bulk-delete-button"
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1.5 text-xs transition-colors duration-150"
+                style={{
+                  backgroundColor: 'rgba(239,68,68,0.08)',
+                  borderColor: 'rgba(239,68,68,0.3)',
+                  color: '#ef4444',
+                }}
+              >
+                <Trash2 size={12} />
+                Delete {selectedCount}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent
+              style={{ backgroundColor: 'var(--bg-elev-1)', borderColor: 'var(--stroke)', color: 'var(--text)' }}
+            >
+              <AlertDialogHeader>
+                <AlertDialogTitle style={{ color: 'var(--text)' }}>Delete {selectedCount} contact{selectedCount !== 1 ? 's' : ''}?</AlertDialogTitle>
+                <AlertDialogDescription style={{ color: 'var(--text-dim)' }}>
+                  This will permanently remove {selectedCount === 1 ? 'this contact' : `all ${selectedCount} contacts`} and their visit history. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel
+                  style={{ backgroundColor: 'var(--bg-elev-2)', borderColor: 'var(--stroke)', color: 'var(--text)' }}
+                >
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  data-testid="bulk-delete-confirm-button"
+                  onClick={handleBulkDelete}
+                  style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none' }}
+                >
+                  Delete {selectedCount}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      )}
+
       {/* Table */}
       <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--bg-elev-1)' }}>
         <Table data-testid="contacts-table">
           <TableHeader>
             <TableRow className="border-b hover:bg-transparent" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--bg-elev-2)' }}>
-              <TableHead className="text-xs font-medium uppercase tracking-widest h-10 pl-4" style={{ color: 'var(--text-dim)' }}>Name</TableHead>
+              {/* Checkbox column header */}
+              <TableHead className="w-10 pl-4 pr-0">
+                <Checkbox
+                  data-testid="contacts-select-all-checkbox"
+                  checked={allSelected}
+                  // indeterminate state when some but not all are selected
+                  ref={el => { if (el) el.indeterminate = someSelected && !allSelected; }}
+                  onCheckedChange={toggleAll}
+                  onClick={e => e.stopPropagation()}
+                  aria-label="Select all contacts"
+                  style={{
+                    borderColor: someSelected ? 'var(--primary-cyan)' : 'var(--stroke)',
+                    backgroundColor: allSelected ? 'var(--primary-cyan)' : 'transparent',
+                  }}
+                />
+              </TableHead>
+              <TableHead className="text-xs font-medium uppercase tracking-widest h-10 pl-3" style={{ color: 'var(--text-dim)' }}>Name</TableHead>
               <TableHead className="text-xs font-medium uppercase tracking-widest h-10" style={{ color: 'var(--text-dim)' }}>Email</TableHead>
               <TableHead className="text-xs font-medium uppercase tracking-widest h-10 hidden sm:table-cell" style={{ color: 'var(--text-dim)' }}>Source</TableHead>
               <TableHead className="text-xs font-medium uppercase tracking-widest h-10 hidden md:table-cell" style={{ color: 'var(--text-dim)' }}>Created</TableHead>
@@ -75,7 +223,8 @@ export const ContactsTable = ({ contacts, loading, initialLoad, onSelectContact,
             {(loading && initialLoad) ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i} style={{ borderColor: 'var(--stroke)' }}>
-                  <TableCell className="pl-4"><Skeleton className="h-4 w-28" style={{ backgroundColor: 'var(--stroke)' }} /></TableCell>
+                  <TableCell className="w-10 pl-4 pr-0"><Skeleton className="h-4 w-4" style={{ backgroundColor: 'var(--stroke)' }} /></TableCell>
+                  <TableCell className="pl-3"><Skeleton className="h-4 w-28" style={{ backgroundColor: 'var(--stroke)' }} /></TableCell>
                   <TableCell><Skeleton className="h-4 w-44" style={{ backgroundColor: 'var(--stroke)' }} /></TableCell>
                   <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-20" style={{ backgroundColor: 'var(--stroke)' }} /></TableCell>
                   <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-20" style={{ backgroundColor: 'var(--stroke)' }} /></TableCell>
@@ -84,7 +233,7 @@ export const ContactsTable = ({ contacts, loading, initialLoad, onSelectContact,
               ))
             ) : filtered.length === 0 ? (
               <TableRow style={{ borderColor: 'transparent' }}>
-                <TableCell colSpan={5}>
+                <TableCell colSpan={6}>
                   <div data-testid="contacts-empty-state" className="flex flex-col items-center justify-center py-16 gap-4">
                     <div className="w-14 h-14 rounded-full flex items-center justify-center"
                       style={{ backgroundColor: 'var(--bg-elev-2)', border: '1px solid var(--stroke)' }}
@@ -114,19 +263,38 @@ export const ContactsTable = ({ contacts, loading, initialLoad, onSelectContact,
             ) : (
               filtered.map((contact) => {
                 const src = utmSource(contact);
+                const isSelected = selected.has(contact.contact_id);
                 return (
                   <TableRow
                     data-testid="contacts-table-row"
                     key={contact.contact_id}
                     className="contact-row border-b"
-                    style={{ borderColor: 'var(--stroke)', cursor: 'pointer' }}
+                    style={{
+                      borderColor: 'var(--stroke)',
+                      cursor: 'pointer',
+                      backgroundColor: isSelected ? 'rgba(21,184,200,0.05)' : undefined,
+                    }}
                     onClick={() => onSelectContact(contact.contact_id)}
                     tabIndex={0}
                     role="button"
                     onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectContact(contact.contact_id); } }}
                     aria-label={`View details for ${contact.name || contact.email || 'Anonymous'}`}
                   >
-                    <TableCell className="py-3 pl-4">
+                    {/* Checkbox cell */}
+                    <TableCell className="w-10 pl-4 pr-0" onClick={e => toggleOne(contact.contact_id, e)}>
+                      <Checkbox
+                        data-testid={`contact-checkbox-${contact.contact_id}`}
+                        checked={isSelected}
+                        onCheckedChange={() => {}}
+                        onClick={e => toggleOne(contact.contact_id, e)}
+                        aria-label={`Select ${contact.name || contact.email || 'contact'}`}
+                        style={{
+                          borderColor: isSelected ? 'var(--primary-cyan)' : 'var(--stroke)',
+                          backgroundColor: isSelected ? 'var(--primary-cyan)' : 'transparent',
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell className="py-3 pl-3">
                       <div>
                         <span className="text-sm font-medium" style={{ color: contact.name ? 'var(--text)' : 'var(--text-dim)', fontStyle: !contact.name ? 'italic' : undefined }}>
                           {contact.name || 'Anonymous'}
