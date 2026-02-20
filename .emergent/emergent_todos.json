@@ -1,22 +1,18 @@
 [
   {
-    "content": "Fix name not captured: propagate stored name/firstName/lastName when sending email lead",
-    "status": "completed"
+    "content": "Rename existing LeadsPage → VisitorsPage (all contacts, unchanged)",
+    "status": "in_progress"
   },
   {
-    "content": "Remove browser-side HTTP stitch calls, keep only session_id adoption via postMessage",
-    "status": "completed"
+    "content": "Create new LeadsPage — identified contacts only (has email/phone/name), filter controls",
+    "status": "pending"
   },
   {
-    "content": "Add GET /api/logs endpoint (page visits enriched with contact info)",
-    "status": "completed"
+    "content": "Update Sidebar: Analytics, Leads, Visitors, Logs",
+    "status": "pending"
   },
   {
-    "content": "Build sidebar layout + Analytics / Leads / Logs pages",
-    "status": "completed"
-  },
-  {
-    "content": "Test all changes",
-    "status": "completed"
+    "content": "Update App.js routing: / → Leads, /visitors → Visitors",
+    "status": "pending"
   }
 ]
