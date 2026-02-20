@@ -1,6 +1,20 @@
-/* StealthTrack App Styles */
-.App {
+/* App shell — light theme canvas */
+.app-canvas {
   min-height: 100vh;
-  background-color: var(--bg);
-  color: var(--text);
+  background-color: var(--app-canvas);
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 640px) {
+  .app-canvas { padding: 12px; }
+}
+
+.main-card {
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  min-height: calc(100vh - 48px);
+  overflow: hidden;
+  border: 1px solid var(--stroke);
 }
