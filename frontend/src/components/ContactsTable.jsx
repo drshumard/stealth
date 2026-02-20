@@ -243,7 +243,10 @@ export const ContactsTable = ({
           <TableHeader>
             <TableRow
               className="hover:bg-transparent"
-              style={{ backgroundColor: '#f8f7f4', borderColor: 'var(--stroke)' }}
+              style={{
+                background: 'linear-gradient(to bottom, #eef0f8, #f4f5fb)',
+                borderColor: '#d2d8ef',
+              }}
             >
               <TableHead className="w-10 pl-4 pr-0">
                 <Checkbox
