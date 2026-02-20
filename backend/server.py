@@ -360,10 +360,23 @@ async def _do_stitch(parent_id: str, child_id: str, now: datetime) -> dict:
     # Merge attribution: copy child attrs where parent attrs are empty
     child_attr  = child.get('attribution') or {}
     parent_attr = parent.get('attribution') or {}
-    if isinstance(child_attr, dict):
-        for k, v in child_attr.items():
-            if v and not parent_attr.get(k):
-                parent_update[f'attribution.{k}'] = v
+    if isinstance(child_attr, dict) and child_attr:
+        if not parent_attr or not isinstance(parent_attr, dict):
+            # Parent has no attribution — set the whole child attribution at once
+            built = safe_attribution(child_attr)
+            if built:
+                built_dict = built.model_dump()
+                parent_update['attribution'] = {k: v for k, v in built_dict.items() if v is not None}
+        else:
+            # Parent already has attribution — patch missing fields individually
+            for k, v in child_attr.items():
+                if k == 'extra' and isinstance(v, dict):
+                    existing_extra = parent_attr.get('extra') or {}
+                    for ek, ev in v.items():
+                        if ev and not existing_extra.get(ek):
+                            parent_update[f'attribution.extra.{ek}'] = str(ev)[:500]
+                elif v and not parent_attr.get(k):
+                    parent_update[f'attribution.{k}'] = v
 
     # Track merged children
     existing_children = parent.get('merged_children') or []
