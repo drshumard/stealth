@@ -72,7 +72,7 @@ export const ContactsTable = ({ contacts, loading, initialLoad, onSelectContact,
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading ? (
+            {(loading && initialLoad) ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i} style={{ borderColor: 'var(--stroke)' }}>
                   <TableCell className="pl-4"><Skeleton className="h-4 w-28" style={{ backgroundColor: 'var(--stroke)' }} /></TableCell>
