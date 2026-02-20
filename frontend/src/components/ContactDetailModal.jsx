@@ -378,7 +378,7 @@ export const ContactDetailModal = ({ contactId, open, onClose, onDelete }) => {
             </div>
           ) : (
             <Tabs defaultValue="overview">
-              <TabsList className="h-8 mb-4" style={{ backgroundColor: 'var(--bg-elev-2)', border: '1px solid var(--stroke)' }}>
+              <TabsList className="h-8 mb-4" style={{ backgroundColor: '#f3f4f6', border: '1px solid var(--stroke)' }}>
                 <TabsTrigger data-testid="contact-overview-tab" value="overview" className="text-xs data-[state=active]:text-white">
                   Overview
                 </TabsTrigger>
