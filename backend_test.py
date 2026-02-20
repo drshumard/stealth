@@ -80,12 +80,12 @@ class StealthTrackAPITester:
                 return False
         return success
 
-    def test_tracker_js(self):
-        """Test GET /api/tracker.js returns valid JavaScript"""
+    def test_shumard_js(self):
+        """Test GET /api/shumard.js returns valid JavaScript with [Shumard] logs"""
         success, response = self.run_test(
-            "Tracker JS Script",
+            "Shumard JS Script",
             "GET",
-            "/tracker.js",
+            "/shumard.js",
             200,
             headers={'Accept': 'application/javascript, text/plain, */*'}
         )
@@ -93,16 +93,31 @@ class StealthTrackAPITester:
             js_content = response.text
             # Check that BACKEND_URL is properly set (no double braces)
             if '{{' in js_content or '}}' in js_content:
-                print("⚠️  Found double braces in tracker.js - templating issue")
+                print("⚠️  Found double braces in shumard.js - templating issue")
                 return False
             if 'BACKEND_URL' not in js_content:
-                print("⚠️  BACKEND_URL not found in tracker.js")
+                print("⚠️  BACKEND_URL not found in shumard.js")
+                return False
+            if '[Shumard]' not in js_content:
+                print("⚠️  [Shumard] log messages not found in script")
                 return False
             if self.base_url in js_content:
                 print(f"✅ BACKEND_URL correctly set to {self.base_url}")
+                print(f"✅ [Shumard] logging found in script")
             else:
-                print(f"⚠️  BACKEND_URL not properly set in tracker.js")
+                print(f"⚠️  BACKEND_URL not properly set in shumard.js")
                 return False
+        return success
+
+    def test_tracker_js_404(self):
+        """Test GET /api/tracker.js returns 404 (old name should not exist)"""
+        success, response = self.run_test(
+            "Old Tracker JS (should be 404)",
+            "GET",
+            "/tracker.js",
+            404,
+            headers={'Accept': 'application/javascript, text/plain, */*'}
+        )
         return success
 
     def test_track_pageview(self):
