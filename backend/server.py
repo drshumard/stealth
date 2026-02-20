@@ -279,14 +279,9 @@ async def root():
 
 # Serve tracker.js
 @api_router.get("/tracker.js", response_class=PlainTextResponse)
-async def get_tracker_js(request_url: str = None):
-    # Detect backend URL from environment
+async def get_tracker_js():
     backend_url = os.environ.get('REACT_APP_BACKEND_URL', '')
-    if not backend_url:
-        # Try to build from request – fallback
-        backend_url = ''
-    
-    js_content = TRACKER_JS_TEMPLATE.replace('{BACKEND_URL}', backend_url)
+    js_content = build_tracker_js(backend_url)
     return PlainTextResponse(
         content=js_content,
         media_type="application/javascript",
