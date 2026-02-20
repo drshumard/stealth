@@ -264,15 +264,57 @@ export const ContactDetailModal = ({ contactId, open, onClose, onDelete }) => {
                 </p>
               )}
             </div>
-            <button
-              data-testid="contact-detail-modal-close-button"
-              onClick={onClose}
-              className="shrink-0 rounded-md p-1 hover:bg-white/5 transition-colors duration-150"
-              aria-label="Close"
-              style={{ color: 'var(--text-dim)' }}
-            >
-              <X size={16} />
-            </button>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {contact && onDelete && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <button
+                      data-testid="contact-detail-delete-button"
+                      className="rounded-md p-1 hover:bg-red-500/10 transition-colors duration-150"
+                      aria-label="Delete contact"
+                      title="Delete contact"
+                      style={{ color: 'var(--red-error, #ef4444)' }}
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent
+                    style={{ backgroundColor: 'var(--bg-elev-1)', borderColor: 'var(--stroke)', color: 'var(--text)' }}
+                  >
+                    <AlertDialogHeader>
+                      <AlertDialogTitle style={{ color: 'var(--text)' }}>Delete Contact</AlertDialogTitle>
+                      <AlertDialogDescription style={{ color: 'var(--text-dim)' }}>
+                        Are you sure you want to delete <strong style={{ color: 'var(--text)' }}>{contact.name || contact.email || 'this contact'}</strong>?
+                        This will permanently remove the contact and all their visit history.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel
+                        style={{ backgroundColor: 'var(--bg-elev-2)', borderColor: 'var(--stroke)', color: 'var(--text)' }}
+                      >
+                        Cancel
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        data-testid="contact-detail-confirm-delete-button"
+                        onClick={() => { onDelete(contact.contact_id); onClose(); }}
+                        style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none' }}
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+              <button
+                data-testid="contact-detail-modal-close-button"
+                onClick={onClose}
+                className="shrink-0 rounded-md p-1 hover:bg-white/5 transition-colors duration-150"
+                aria-label="Close"
+                style={{ color: 'var(--text-dim)' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
           </div>
         </DialogHeader>
 
