@@ -405,7 +405,7 @@ export const ContactDetailModal = ({ contactId, open, onClose, onDelete }) => {
                 {loading ? (
                   <div className="space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" style={{ backgroundColor: 'var(--stroke)' }} />)}</div>
                 ) : contact ? (
-                  <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--bg-elev-2)' }}>
+                  <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff' }}>
                     <InfoRow icon={User}     label="Full Name"  value={contact.name}  />
                     <InfoRow icon={Mail}     label="Email"      value={contact.email} copyable />
                     <InfoRow icon={Phone}    label="Phone"      value={contact.phone} />
