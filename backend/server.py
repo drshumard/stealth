@@ -882,7 +882,7 @@ def build_tracker_js(backend_url: str) -> str:
   }
 
   /* ─── Public API ─── */
-  window.StealthTrack = {
+  window.Shumard = {
     getContactId:  getContactId,
     getSessionId:  function(){ return store.config.sessionId; },
     identify: function(fields){
@@ -890,8 +890,7 @@ def build_tracker_js(backend_url: str) -> str:
     },
     stitch:    sendStitch,
     trackEvent: sendLead,
-    store:     store,
-    debug:     function(){ window.__ST_DEBUG=true; }
+    store:     store
   };
 
 })();
