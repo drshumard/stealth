@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Users, ChevronRight, Copy, Tag } from 'lucide-react';
+import { Search, Users, ChevronRight, Copy, Tag, GitMerge } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
