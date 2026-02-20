@@ -1583,36 +1583,98 @@ async def delete_automation(auto_id: str):
 
 @api_router.post("/automations/{auto_id}/test")
 async def test_automation(auto_id: str):
-    """Send a test payload using the latest identified contact."""
+    """Send a test payload using the most recent identified contact (or synthetic data)."""
     auto = await db.automations.find_one({"id": auto_id}, {"_id": 0})
     if not auto:
         raise HTTPException(status_code=404, detail="Automation not found")
-    # Find the most recent identified contact to use as test data
+
     contact = await db.contacts.find_one(
-        {"merged_into": None, "$or": [{"email": {"$exists": True, "$ne": None}},
-                                      {"phone": {"$exists": True, "$ne": None}}]},
+        {"merged_into": None, "$or": [
+            {"email": {"$exists": True, "$ne": None}},
+            {"phone": {"$exists": True, "$ne": None}}
+        ]},
         {"_id": 0}
     )
     if not contact:
-        # Use a synthetic sample
         contact = {
             "contact_id": "test-" + str(uuid.uuid4())[:8],
             "email": "test@example.com", "name": "Test Lead",
             "phone": "+1-555-0100",
-            "attribution": {"utm_source": "facebook", "utm_campaign": "test"},
+            "attribution": {"utm_source": "facebook", "utm_campaign": "test_campaign"},
             "created_at": dt_to_str(datetime.now(timezone.utc)),
         }
+
     payload = _build_webhook_payload(contact, auto.get('field_map', []))
     payload['_tether_test'] = True
     hdrs = {"Content-Type": "application/json"}
     if auto.get('custom_headers'):
         hdrs.update(auto['custom_headers'])
+
+    # Fire synchronously so we can return the full result immediately
+    import time
+    start       = time.monotonic()
+    http_status = None
+    response_body = None
+    success     = False
+    error_msg   = None
+
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(auto['webhook_url'], json=payload, headers=hdrs)
-        return {"status": "ok", "http_status": resp.status_code, "payload": payload}
+            http_status   = resp.status_code
+            response_body = resp.text[:2000]
+            success       = 200 <= resp.status_code < 300
     except Exception as e:
-        return {"status": "error", "error": str(e), "payload": payload}
+        error_msg = str(e)
+
+    duration_ms = round((time.monotonic() - start) * 1000)
+    now         = datetime.now(timezone.utc)
+
+    run_doc = {
+        "id":            str(uuid.uuid4()),
+        "automation_id": auto_id,
+        "run_type":      "test",
+        "contact_id":    contact.get("contact_id"),
+        "contact_email": contact.get("email"),
+        "contact_name":  contact.get("name"),
+        "payload":       payload,
+        "webhook_url":   auto['webhook_url'],
+        "http_status":   http_status,
+        "response_body": response_body,
+        "success":       success,
+        "error":         error_msg,
+        "duration_ms":   duration_ms,
+        "triggered_at":  dt_to_str(now),
+    }
+    await db.automation_runs.insert_one(run_doc)
+    await db.automations.update_one({"id": auto_id}, {"$set": {"last_triggered_at": dt_to_str(now)}})
+
+    return {
+        "status":        "ok" if success else "error",
+        "run_id":        run_doc["id"],
+        "http_status":   http_status,
+        "response_body": response_body,
+        "duration_ms":   duration_ms,
+        "success":       success,
+        "error":         error_msg,
+        "payload":       payload,
+    }
+
+
+@api_router.get("/automations/{auto_id}/runs", response_model=List[AutomationRunOut])
+async def get_automation_runs(auto_id: str, limit: int = 50):
+    """Return execution history for a specific automation, newest first."""
+    auto = await db.automations.find_one({"id": auto_id}, {"_id": 0, "id": 1})
+    if not auto:
+        raise HTTPException(status_code=404, detail="Automation not found")
+    runs = await db.automation_runs.find(
+        {"automation_id": auto_id}, {"_id": 0}
+    ).sort("triggered_at", -1).limit(limit).to_list(limit)
+    result = []
+    for r in runs:
+        r["triggered_at"] = str_to_dt(r.get("triggered_at"))
+        result.append(AutomationRunOut(**r))
+    return result
 
 
 # ─────────────────────────── Startup: create indexes ───────────────────────────
