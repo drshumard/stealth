@@ -1222,6 +1222,55 @@ async def get_stats():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.get("/logs")
+async def get_logs(limit: int = 200):
+    """Recent activity feed: page visits enriched with contact identity."""
+    try:
+        visits = await db.page_visits.find({}, {"_id": 0}).sort("timestamp", -1).limit(limit).to_list(limit)
+
+        # Batch-fetch all relevant contacts
+        contact_ids = list({v["contact_id"] for v in visits})
+        contacts_raw = await db.contacts.find(
+            {"contact_id": {"$in": contact_ids}},
+            {"_id": 0, "contact_id": 1, "name": 1, "email": 1, "phone": 1, "merged_into": 1, "attribution": 1}
+        ).to_list(len(contact_ids)) if contact_ids else []
+        contact_map: dict = {c["contact_id"]: c for c in contacts_raw}
+
+        # For merged contacts, try to resolve to the parent
+        parent_ids = [c["merged_into"] for c in contacts_raw if c.get("merged_into") and c["merged_into"] not in contact_map]
+        if parent_ids:
+            parents = await db.contacts.find(
+                {"contact_id": {"$in": parent_ids}},
+                {"_id": 0, "contact_id": 1, "name": 1, "email": 1, "phone": 1}
+            ).to_list(len(parent_ids))
+            for p in parents:
+                contact_map[p["contact_id"]] = p
+
+        result = []
+        for v in visits:
+            c = contact_map.get(v["contact_id"]) or {}
+            if c.get("merged_into"):
+                c = contact_map.get(c["merged_into"]) or c
+            attr = v.get("attribution") or {}
+            result.append({
+                "timestamp": dt_to_str(str_to_dt(v.get("timestamp"))),
+                "contact_id": v["contact_id"],
+                "contact_name": c.get("name"),
+                "contact_email": c.get("email"),
+                "contact_phone": c.get("phone"),
+                "url": v.get("current_url"),
+                "referrer": v.get("referrer_url"),
+                "page_title": v.get("page_title"),
+                "session_id": v.get("session_id"),
+                "utm_source": attr.get("utm_source"),
+                "utm_campaign": attr.get("utm_campaign"),
+            })
+        return result
+    except Exception as e:
+        logger.error(f"Error getting logs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ─────────────────────────── Startup: create indexes ───────────────────────────
 
 @app.on_event("startup")
