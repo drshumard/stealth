@@ -45,15 +45,17 @@ export const ContactsTable = ({ contacts, loading, initialLoad, onSelectContact,
     setSelected(new Set());
   }, [contacts]);
 
-  const filtered = (hideSearch ? contacts : contacts).filter(c => {
-    if (!search || hideSearch) return hideSearch ? true : !search;
-    const q = search.toLowerCase();
-    return (
-      (c.name  && c.name.toLowerCase().includes(q)) ||
-      (c.email && c.email.toLowerCase().includes(q)) ||
-      (c.phone && c.phone.toLowerCase().includes(q))
-    );
-  });
+  const filtered = hideSearch
+    ? contacts  // parent already filtered
+    : contacts.filter(c => {
+        if (!search) return true;
+        const q = search.toLowerCase();
+        return (
+          (c.name  && c.name.toLowerCase().includes(q)) ||
+          (c.email && c.email.toLowerCase().includes(q)) ||
+          (c.phone && c.phone.toLowerCase().includes(q))
+        );
+      });
 
   const filteredIds = filtered.map(c => c.contact_id);
   const allSelected = filteredIds.length > 0 && filteredIds.every(id => selected.has(id));
