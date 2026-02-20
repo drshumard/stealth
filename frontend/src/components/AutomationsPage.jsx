@@ -354,6 +354,7 @@ export default function AutomationsPage() {
               onEdit={handleEdit}
               onDelete={handleDelete}
               onToggle={handleToggle}
+              onViewRuns={handleViewRuns}
             />
           ))}
         </div>
