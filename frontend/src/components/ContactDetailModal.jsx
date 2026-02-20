@@ -93,11 +93,16 @@ const InfoRow = ({ icon: Icon, label, value, mono, copyable, accent }) => (
 const AttrRow = ({ label, value }) => {
   if (!value) return null;
   return (
-    <div className="flex items-start gap-3 py-2 px-4">
-      <div className="text-xs w-40 shrink-0" style={{ color: 'var(--text-dim)' }}>{label}</div>
+    <div className="flex items-start gap-3 py-2 px-4 min-w-0">
+      <div className="text-xs w-36 shrink-0" style={{ color: 'var(--text-dim)' }}>{label}</div>
       <div
-        className="text-xs break-all font-mono flex-1"
-        style={{ color: 'var(--amber-warn)', fontFamily: 'IBM Plex Mono, monospace' }}
+        className="text-xs font-mono flex-1 min-w-0"
+        style={{
+          color: 'var(--amber-warn)',
+          fontFamily: 'IBM Plex Mono, monospace',
+          wordBreak: 'break-all',
+          overflowWrap: 'anywhere',
+        }}
       >
         {value}
       </div>
