@@ -1695,6 +1695,7 @@ async def test_automation(auto_id: str):
         "run_id":        run_doc["id"],
         "http_status":   http_status,
         "response_body": response_body,
+        "response_hint": response_hint,
         "duration_ms":   duration_ms,
         "success":       success,
         "error":         error_msg,
