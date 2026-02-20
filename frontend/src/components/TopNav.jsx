@@ -1,12 +1,13 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Users, Globe, BarChart3, List, Search, Bell, ChevronDown } from 'lucide-react';
+import { Users, Globe, BarChart3, List, Search, Bell, ChevronDown, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const NAV_TABS = [
-  { id: 'leads',     label: 'Leads',     icon: Users,     path: '/' },
-  { id: 'visitors',  label: 'Visitors',  icon: Globe,     path: '/visitors' },
-  { id: 'analytics', label: 'Analytics', icon: BarChart3, path: '/analytics' },
-  { id: 'logs',      label: 'Logs',      icon: List,      path: '/logs' },
+  { id: 'leads',       label: 'Leads',       icon: Users,     path: '/' },
+  { id: 'visitors',    label: 'Visitors',    icon: Globe,     path: '/visitors' },
+  { id: 'automations', label: 'Automations', icon: Zap,       path: '/automations' },
+  { id: 'analytics',   label: 'Analytics',   icon: BarChart3, path: '/analytics' },
+  { id: 'logs',        label: 'Logs',        icon: List,      path: '/logs' },
 ];
 
 export const TopNav = ({ stats }) => {
