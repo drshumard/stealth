@@ -1,10 +1,34 @@
 [
   {
-    "content": "Fix flash: only show skeletons on first load (no data yet), not on refresh",
-    "status": "in_progress"
+    "content": "P0: Test contact deletion (backend curl + frontend UI)",
+    "status": "pending"
   },
   {
-    "content": "Add delete contact: backend DELETE endpoint + frontend trash button with confirm dialog",
+    "content": "P0: Test UI flash fix on page reload",
+    "status": "pending"
+  },
+  {
+    "content": "P1: Add phone field to backend Contact model",
+    "status": "pending"
+  },
+  {
+    "content": "P1: Update tracker template to capture phone from forms",
+    "status": "pending"
+  },
+  {
+    "content": "P1: Display phone in ContactDetailModal frontend",
+    "status": "pending"
+  },
+  {
+    "content": "P2: Rename tracker.js to shumard.js (endpoint + template + references)",
+    "status": "pending"
+  },
+  {
+    "content": "P2: Add console.log messages for captured events in script",
+    "status": "pending"
+  },
+  {
+    "content": "Run comprehensive testing via testing agent",
     "status": "pending"
   }
 ]
