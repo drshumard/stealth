@@ -263,7 +263,7 @@ export const ContactsTable = ({
               <Col label="Created" col="updated_at" className="hidden md:table-cell w-36" />
               <Col label="Source"  col="attribution.utm_source" className="hidden sm:table-cell w-32" />
               <Col label="Visits"  col="visit_count" className="text-right pr-6 w-20" />
-              <TableHead className="w-20 pr-4 text-right text-xs uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+              <TableHead className="w-20 pr-4 text-right text-xs uppercase tracking-wide" style={{ color: '#030352', opacity: 0.65, fontWeight: 700 }}>
                 Actions
               </TableHead>
             </TableRow>
