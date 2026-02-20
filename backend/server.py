@@ -721,12 +721,13 @@ async def _fire_webhook_task(
     error_msg   = None
 
     try:
-        async with httpx.AsyncClient(timeout=12.0) as client:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             resp = await client.post(url, json=payload, headers=headers)
             http_status   = resp.status_code
-            response_body = resp.text[:2000]
+            raw_text      = resp.text.strip() if resp.text else ''
+            response_body = raw_text[:2000] if raw_text else None
             success       = 200 <= resp.status_code < 300
-            logger.info(f"Automation {auto_id[:8]} [{run_type}] → HTTP {resp.status_code}")
+            logger.info(f"Automation {auto_id[:8]} [{run_type}] -> HTTP {resp.status_code}")
     except Exception as e:
         error_msg = str(e)
         logger.error(f"Automation {auto_id[:8]} webhook error: {e}")
