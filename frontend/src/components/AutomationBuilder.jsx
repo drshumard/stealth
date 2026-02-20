@@ -267,8 +267,8 @@ export function AutomationBuilder({ open, automation, onClose, onSave }) {
       const res = await fetch(`${API}/automations/${id}/test`, { method: 'POST' });
       const data = await res.json();
       setTestResult(data);
-      if (data.status === 'ok') toast.success(`Test fired → HTTP ${data.http_status}`);
-      else toast.error(`Test failed: ${data.error}`);
+      if (data.success) toast.success(`Test sent → HTTP ${data.http_status} (${data.duration_ms}ms)`);
+      else toast.error(data.error ? `Error: ${data.error}` : `HTTP ${data.http_status}`);
     } catch (e) {
       toast.error('Test request failed');
     } finally {
