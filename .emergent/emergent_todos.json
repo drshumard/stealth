@@ -1,18 +1,38 @@
 [
   {
-    "content": "Rename existing LeadsPage → VisitorsPage (all contacts, unchanged)",
-    "status": "completed"
+    "content": "Update index.css: light theme CSS variables (dark → light)",
+    "status": "in_progress"
   },
   {
-    "content": "Create new LeadsPage — identified contacts only (has email/phone/name), filter controls",
-    "status": "completed"
+    "content": "Rewrite App.js: new layout with TopNav inside white card on beige canvas",
+    "status": "pending"
   },
   {
-    "content": "Update Sidebar: Leads, Visitors, Analytics, Logs",
-    "status": "completed"
+    "content": "Create TopNav.jsx: horizontal pill-tab navigation",
+    "status": "pending"
   },
   {
-    "content": "Update App.js routing: / → Leads, /visitors → Visitors",
-    "status": "completed"
+    "content": "Rewrite ContactsTable.jsx: light design + pagination + source badges + sort",
+    "status": "pending"
+  },
+  {
+    "content": "Rewrite LeadsPage + VisitorsPage: new light layout + toolbar",
+    "status": "pending"
+  },
+  {
+    "content": "Rewrite AnalyticsPage + LogsPage: light theme",
+    "status": "pending"
+  },
+  {
+    "content": "Update ContactDetailModal: light theme",
+    "status": "pending"
+  },
+  {
+    "content": "Update ScriptEmbedCard: light theme",
+    "status": "pending"
+  },
+  {
+    "content": "Screenshot and verify",
+    "status": "pending"
   }
 ]
