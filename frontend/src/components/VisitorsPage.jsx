@@ -7,34 +7,30 @@ import { ContactsTable } from '@/components/ContactsTable';
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
 
 export default function VisitorsPage({ contacts, loading, initialLoad, stats, onRefresh, onSelectContact, onDeleteContact, onBulkDelete }) {
-  const handleCopyScript = () => {
+  const handleCopyScript = () =>
     navigator.clipboard.writeText(`<script src="${BACKEND_URL}/api/shumard.js"></script>`)
-      .then(() => toast.success('Script copied!', { description: 'Paste in your page <head>' }));
-  };
+      .then(() => toast.success('Script copied!'));
 
   return (
-    <div className="p-6 md:p-8">
-      {/* Page header */}
-      <div className="flex items-start justify-between mb-6">
+    <div className="p-8 md:p-10">
+      <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--text)' }}>Visitors</h1>
-          <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
+          <h1 className="text-4xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--brand-navy)', letterSpacing: '-0.02em' }}>
+            Visitors
+          </h1>
+          <p className="text-base mt-1 font-medium" style={{ color: 'var(--text-muted)' }}>
             {contacts.length} total visitor{contacts.length !== 1 ? 's' : ''} tracked
           </p>
         </div>
-        <div className="flex items-center gap-2 mt-1">
-          <Button
-            variant="outline" size="sm"
-            className="gap-1.5 h-9 text-sm"
-            style={{ borderColor: 'var(--stroke)', color: 'var(--text-muted)' }}
-          >
+        <div className="flex items-center gap-3 mt-1">
+          <Button variant="outline" size="sm" className="gap-2 h-10 px-5 text-sm font-semibold"
+            style={{ borderColor: 'var(--brand-navy)', color: 'var(--brand-navy)' }}>
             <Download size={14} /> Export
           </Button>
           <Button
             data-testid="visitors-copy-script-button"
-            size="sm"
-            className="gap-1.5 h-9 text-sm text-white"
-            style={{ backgroundColor: 'var(--primary-orange)' }}
+            size="sm" className="gap-2 h-10 px-5 text-sm font-semibold text-white"
+            style={{ backgroundColor: 'var(--brand-red)' }}
             onClick={handleCopyScript}
           >
             <Copy size={14} /> Copy Script
@@ -42,20 +38,16 @@ export default function VisitorsPage({ contacts, loading, initialLoad, stats, on
         </div>
       </div>
 
-      {/* Embed card */}
-      <div className="mb-6">
-        <ScriptEmbedCard />
-      </div>
+      <div className="mb-6"><ScriptEmbedCard /></div>
 
-      {/* Table card */}
       <div className="rounded-2xl border" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff', boxShadow: 'var(--shadow-soft)' }}>
-        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--stroke)' }}>
-          <span className="text-sm font-semibold" style={{ color: 'var(--text)', fontFamily: 'Space Grotesk, sans-serif' }}>All Visitors</span>
-          <Button variant="ghost" size="sm" onClick={onRefresh} className="h-8 w-8 p-0" style={{ color: 'var(--text-dim)' }}>
-            <RefreshCw size={13} />
+        <div className="flex items-center justify-between px-6 py-5 border-b" style={{ borderColor: 'var(--stroke)' }}>
+          <span className="text-base font-bold" style={{ color: 'var(--brand-navy)', fontFamily: 'Space Grotesk, sans-serif' }}>All Visitors</span>
+          <Button variant="ghost" size="sm" onClick={onRefresh} className="h-9 w-9 p-0 rounded-lg" style={{ color: 'var(--text-dim)' }}>
+            <RefreshCw size={14} />
           </Button>
         </div>
-        <div className="p-4 pt-3">
+        <div className="px-6 py-4">
           <ContactsTable
             contacts={contacts}
             loading={loading}

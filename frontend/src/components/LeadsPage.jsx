@@ -20,20 +20,19 @@ function passesDate(c, range) {
   if (range === 'all') return true;
   const d = new Date(c.updated_at), now = Date.now();
   if (range === 'today') { const s = new Date(); s.setHours(0,0,0,0); return d >= s; }
-  if (range === '7d')  return d >= new Date(now - 7  * 864e5);
+  if (range === '7d')  return d >= new Date(now - 7 * 864e5);
   if (range === '30d') return d >= new Date(now - 30 * 864e5);
   return true;
 }
 
 export default function LeadsPage({ contacts, loading, initialLoad, stats, onRefresh, onSelectContact, onDeleteContact, onBulkDelete }) {
-  const [search,   setSearch]  = useState('');
-  const [srcFilter, setSrc]    = useState('all');
-  const [dateFilter, setDate]  = useState('all');
+  const [search,    setSearch] = useState('');
+  const [srcFilter, setSrc]   = useState('all');
+  const [dateFilter, setDate] = useState('all');
 
-  const handleCopyScript = () => {
+  const handleCopyScript = () =>
     navigator.clipboard.writeText(`<script src="${BACKEND_URL}/api/shumard.js"></script>`)
-      .then(() => toast.success('Script copied!', { description: 'Paste in your page <head>' }));
-  };
+      .then(() => toast.success('Script copied!'));
 
   const identified = useMemo(() => contacts.filter(c => c.email || c.phone || c.name), [contacts]);
   const sources    = useMemo(() => {
@@ -46,7 +45,7 @@ export default function LeadsPage({ contacts, loading, initialLoad, stats, onRef
     return identified.filter(c => {
       if (srcFilter !== 'all' && c.attribution?.utm_source !== srcFilter) return false;
       if (!passesDate(c, dateFilter)) return false;
-      if (q) return (c.name?.toLowerCase().includes(q)) || (c.email?.toLowerCase().includes(q)) || (c.phone?.toLowerCase().includes(q));
+      if (q) return c.name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q) || c.phone?.toLowerCase().includes(q);
       return true;
     });
   }, [identified, srcFilter, dateFilter, search]);
@@ -54,28 +53,30 @@ export default function LeadsPage({ contacts, loading, initialLoad, stats, onRef
   const activeFilters = (srcFilter !== 'all' ? 1 : 0) + (dateFilter !== 'all' ? 1 : 0);
 
   return (
-    <div className="p-6 md:p-8">
+    <div className="p-8 md:p-10">
       {/* Page header */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--text)' }}>Leads</h1>
-          <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
+          <h1 className="text-4xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--brand-navy)', letterSpacing: '-0.02em' }}>
+            Leads
+          </h1>
+          <p className="text-base mt-1 font-medium" style={{ color: 'var(--text-muted)' }}>
             {identified.length} identified contact{identified.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <div className="flex items-center gap-2 mt-1">
+        <div className="flex items-center gap-3 mt-1">
           <Button
             variant="outline" size="sm"
-            className="gap-1.5 h-9 text-sm"
-            style={{ borderColor: 'var(--stroke)', color: 'var(--text-muted)' }}
+            className="gap-2 h-10 px-5 text-sm font-semibold"
+            style={{ borderColor: 'var(--brand-navy)', color: 'var(--brand-navy)' }}
           >
             <Download size={14} /> Export
           </Button>
           <Button
             data-testid="leads-copy-script-button"
             size="sm"
-            className="gap-1.5 h-9 text-sm text-white"
-            style={{ backgroundColor: 'var(--primary-orange)' }}
+            className="gap-2 h-10 px-5 text-sm font-semibold text-white"
+            style={{ backgroundColor: 'var(--brand-red)' }}
             onClick={handleCopyScript}
           >
             <Copy size={14} /> Copy Script
@@ -86,66 +87,60 @@ export default function LeadsPage({ contacts, loading, initialLoad, stats, onRef
       {/* Table card */}
       <div className="rounded-2xl border" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff', boxShadow: 'var(--shadow-soft)' }}>
         {/* Toolbar */}
-        <div className="flex items-center gap-3 px-5 py-4 border-b flex-wrap" style={{ borderColor: 'var(--stroke)' }}>
-          <div className="relative flex-1 min-w-[160px] max-w-xs">
-            <Filter size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-dim)' }} />
+        <div className="flex items-center gap-3 px-6 py-5 border-b flex-wrap" style={{ borderColor: 'var(--stroke)' }}>
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <Filter size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-dim)' }} />
             <Input
               data-testid="leads-filter-search-input"
               placeholder="Search name, email, phone…"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="pl-9 h-8 text-xs"
-              style={{ borderColor: 'var(--stroke)', backgroundColor: '#fafaf8', color: 'var(--text)' }}
+              className="pl-10 h-10 text-sm font-medium"
+              style={{ borderColor: 'var(--stroke)', backgroundColor: '#faf9f7', color: 'var(--text)' }}
             />
           </div>
 
           <Select value={srcFilter} onValueChange={setSrc}>
-            <SelectTrigger data-testid="leads-filter-source-select" className="h-8 text-xs w-36" style={{ borderColor: 'var(--stroke)' }}>
+            <SelectTrigger data-testid="leads-filter-source-select" className="h-10 text-sm w-40 font-medium" style={{ borderColor: 'var(--stroke)' }}>
               <SelectValue placeholder="All sources" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all" className="text-xs">All sources</SelectItem>
-              {sources.map(s => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}
+              <SelectItem value="all" className="text-sm">All sources</SelectItem>
+              {sources.map(s => <SelectItem key={s} value={s} className="text-sm">{s}</SelectItem>)}
             </SelectContent>
           </Select>
 
           <Select value={dateFilter} onValueChange={setDate}>
-            <SelectTrigger data-testid="leads-filter-date-range" className="h-8 text-xs w-28" style={{ borderColor: 'var(--stroke)' }}>
+            <SelectTrigger data-testid="leads-filter-date-range" className="h-10 text-sm w-36 font-medium" style={{ borderColor: 'var(--stroke)' }}>
               <SelectValue placeholder="All time" />
             </SelectTrigger>
             <SelectContent>
-              {DATE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>)}
+              {DATE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value} className="text-sm">{o.label}</SelectItem>)}
             </SelectContent>
           </Select>
 
           {(activeFilters > 0 || search) && (
             <button
               onClick={() => { setSrc('all'); setDate('all'); setSearch(''); }}
-              className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg border transition-colors"
+              className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border transition-colors font-medium"
               style={{ color: 'var(--text-muted)', borderColor: 'var(--stroke)' }}
             >
-              <X size={11} /> Clear
+              <X size={13} /> Clear
             </button>
           )}
 
-          <div className="ml-auto flex items-center gap-2">
-            <Button
-              variant="ghost" size="sm"
-              onClick={onRefresh}
-              className="h-8 w-8 p-0"
-              style={{ color: 'var(--text-dim)' }}
-            ><RefreshCw size={13} /></Button>
-            <Badge
-              className="text-xs font-mono px-2 h-6"
-              style={{ backgroundColor: '#fff7ed', color: 'var(--primary-orange)', border: '1px solid #fed7aa' }}
-            >
-              {filtered.length}
-            </Badge>
+          <div className="ml-auto flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={onRefresh} className="h-9 w-9 p-0 rounded-lg" style={{ color: 'var(--text-dim)' }}>
+              <RefreshCw size={14} />
+            </Button>
+            <span className="text-sm font-bold tabular-nums" style={{ color: 'var(--brand-navy)' }}>
+              {filtered.length} results
+            </span>
           </div>
         </div>
 
         {/* Table */}
-        <div className="p-4 pt-3">
+        <div className="px-6 py-4">
           <ContactsTable
             contacts={filtered}
             loading={loading}
