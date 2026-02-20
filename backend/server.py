@@ -244,9 +244,25 @@ async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = 
         if client_ip and not existing.get('client_ip'):
             update['client_ip'] = client_ip
         if data.get('attribution'):
-            for k, v in data['attribution'].items():
-                if v and not (existing.get('attribution') or {}).get(k):
-                    update[f'attribution.{k}'] = v
+            existing_attr = existing.get('attribution')
+            if not existing_attr or not isinstance(existing_attr, dict):
+                # attribution is null/missing — build and set the whole object at once
+                built = safe_attribution(data['attribution'])
+                if built:
+                    built_dict = built.model_dump()
+                    # strip None values so we don't write nulls
+                    update['attribution'] = {k: v for k, v in built_dict.items() if v is not None}
+            else:
+                # attribution exists — patch individual fields that are missing
+                for k, v in data['attribution'].items():
+                    if k == 'extra' and isinstance(v, dict):
+                        # merge extra keys individually to avoid overwriting existing ones
+                        existing_extra = existing_attr.get('extra') or {}
+                        for ek, ev in v.items():
+                            if ev and not existing_extra.get(ek):
+                                update[f'attribution.extra.{ek}'] = str(ev)[:500]
+                    elif v and not existing_attr.get(k):
+                        update[f'attribution.{k}'] = v
         await db.contacts.update_one({"contact_id": cid}, {"$set": update})
     else:
         contact = Contact(
