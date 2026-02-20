@@ -49,8 +49,8 @@ function formatTime(dt) {
 const SortIcon = ({ col, sort }) => {
   if (sort.col !== col) return <ArrowUpDown size={12} className="opacity-30 ml-1 shrink-0" />;
   return sort.dir === 'asc'
-    ? <ArrowUp size={12} className="ml-1 shrink-0" style={{ color: 'var(--primary-orange)' }} />
-    : <ArrowDown size={12} className="ml-1 shrink-0" style={{ color: 'var(--primary-orange)' }} />;
+    ? <ArrowUp size={12} className="ml-1 shrink-0" style={{ color: 'var(--brand-navy)' }} />
+    : <ArrowDown size={12} className="ml-1 shrink-0" style={{ color: 'var(--brand-navy)' }} />;
 };
 
 const PAGE_SIZES = [8, 10, 20, 50];
@@ -187,10 +187,10 @@ export const ContactsTable = ({
         <div
           data-testid="bulk-action-bar"
           className="flex items-center justify-between gap-3 mb-3 px-4 py-2.5 rounded-xl border"
-          style={{ backgroundColor: '#fff7ed', borderColor: '#fed7aa' }}
+          style={{ backgroundColor: '#fff0ee', borderColor: '#fecdc7' }}
         >
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold" style={{ color: 'var(--primary-orange)' }}>
+            <span className="text-sm font-semibold" style={{ color: 'var(--brand-navy)' }}>
               {selectedCount} selected
             </span>
             <button
@@ -208,7 +208,7 @@ export const ContactsTable = ({
                 data-testid="leads-bulk-delete-button"
                 size="sm" variant="outline"
                 className="h-7 gap-1.5 text-xs"
-                style={{ borderColor: '#fca5a5', color: '#b91c1c', backgroundColor: '#fef2f2' }}
+                style={{ borderColor: '#fecdc7', color: 'var(--brand-red)', backgroundColor: '#fff0ee' }}
               >
                 <Trash2 size={12} /> Delete {selectedCount}
               </Button>
@@ -227,7 +227,7 @@ export const ContactsTable = ({
                 <AlertDialogAction
                   data-testid="bulk-delete-confirm-button"
                   onClick={handleBulkDelete}
-                  style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none' }}
+                  style={{ backgroundColor: 'var(--brand-red)', color: '#fff', border: 'none' }}
                 >
                   Delete {selectedCount}
                 </AlertDialogAction>
@@ -302,7 +302,7 @@ export const ContactsTable = ({
                         data-testid="contacts-empty-state-copy-script"
                         size="sm" onClick={onCopyScript}
                         className="gap-1.5 text-xs text-white"
-                        style={{ backgroundColor: 'var(--primary-orange)' }}
+                        style={{ backgroundColor: 'var(--brand-navy)' }}
                       >
                         <Copy size={12} /> Copy Script
                       </Button>
@@ -388,7 +388,7 @@ export const ContactsTable = ({
                         )}
                         <span
                           className="text-xs font-mono font-semibold tabular-nums"
-                          style={{ color: contact.visit_count > 0 ? 'var(--primary-orange)' : 'var(--text-dim)' }}
+                          style={{ color: contact.visit_count > 0 ? 'var(--brand-navy)' : 'var(--text-dim)' }}
                         >
                           {contact.visit_count}
                         </span>
@@ -462,9 +462,9 @@ export const ContactsTable = ({
                     onClick={() => setPage(p)}
                     className="w-7 h-7 rounded-lg border text-xs font-medium transition-colors"
                     style={{
-                      backgroundColor: safePage === p ? 'var(--primary-orange)' : '#ffffff',
+                      backgroundColor: safePage === p ? 'var(--brand-navy)' : '#ffffff',
                       color: safePage === p ? '#ffffff' : 'var(--text)',
-                      borderColor: safePage === p ? 'var(--primary-orange)' : 'var(--stroke)',
+                      borderColor: safePage === p ? 'var(--brand-navy)' : 'var(--stroke)',
                     }}
                   >{p}</button>
                 )
