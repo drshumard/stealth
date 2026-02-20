@@ -26,7 +26,7 @@ function timeAgo(ts) {
   return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function AutomationCard({ auto, onEdit, onDelete, onToggle }) {
+function AutomationCard({ auto, onEdit, onDelete, onToggle, onViewRuns }) {
   const filterCount = auto.filters?.length || 0;
   const mapCount    = auto.field_map?.length || 0;
 
