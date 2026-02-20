@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Zap, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, CheckCircle, XCircle, Globe, Clock, ChevronRight, Activity } from 'lucide-react';
+import { Zap, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, CheckCircle, XCircle, Globe, Clock, ChevronRight, Activity, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
@@ -8,6 +8,9 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { toast } from 'sonner';
+import { AutomationBuilder } from '@/components/AutomationBuilder';
+import { AutomationRuns } from '@/components/AutomationRuns';
 import { toast } from 'sonner';
 import { AutomationBuilder } from '@/components/AutomationBuilder';
 
