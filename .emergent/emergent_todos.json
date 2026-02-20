@@ -1,0 +1,26 @@
+[
+  {
+    "content": "Get design guidelines from design_agent",
+    "status": "in_progress"
+  },
+  {
+    "content": "Create implementation plan",
+    "status": "pending"
+  },
+  {
+    "content": "Build backend - tracking endpoints, contact model, URL visit model",
+    "status": "pending"
+  },
+  {
+    "content": "Build tracking script (served at /api/tracker.js)",
+    "status": "pending"
+  },
+  {
+    "content": "Build frontend dashboard - contacts table + modal with visit history",
+    "status": "pending"
+  },
+  {
+    "content": "Test all features end-to-end",
+    "status": "pending"
+  }
+]
