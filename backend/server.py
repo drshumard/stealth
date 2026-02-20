@@ -590,8 +590,19 @@ async def _session_auto_stitch(contact_id: str, session_id: Optional[str], now: 
 async def _ip_auto_stitch(contact_id: str, client_ip: Optional[str], now: datetime) -> None:
     """
     Auto-stitch by IP when one contact clearly has attribution (UTM/fbclid)
-    AND another has email/phone — and neither has both yet.
-    Uses a 30-minute window to catch delayed registrations.
+async def _ip_auto_stitch(contact_id: str, client_ip: Optional[str], now: datetime) -> None:
+    """
+    Auto-stitch contacts that share the same IP within a 30-minute window.
+
+    Two stitching rules (in priority order):
+    1. Identity cross-match  — one side has attribution AND the other has email/phone.
+    2. Iframe companion rule — one side has REAL attribution (UTMs/click-IDs) AND the
+       other is completely anonymous (no real attribution, no identity).
+       This handles the common pattern where drshumardworkshop.com/register (landing page
+       with FB attribution) loads joinnow.live/embed/… as an iframe.  The iframe contact
+       has no UTMs (only possibly an extra param like ?layout=…) but is provably the same
+       person because (a) joinnow is only reachable as an iframe on drshumardworkshop, and
+       (b) they share the same IP with sub-minute timing.
     """
     if not client_ip:
         return
@@ -611,25 +622,37 @@ async def _ip_auto_stitch(contact_id: str, client_ip: Optional[str], now: dateti
     if not current or current.get('merged_into'):
         return
 
-    def has_attribution(c):
+    def has_real_attribution(c):
+        """True only when there are actual UTM/click-ID signals (excludes extra)."""
         attr = c.get('attribution') or {}
         return any(v for k, v in attr.items() if k not in ('extra',) and v)
 
     def has_identity(c):
         return bool(c.get('email') or c.get('phone'))
 
-    c_attr  = has_attribution(current)
+    c_attr  = has_real_attribution(current)
     c_ident = has_identity(current)
 
     for candidate in candidates:
-        cand_attr  = has_attribution(candidate)
+        cand_attr  = has_real_attribution(candidate)
         cand_ident = has_identity(candidate)
 
-        # Only stitch when EXACTLY one side has attribution AND other has identity
+        # ── Rule 1: attribution ↔ identity cross-match ──────────────────────────
         if c_attr and cand_ident and not c_ident and not cand_attr:
             await _do_stitch(contact_id, candidate['contact_id'], now)
             break
         elif cand_attr and c_ident and not c_attr and not cand_ident:
+            await _do_stitch(candidate['contact_id'], contact_id, now)
+            break
+
+        # ── Rule 2: iframe companion — attribution-rich + completely anonymous ──
+        # The anonymous side has no real UTMs and no identity (likely an iframe
+        # companion).  Since joinnow.live is only accessible as an iframe on the
+        # landing page, sharing an IP is definitive proof they're the same person.
+        elif c_attr and not cand_attr and not cand_ident:
+            await _do_stitch(contact_id, candidate['contact_id'], now)
+            break
+        elif cand_attr and not c_attr and not c_ident:
             await _do_stitch(candidate['contact_id'], contact_id, now)
             break
 
