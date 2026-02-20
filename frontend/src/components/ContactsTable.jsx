@@ -45,8 +45,8 @@ export const ContactsTable = ({ contacts, loading, initialLoad, onSelectContact,
     setSelected(new Set());
   }, [contacts]);
 
-  const filtered = contacts.filter(c => {
-    if (!search) return true;
+  const filtered = (hideSearch ? contacts : contacts).filter(c => {
+    if (!search || hideSearch) return hideSearch ? true : !search;
     const q = search.toLowerCase();
     return (
       (c.name  && c.name.toLowerCase().includes(q)) ||
