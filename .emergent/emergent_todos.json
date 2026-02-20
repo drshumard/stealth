@@ -9,14 +9,14 @@
   },
   {
     "content": "Build backend - tracking endpoints, contact model, URL visit model, tracker.js endpoint",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Build frontend dashboard - contacts table + modal with visit history + CSS tokens",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Test all features end-to-end",
-    "status": "pending"
+    "status": "in_progress"
   }
 ]
