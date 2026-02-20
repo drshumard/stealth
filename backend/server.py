@@ -667,24 +667,27 @@ def build_tracker_js(backend_url: str) -> str:
   function sendPageview() {
     if (store.processedData.pageSent) return;
     store.processedData.pageSent = true;
-    logger('📄 Page view captured → ' + window.location.href);
     send('/track/pageview', buildPayload());
   }
 
   function sendLead(fields) {
-    var logParts = [];
-    if (fields && fields.email) logParts.push('email: ' + fields.email);
-    if (fields && fields.phone) logParts.push('phone: ' + fields.phone);
-    logger('✉️  Lead captured' + (logParts.length ? ' (' + logParts.join(', ') + ')' : ''), fields);
+    var email = fields && fields.email;
+    var phone = fields && fields.phone;
+    if (email || phone) {
+      var parts = [];
+      if (email) parts.push('email: ' + email);
+      if (phone) parts.push('phone: ' + phone);
+      logger('Contact captured — ' + parts.join(' | '));
+    }
     send('/track/lead', buildPayload(fields));
   }
 
   function sendRegistration(fields) {
-    var logParts = [];
-    if (fields && fields.email) logParts.push('email: ' + fields.email);
-    if (fields && fields.phone) logParts.push('phone: ' + fields.phone);
-    if (fields && fields.name)  logParts.push('name: ' + fields.name);
-    logger('📝 Registration captured' + (logParts.length ? ' (' + logParts.join(', ') + ')' : ''), fields);
+    var parts = [];
+    if (fields && fields.email) parts.push('email: ' + fields.email);
+    if (fields && fields.phone) parts.push('phone: ' + fields.phone);
+    if (fields && fields.name)  parts.push('name: ' + fields.name);
+    if (parts.length) logger('Contact captured — ' + parts.join(' | '));
     send('/track/registration', buildPayload(fields));
   }
 
