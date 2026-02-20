@@ -162,6 +162,54 @@ class ContactDetail(BaseModel):
     visits: List[PageVisit] = []
 
 
+# ─────────────────────────── Automation Models ───────────────────────────
+
+class AutomationFilter(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    field: str           # e.g. 'utm_source', 'email', 'phone'
+    operator: str        # 'exists' | 'not_exists' | 'equals' | 'contains' | 'not_equals'
+    value: Optional[str] = None
+
+
+class AutomationFieldMap(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    source: str          # Tether field name
+    target: str          # Target webhook field name
+
+
+class AutomationCreate(BaseModel):
+    name: str
+    enabled: bool = True
+    webhook_url: str
+    filters: List[AutomationFilter] = []
+    field_map: List[AutomationFieldMap] = []
+    custom_headers: Optional[Dict[str, str]] = None
+
+
+class AutomationUpdate(BaseModel):
+    name: Optional[str] = None
+    enabled: Optional[bool] = None
+    webhook_url: Optional[str] = None
+    filters: Optional[List[AutomationFilter]] = None
+    field_map: Optional[List[AutomationFieldMap]] = None
+    custom_headers: Optional[Dict[str, str]] = None
+
+
+class AutomationOut(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    name: str
+    enabled: bool
+    webhook_url: str
+    filters: List[AutomationFilter] = []
+    field_map: List[AutomationFieldMap] = []
+    custom_headers: Optional[Dict[str, str]] = None
+    created_at: datetime
+    updated_at: datetime
+    last_triggered_at: Optional[datetime] = None
+    trigger_count: int = 0
+
+
 # ─────────────────────────── Helpers ───────────────────────────
 
 def dt_to_str(dt):
