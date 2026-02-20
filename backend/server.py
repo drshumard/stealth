@@ -931,14 +931,6 @@ def build_tracker_js(backend_url: str) -> str:
     bindForms();
     bindLooseInputs();
     watchDOM();
-    /* ─── Init ─── */
-  function init() {
-    store.config.contactId = getContactId();
-    store.config.sessionId = initSessionId();
-    captureAttribution();
-    bindForms();
-    bindLooseInputs();
-    watchDOM();
     sendPageview();
     /* Parent page: start broadcasting identity to iframes */
     if (!store.config.isIframe) {
