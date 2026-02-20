@@ -229,6 +229,7 @@ export default function AutomationsPage() {
   const [loading, setLoading]          = useState(true);
   const [builderOpen, setBuilderOpen]  = useState(false);
   const [editingAuto, setEditingAuto]  = useState(null);
+  const [runsAuto,    setRunsAuto]     = useState(null);
 
   const fetchAutomations = useCallback(async () => {
     try {
