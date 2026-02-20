@@ -1,22 +1,14 @@
 [
   {
-    "content": "Get design guidelines from design_agent",
-    "status": "completed"
-  },
-  {
-    "content": "Create implementation plan",
-    "status": "completed"
-  },
-  {
-    "content": "Build backend - tracking endpoints, contact model, URL visit model, tracker.js endpoint",
-    "status": "completed"
-  },
-  {
-    "content": "Build frontend dashboard - contacts table + modal with visit history + CSS tokens",
-    "status": "completed"
-  },
-  {
-    "content": "Test all features end-to-end",
+    "content": "Rebuild tracker.js mimicking Hyros architecture (IIFE, session-ID, change events, UTM/attribution, cookie persistence, special class names)",
     "status": "in_progress"
+  },
+  {
+    "content": "Update backend to support session-ID header, attribution fields (UTM params, fbclid, gclid), richer data model",
+    "status": "pending"
+  },
+  {
+    "content": "Fix frontend modal click issue & re-test",
+    "status": "pending"
   }
 ]
