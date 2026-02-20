@@ -11,8 +11,6 @@ import {
 import { toast } from 'sonner';
 import { AutomationBuilder } from '@/components/AutomationBuilder';
 import { AutomationRuns } from '@/components/AutomationRuns';
-import { toast } from 'sonner';
-import { AutomationBuilder } from '@/components/AutomationBuilder';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
 const API = `${BACKEND_URL}/api`;
