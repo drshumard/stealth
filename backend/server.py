@@ -853,6 +853,7 @@ def build_tracker_js(backend_url: str) -> str:
     bindForms();
     bindLooseInputs();
     watchDOM();
+    logger('🚀 Shumard initialized | contact: ' + store.config.contactId.substring(0,8) + '… | session: ' + store.config.sessionId.substring(0,8) + '… | isIframe: ' + store.config.isIframe);
     sendPageview();
 
     /* Parent page: start broadcasting identity to iframes */
