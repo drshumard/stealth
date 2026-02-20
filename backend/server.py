@@ -632,7 +632,6 @@ def build_tracker_js(backend_url: str) -> str:
 
     if (found) {
       lsSet(ATTR_KEY, JSON.stringify(store.source));
-      logger('📌 Attribution captured from URL', store.source);
     }
   }
 
