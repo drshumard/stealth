@@ -195,12 +195,19 @@ def safe_attribution(raw: Optional[dict]) -> Optional[Attribution]:
     if not raw:
         return None
     try:
-        known = {'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
-                 'fbclid', 'gclid', 'ttclid', 'source_link_tag', 'fb_ad_set_id', 'google_campaign_id'}
+        known = {
+            'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
+            'utm_id', 'campaign_id', 'adset_id', 'ad_id',
+            'fbclid', 'gclid', 'ttclid', 'source_link_tag', 'fb_ad_set_id', 'google_campaign_id'
+        }
         attrs = {k: str(v)[:500] for k, v in raw.items() if k in known and v}
-        extra = {k: str(v)[:200] for k, v in raw.items() if k not in known and k != 'extra' and v}
-        if extra:
-            attrs['extra'] = extra
+        # Capture ALL unrecognised params into extra (merge with any existing extra dict)
+        raw_extra = raw.get('extra') or {}
+        extra_from_raw = {k: str(v)[:500] for k, v in raw.items() if k not in known and k != 'extra' and v}
+        if isinstance(raw_extra, dict):
+            extra_from_raw.update({k: str(v)[:500] for k, v in raw_extra.items() if v})
+        if extra_from_raw:
+            attrs['extra'] = extra_from_raw
         return Attribution(**attrs) if attrs else None
     except Exception:
         return None
