@@ -924,17 +924,42 @@ def build_tracker_js(backend_url: str) -> str:
   function handleFieldChange(el) {
     var ft = classifyInput(el); if (!ft) return;
     var val = (el.value||'').trim(); if (!val) return;
+
+    /* Helper: build name from whatever is already stored */
+    function storedName() {
+      return store.lead.name || ((store.lead.firstName+' '+store.lead.lastName).trim()) || null;
+    }
+
     if (ft==='email' && isEmail(val) && val!==store.lead.email) {
-      store.lead.email=val;
-      sendLead({email:val});
+      store.lead.email = val;
+      var p = { email: val };
+      var n = storedName(); if (n) p.name = n;
+      if (store.lead.firstName) p.first_name = store.lead.firstName;
+      if (store.lead.lastName)  p.last_name  = store.lead.lastName;
+      sendLead(p);
     }
     else if (ft==='phone' && isPhone(val) && val!==store.lead.phone) {
-      store.lead.phone=val;
-      sendLead({phone:val});
+      store.lead.phone = val;
+      var pp = { phone: val };
+      if (store.lead.email) pp.email = store.lead.email;
+      var pn = storedName(); if (pn) pp.name = pn;
+      sendLead(pp);
     }
-    else if (ft==='firstName') store.lead.firstName=val;
-    else if (ft==='lastName')  store.lead.lastName=val;
-    else if (ft==='name')      store.lead.name=val;
+    else if (ft==='firstName') {
+      store.lead.firstName = val;
+      if (store.lead.email || store.lead.phone)
+        sendLead({ email: store.lead.email||null, phone: store.lead.phone||null, first_name: val, name: storedName() });
+    }
+    else if (ft==='lastName') {
+      store.lead.lastName = val;
+      if (store.lead.email || store.lead.phone)
+        sendLead({ email: store.lead.email||null, phone: store.lead.phone||null, last_name: val, name: storedName() });
+    }
+    else if (ft==='name') {
+      store.lead.name = val;
+      if (store.lead.email || store.lead.phone)
+        sendLead({ email: store.lead.email||null, phone: store.lead.phone||null, name: val });
+    }
   }
 
   /* ─── Form submit ─── */
