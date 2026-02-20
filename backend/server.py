@@ -237,11 +237,29 @@ def strip_nulls(d: dict) -> dict:
             continue
         if isinstance(v, dict):
             cleaned = strip_nulls(v)
-            if cleaned:          # only include non-empty dicts
+            if cleaned:
                 result[k] = cleaned
         else:
             result[k] = v
     return result
+
+
+async def _resolve_contact_id(contact_id: str) -> str:
+    """
+    Follow the merge chain to find the root (visible) contact_id.
+    If a browser holds a stale child ID from a previous session, all operations
+    will transparently target the parent contact instead.
+    Guards against cycles with a visited set.
+    """
+    visited: set = set()
+    cid = contact_id
+    while cid and cid not in visited:
+        visited.add(cid)
+        doc = await db.contacts.find_one({"contact_id": cid}, {"_id": 0, "merged_into": 1})
+        if not doc or not doc.get("merged_into"):
+            return cid
+        cid = doc["merged_into"]
+    return contact_id  # fallback (cycle or missing)
 
 
 async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = None) -> None:
