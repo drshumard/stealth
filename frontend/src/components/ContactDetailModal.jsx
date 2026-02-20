@@ -429,24 +429,63 @@ export const ContactDetailModal = ({ contactId, open, onClose, onDelete }) => {
                 {loading ? (
                   <div className="space-y-3">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-8 w-full" style={{ backgroundColor: 'var(--stroke)' }} />)}</div>
                 ) : contact ? (
-                  <div>
+                  <div className="space-y-4">
                     {hasAttribution ? (
-                      <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--bg-elev-2)' }}>
-                        <AttrRow label="UTM Source"   value={contact.attribution?.utm_source} />
-                        <AttrRow label="UTM Medium"   value={contact.attribution?.utm_medium} />
-                        <AttrRow label="UTM Campaign" value={contact.attribution?.utm_campaign} />
-                        <AttrRow label="UTM Term"     value={contact.attribution?.utm_term} />
-                        <AttrRow label="UTM Content"  value={contact.attribution?.utm_content} />
-                        <AttrRow label="Facebook Click ID" value={contact.attribution?.fbclid} />
-                        <AttrRow label="Google Click ID"   value={contact.attribution?.gclid} />
-                        <AttrRow label="TikTok Click ID"   value={contact.attribution?.ttclid} />
-                        <AttrRow label="Source Link Tag"   value={contact.attribution?.source_link_tag} />
-                        <AttrRow label="FB Ad Set ID"       value={contact.attribution?.fb_ad_set_id} />
-                        <AttrRow label="Google Campaign ID" value={contact.attribution?.google_campaign_id} />
-                        {contact.attribution?.extra && Object.entries(contact.attribution.extra).map(([k, v]) => (
-                          <AttrRow key={k} label={k} value={v} />
-                        ))}
-                      </div>
+                      <>
+                        {/* UTM Parameters */}
+                        {(contact.attribution?.utm_source || contact.attribution?.utm_medium || contact.attribution?.utm_campaign || contact.attribution?.utm_term || contact.attribution?.utm_content || contact.attribution?.utm_id) && (
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-widest mb-2 px-1" style={{ color: 'var(--text-dim)' }}>UTM Parameters</p>
+                            <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--bg-elev-2)' }}>
+                              <AttrRow label="utm_source"   value={contact.attribution?.utm_source} />
+                              <AttrRow label="utm_medium"   value={contact.attribution?.utm_medium} />
+                              <AttrRow label="utm_campaign" value={contact.attribution?.utm_campaign} />
+                              <AttrRow label="utm_term"     value={contact.attribution?.utm_term} />
+                              <AttrRow label="utm_content"  value={contact.attribution?.utm_content} />
+                              <AttrRow label="utm_id"       value={contact.attribution?.utm_id} />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Ad Platform IDs */}
+                        {(contact.attribution?.campaign_id || contact.attribution?.adset_id || contact.attribution?.ad_id || contact.attribution?.fb_ad_set_id || contact.attribution?.google_campaign_id) && (
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-widest mb-2 px-1" style={{ color: 'var(--text-dim)' }}>Ad Platform IDs</p>
+                            <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--bg-elev-2)' }}>
+                              <AttrRow label="campaign_id"        value={contact.attribution?.campaign_id} />
+                              <AttrRow label="adset_id"           value={contact.attribution?.adset_id} />
+                              <AttrRow label="ad_id"              value={contact.attribution?.ad_id} />
+                              <AttrRow label="fb_ad_set_id"       value={contact.attribution?.fb_ad_set_id} />
+                              <AttrRow label="google_campaign_id" value={contact.attribution?.google_campaign_id} />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Click IDs */}
+                        {(contact.attribution?.fbclid || contact.attribution?.gclid || contact.attribution?.ttclid || contact.attribution?.source_link_tag) && (
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-widest mb-2 px-1" style={{ color: 'var(--text-dim)' }}>Click IDs</p>
+                            <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--bg-elev-2)' }}>
+                              <AttrRow label="fbclid"          value={contact.attribution?.fbclid} />
+                              <AttrRow label="gclid"           value={contact.attribution?.gclid} />
+                              <AttrRow label="ttclid"          value={contact.attribution?.ttclid} />
+                              <AttrRow label="source_link_tag" value={contact.attribution?.source_link_tag} />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* All Other / Unknown Params */}
+                        {contact.attribution?.extra && Object.keys(contact.attribution.extra).length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-widest mb-2 px-1" style={{ color: 'var(--text-dim)' }}>Other Parameters</p>
+                            <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: 'var(--bg-elev-2)' }}>
+                              {Object.entries(contact.attribution.extra).map(([k, v]) => (
+                                <AttrRow key={k} label={k} value={v} />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     ) : (
                       <div className="flex flex-col items-center justify-center py-12 gap-2" style={{ color: 'var(--text-dim)' }}>
                         <TrendingUp size={32} />
