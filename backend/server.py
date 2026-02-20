@@ -612,6 +612,94 @@ async def _ip_auto_stitch(contact_id: str, client_ip: Optional[str], now: dateti
             break
 
 
+
+# ─────────────────────────── Automation Engine ───────────────────────────
+
+def _get_contact_field(contact: dict, field: str) -> Any:
+    attr_fields = {
+        'utm_source','utm_medium','utm_campaign','utm_term','utm_content',
+        'utm_id','campaign_id','adset_id','ad_id',
+        'fbclid','gclid','ttclid','source_link_tag','fb_ad_set_id','google_campaign_id',
+    }
+    if field in attr_fields:
+        return (contact.get('attribution') or {}).get(field)
+    return contact.get(field)
+
+
+def _evaluate_filters(contact: dict, filters: list) -> bool:
+    for f in filters:
+        field    = f.get('field','') if isinstance(f,dict) else getattr(f,'field','')
+        operator = f.get('operator','exists') if isinstance(f,dict) else getattr(f,'operator','exists')
+        value    = f.get('value') if isinstance(f,dict) else getattr(f,'value',None)
+        val      = _get_contact_field(contact, field)
+        vs, cs   = str(val or '').lower(), str(value or '').lower()
+        if operator == 'exists'     and not val:     return False
+        if operator == 'not_exists' and val:         return False
+        if operator == 'equals'     and vs != cs:    return False
+        if operator == 'not_equals' and vs == cs:    return False
+        if operator == 'contains'   and cs not in vs: return False
+    return True
+
+
+def _build_webhook_payload(contact: dict, field_map: list) -> dict:
+    attr = contact.get('attribution') or {}
+    src = {
+        'email': contact.get('email'), 'name': contact.get('name'),
+        'first_name': contact.get('first_name'), 'last_name': contact.get('last_name'),
+        'phone': contact.get('phone'), 'contact_id': contact.get('contact_id'),
+        'client_ip': contact.get('client_ip'),
+        'created_at': dt_to_str(contact.get('created_at')),
+        'updated_at': dt_to_str(contact.get('updated_at')),
+        'utm_source': attr.get('utm_source'), 'utm_medium': attr.get('utm_medium'),
+        'utm_campaign': attr.get('utm_campaign'), 'utm_term': attr.get('utm_term'),
+        'utm_content': attr.get('utm_content'), 'utm_id': attr.get('utm_id'),
+        'campaign_id': attr.get('campaign_id'), 'adset_id': attr.get('adset_id'),
+        'ad_id': attr.get('ad_id'), 'fbclid': attr.get('fbclid'),
+    }
+    if not field_map:
+        return {k: v for k, v in src.items() if v is not None}
+    payload = {}
+    for m in field_map:
+        s = m.get('source') if isinstance(m,dict) else getattr(m,'source','')
+        t = (m.get('target') if isinstance(m,dict) else getattr(m,'target','')) or s
+        if s in src: payload[t] = src[s]
+    return payload
+
+
+async def _fire_webhook_task(auto_id: str, url: str, payload: dict, headers: dict) -> None:
+    try:
+        async with httpx.AsyncClient(timeout=12.0) as client:
+            resp = await client.post(url, json=payload, headers=headers)
+            logger.info(f"Automation {auto_id[:8]} fired → HTTP {resp.status_code}")
+    except Exception as e:
+        logger.error(f"Automation {auto_id[:8]} webhook error: {e}")
+    finally:
+        await db.automations.update_one(
+            {"id": auto_id},
+            {"$set": {"last_triggered_at": dt_to_str(datetime.now(timezone.utc))},
+             "$inc": {"trigger_count": 1}}
+        )
+
+
+async def _run_automations(contact_id: str) -> None:
+    contact = await db.contacts.find_one({"contact_id": contact_id}, {"_id": 0})
+    if not contact or not (contact.get('email') or contact.get('phone')):
+        return
+    automations = await db.automations.find({"enabled": True}, {"_id": 0}).to_list(100)
+    for auto in automations:
+        try:
+            if not _evaluate_filters(contact, auto.get('filters', [])):
+                continue
+            payload = _build_webhook_payload(contact, auto.get('field_map', []))
+            hdrs = {"Content-Type": "application/json"}
+            if auto.get('custom_headers'):
+                hdrs.update(auto['custom_headers'])
+            asyncio.create_task(_fire_webhook_task(auto['id'], auto['webhook_url'], payload, hdrs))
+        except Exception as e:
+            logger.error(f"Automation eval error {auto.get('id','?')}: {e}")
+
+
+
 # ─────────────────────────── Tracker JS ───────────────────────────
 
 def build_tracker_js(backend_url: str) -> str:
