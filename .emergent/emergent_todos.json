@@ -5,18 +5,14 @@
   },
   {
     "content": "Create implementation plan",
+    "status": "completed"
+  },
+  {
+    "content": "Build backend - tracking endpoints, contact model, URL visit model, tracker.js endpoint",
     "status": "in_progress"
   },
   {
-    "content": "Build backend - tracking endpoints, contact model, URL visit model",
-    "status": "pending"
-  },
-  {
-    "content": "Build tracking script (served at /api/tracker.js)",
-    "status": "pending"
-  },
-  {
-    "content": "Build frontend dashboard - contacts table + modal with visit history",
+    "content": "Build frontend dashboard - contacts table + modal with visit history + CSS tokens",
     "status": "pending"
   },
   {
