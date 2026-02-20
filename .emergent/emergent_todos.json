@@ -20,7 +20,11 @@
     "status": "completed"
   },
   {
+    "content": "Fix: Add delete button to ContactDetailModal (was missing from UI)",
+    "status": "completed"
+  },
+  {
     "content": "Run comprehensive testing via testing agent",
-    "status": "in_progress"
+    "status": "completed"
   }
 ]
