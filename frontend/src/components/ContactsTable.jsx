@@ -160,6 +160,14 @@ export const ContactsTable = ({ contacts, loading, onSelectContact, onCopyScript
                     </TableCell>
                     <TableCell className="py-3 pr-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        {contact.merged_children && contact.merged_children.length > 0 && (
+                          <Badge variant="secondary" className="text-xs px-1.5 py-0 gap-1 hidden sm:flex"
+                            style={{ backgroundColor: 'rgba(69,209,156,0.1)', color: 'var(--mint-success)', border: '1px solid rgba(69,209,156,0.2)' }}
+                          >
+                            <GitMerge size={9} />
+                            {contact.merged_children.length}
+                          </Badge>
+                        )}
                         <Badge variant="secondary" className="text-xs font-mono px-2"
                           style={{
                             backgroundColor: contact.visit_count > 0 ? 'rgba(21,184,200,0.12)' : 'var(--bg-elev-2)',
