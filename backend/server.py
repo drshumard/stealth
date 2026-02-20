@@ -1636,18 +1636,35 @@ async def test_automation(auto_id: str):
 
     # Fire synchronously so we can return the full result immediately
     import time
-    start       = time.monotonic()
-    http_status = None
+    start         = time.monotonic()
+    http_status   = None
     response_body = None
-    success     = False
-    error_msg   = None
+    response_hint = None   # extracted from error responses (e.g. n8n "hint" field)
+    success       = False
+    error_msg     = None
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             resp = await client.post(auto['webhook_url'], json=payload, headers=hdrs)
-            http_status   = resp.status_code
-            response_body = resp.text[:2000]
+            http_status = resp.status_code
+            raw_text    = resp.text.strip() if resp.text else ''
+            # Normalise: store None for empty body (not empty string) so UI can distinguish
+            response_body = raw_text[:2000] if raw_text else None
             success       = 200 <= resp.status_code < 300
+
+            # Extract hint from structured error responses (e.g. n8n {"hint": "..."})
+            if not success and response_body:
+                try:
+                    parsed = json.loads(response_body)
+                    response_hint = parsed.get('hint') or parsed.get('message') or parsed.get('error')
+                except Exception:
+                    pass
+    except httpx.TimeoutException:
+        error_msg = (
+            "Request timed out after 30 seconds. "
+            "For n8n test webhooks: make sure you clicked 'Execute Workflow' in n8n "
+            "immediately before running this test — test webhooks only stay active for a few seconds."
+        )
     except Exception as e:
         error_msg = str(e)
 
