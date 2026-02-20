@@ -265,6 +265,19 @@ async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = 
                         update[f'attribution.{k}'] = v
         await db.contacts.update_one({"contact_id": cid}, {"$set": update})
     else:
+        # Only create a NEW contact record when it carries meaningful data.
+        # Pure pageview-only contacts (no identity, no attribution) are skipped —
+        # their visits are still logged in page_visits and will be associated
+        # when the contact is eventually identified via a lead/registration event.
+        has_identity = any(data.get(f) for f in ['name', 'email', 'phone', 'first_name', 'last_name'])
+        raw_attr = data.get('attribution') or {}
+        attr_fields = {'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
+                       'utm_id', 'campaign_id', 'adset_id', 'ad_id',
+                       'fbclid', 'gclid', 'ttclid', 'source_link_tag', 'fb_ad_set_id', 'google_campaign_id'}
+        has_attribution = any(raw_attr.get(k) for k in attr_fields)
+        if not has_identity and not has_attribution:
+            return  # skip — don't pollute contacts with anonymous page-load-only records
+
         contact = Contact(
             contact_id=cid,
             session_id=data.get('session_id'),
