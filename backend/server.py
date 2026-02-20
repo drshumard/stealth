@@ -589,9 +589,6 @@ async def _session_auto_stitch(contact_id: str, session_id: Optional[str], now: 
 
 async def _ip_auto_stitch(contact_id: str, client_ip: Optional[str], now: datetime) -> None:
     """
-    Auto-stitch by IP when one contact clearly has attribution (UTM/fbclid)
-async def _ip_auto_stitch(contact_id: str, client_ip: Optional[str], now: datetime) -> None:
-    """
     Auto-stitch contacts that share the same IP within a 30-minute window.
 
     Two stitching rules (in priority order):
