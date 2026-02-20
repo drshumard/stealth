@@ -254,6 +254,31 @@ class StealthTrackAPITester:
         )
         return success
 
+    def test_delete_contact(self, contact_id):
+        """Test DELETE /api/contacts/{contact_id}"""
+        if not contact_id:
+            print("⚠️  No contact_id provided for delete test")
+            return False
+            
+        success, response = self.run_test(
+            "Delete Contact",
+            "DELETE",
+            f"/contacts/{contact_id}",
+            204
+        )
+        return success
+
+    def test_delete_invalid_contact(self):
+        """Test DELETE /api/contacts/{invalid_id} returns 404"""
+        invalid_id = "invalid-contact-id-123"
+        success, response = self.run_test(
+            "Delete Invalid Contact",
+            "DELETE", 
+            f"/contacts/{invalid_id}",
+            404
+        )
+        return success
+
 def main():
     print("🚀 Starting StealthTrack API Tests")
     print("=" * 50)
