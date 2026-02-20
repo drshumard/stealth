@@ -148,8 +148,8 @@ export const ContactsTable = ({
 
   const Col = ({ label, col: colKey, className = '' }) => (
     <TableHead
-      className={`text-xs uppercase tracking-wide cursor-pointer select-none h-10 ${className}`}
-      style={{ color: 'var(--text-muted)', fontFamily: 'Work Sans, sans-serif' }}
+      className={`text-xs uppercase tracking-wide cursor-pointer select-none h-11 ${className}`}
+      style={{ color: '#030352', opacity: 0.65, fontFamily: 'Work Sans, sans-serif', fontWeight: 700 }}
       onClick={() => toggleSort(colKey)}
     >
       <div className="flex items-center">
