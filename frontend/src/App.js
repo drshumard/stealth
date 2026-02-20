@@ -14,7 +14,8 @@ const API = `${BACKEND_URL}/api`;
 function Dashboard() {
   const [contacts, setContacts] = useState([]);
   const [stats, setStats] = useState({ total_contacts: 0, total_visits: 0, today_visits: 0 });
-  const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true); // true only until first fetch completes
+  const [loading, setLoading] = useState(false); // background refresh indicator
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
