@@ -684,19 +684,59 @@ def _build_webhook_payload(contact: dict, field_map: list) -> dict:
     return payload
 
 
-async def _fire_webhook_task(auto_id: str, url: str, payload: dict, headers: dict) -> None:
+async def _fire_webhook_task(
+    auto_id: str, url: str, payload: dict, headers: dict,
+    run_type: str = "live", contact: Optional[dict] = None
+) -> None:
+    """Fire a webhook, persist the run record, and update automation stats."""
+    import time
+    start       = time.monotonic()
+    http_status = None
+    response_body = None
+    success     = False
+    error_msg   = None
+
     try:
         async with httpx.AsyncClient(timeout=12.0) as client:
             resp = await client.post(url, json=payload, headers=headers)
-            logger.info(f"Automation {auto_id[:8]} fired → HTTP {resp.status_code}")
+            http_status   = resp.status_code
+            response_body = resp.text[:2000]
+            success       = 200 <= resp.status_code < 300
+            logger.info(f"Automation {auto_id[:8]} [{run_type}] → HTTP {resp.status_code}")
     except Exception as e:
+        error_msg = str(e)
         logger.error(f"Automation {auto_id[:8]} webhook error: {e}")
-    finally:
+
+    duration_ms = round((time.monotonic() - start) * 1000)
+    now         = datetime.now(timezone.utc)
+
+    run_doc = {
+        "id":            str(uuid.uuid4()),
+        "automation_id": auto_id,
+        "run_type":      run_type,
+        "contact_id":    contact.get("contact_id")  if contact else None,
+        "contact_email": contact.get("email")        if contact else None,
+        "contact_name":  contact.get("name")         if contact else None,
+        "payload":       payload,
+        "webhook_url":   url,
+        "http_status":   http_status,
+        "response_body": response_body,
+        "success":       success,
+        "error":         error_msg,
+        "duration_ms":   duration_ms,
+        "triggered_at":  dt_to_str(now),
+    }
+    await db.automation_runs.insert_one(run_doc)
+
+    # Update automation stats (only count live runs toward trigger_count)
+    stat_update: dict = {"last_triggered_at": dt_to_str(now)}
+    if run_type == "live":
         await db.automations.update_one(
             {"id": auto_id},
-            {"$set": {"last_triggered_at": dt_to_str(datetime.now(timezone.utc))},
-             "$inc": {"trigger_count": 1}}
+            {"$set": stat_update, "$inc": {"trigger_count": 1}}
         )
+    else:
+        await db.automations.update_one({"id": auto_id}, {"$set": stat_update})
 
 
 async def _run_automations(contact_id: str) -> None:
@@ -712,10 +752,12 @@ async def _run_automations(contact_id: str) -> None:
             hdrs = {"Content-Type": "application/json"}
             if auto.get('custom_headers'):
                 hdrs.update(auto['custom_headers'])
-            asyncio.create_task(_fire_webhook_task(auto['id'], auto['webhook_url'], payload, hdrs))
+            asyncio.create_task(
+                _fire_webhook_task(auto['id'], auto['webhook_url'], payload, hdrs,
+                                   run_type="live", contact=contact)
+            )
         except Exception as e:
             logger.error(f"Automation eval error {auto.get('id','?')}: {e}")
-
 
 
 # ─────────────────────────── Tracker JS ───────────────────────────
