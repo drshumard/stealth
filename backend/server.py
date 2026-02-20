@@ -865,8 +865,8 @@ async def root():
     return {"message": "StealthTrack API", "status": "running"}
 
 
-@api_router.get("/tracker.js", response_class=PlainTextResponse)
-async def get_tracker_js():
+@api_router.get("/shumard.js", response_class=PlainTextResponse)
+async def get_shumard_js():
     backend_url = os.environ.get('REACT_APP_BACKEND_URL', '')
     return PlainTextResponse(
         content=build_tracker_js(backend_url),
