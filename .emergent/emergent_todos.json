@@ -1,18 +1,18 @@
 [
   {
     "content": "Rename existing LeadsPage → VisitorsPage (all contacts, unchanged)",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Create new LeadsPage — identified contacts only (has email/phone/name), filter controls",
-    "status": "pending"
+    "status": "completed"
   },
   {
-    "content": "Update Sidebar: Analytics, Leads, Visitors, Logs",
-    "status": "pending"
+    "content": "Update Sidebar: Leads, Visitors, Analytics, Logs",
+    "status": "completed"
   },
   {
     "content": "Update App.js routing: / → Leads, /visitors → Visitors",
-    "status": "pending"
+    "status": "completed"
   }
 ]
