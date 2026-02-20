@@ -442,7 +442,9 @@ def build_tracker_js(backend_url: str) -> str:
     lead: { email: '', phone: '', firstName: '', lastName: '', name: '' },
     source: {
       utm_source: '', utm_medium: '', utm_campaign: '', utm_term: '', utm_content: '',
-      fbclid: '', gclid: '', ttclid: '', source_link_tag: '', fb_ad_set_id: '', google_campaign_id: ''
+      utm_id: '', campaign_id: '', adset_id: '', ad_id: '',
+      fbclid: '', gclid: '', ttclid: '', source_link_tag: '', fb_ad_set_id: '', google_campaign_id: '',
+      extra: {}
     },
     config: {
       contactId:      '',
