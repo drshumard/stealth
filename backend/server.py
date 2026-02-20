@@ -228,6 +228,22 @@ def fix_visit_doc(v: dict) -> dict:
     return v
 
 
+def strip_nulls(d: dict) -> dict:
+    """Recursively remove None values so MongoDB never stores null sub-fields
+    that would block future dot-path $set operations."""
+    result = {}
+    for k, v in d.items():
+        if v is None:
+            continue
+        if isinstance(v, dict):
+            cleaned = strip_nulls(v)
+            if cleaned:          # only include non-empty dicts
+                result[k] = cleaned
+        else:
+            result[k] = v
+    return result
+
+
 async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = None) -> None:
     cid = data.get('contact_id')
     if not cid:
