@@ -587,11 +587,26 @@ def build_tracker_js(backend_url: str) -> str:
   function sendPageview() {
     if (store.processedData.pageSent) return;
     store.processedData.pageSent = true;
+    logger('📄 Page view captured → ' + window.location.href);
     send('/track/pageview', buildPayload());
   }
 
-  function sendLead(fields)         { send('/track/lead',         buildPayload(fields)); }
-  function sendRegistration(fields) { send('/track/registration', buildPayload(fields)); }
+  function sendLead(fields) {
+    var logParts = [];
+    if (fields && fields.email) logParts.push('email: ' + fields.email);
+    if (fields && fields.phone) logParts.push('phone: ' + fields.phone);
+    logger('✉️  Lead captured' + (logParts.length ? ' (' + logParts.join(', ') + ')' : ''), fields);
+    send('/track/lead', buildPayload(fields));
+  }
+
+  function sendRegistration(fields) {
+    var logParts = [];
+    if (fields && fields.email) logParts.push('email: ' + fields.email);
+    if (fields && fields.phone) logParts.push('phone: ' + fields.phone);
+    if (fields && fields.name)  logParts.push('name: ' + fields.name);
+    logger('📝 Registration captured' + (logParts.length ? ' (' + logParts.join(', ') + ')' : ''), fields);
+    send('/track/registration', buildPayload(fields));
+  }
 
   /* ─── Stitch two contacts together ─── */
   function sendStitch(parentCid, childCid) {
