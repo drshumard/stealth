@@ -837,12 +837,10 @@ def build_tracker_js(backend_url: str) -> str:
     var val = (el.value||'').trim(); if (!val) return;
     if (ft==='email' && isEmail(val) && val!==store.lead.email) {
       store.lead.email=val;
-      logger('✉️  Email field captured: ' + val);
       sendLead({email:val});
     }
     else if (ft==='phone' && isPhone(val) && val!==store.lead.phone) {
       store.lead.phone=val;
-      logger('📞 Phone field captured: ' + val);
       sendLead({phone:val});
     }
     else if (ft==='firstName') store.lead.firstName=val;
