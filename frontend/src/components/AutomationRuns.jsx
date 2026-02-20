@@ -175,12 +175,20 @@ function RunCard({ run }) {
                 >
                   {prettyResponse}
                 </pre>
+              ) : ok ? (
+                <div
+                  className="rounded-xl p-3 text-xs"
+                  style={{ backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46' }}
+                >
+                  <p className="font-bold mb-1">Webhook acknowledged \u2714</p>
+                  <p style={{ opacity: 0.8 }}>No response body returned. This is normal -- n8n and many webhook services return empty bodies on success. The request was received.</p>
+                </div>
               ) : (
                 <div
                   className="rounded-xl p-3 text-xs font-medium"
                   style={{ backgroundColor: '#f8f7f4', border: '1px solid var(--stroke)', color: 'var(--text-dim)' }}
                 >
-                  Empty response body
+                  No response body
                 </div>
               )}
             </div>
