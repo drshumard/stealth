@@ -423,12 +423,16 @@ export function AutomationBuilder({ open, automation, onClose, onSave }) {
               }}
             >
               {/* Result header */}
-              <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: `1px solid ${testResult.success ? '#a7f3d0' : '#fecaca'}` }}>
+              <div className="flex items-center gap-3 px-4 py-3 flex-wrap" style={{ borderBottom: `1px solid ${testResult.success ? '#a7f3d0' : '#fecaca'}` }}>
                 {testResult.success
                   ? <CheckCircle2 size={16} style={{ color: '#059669' }} />
                   : <AlertTriangle size={16} style={{ color: '#dc2626' }} />}
                 <span className="text-sm font-bold flex-1" style={{ color: testResult.success ? '#065f46' : '#991b1b' }}>
-                  {testResult.success ? `Test sent successfully` : `Test failed`}
+                  {testResult.success
+                    ? `Webhook received \u2714`
+                    : testResult.http_status === null
+                      ? 'Connection failed'
+                      : `Failed \u2014 HTTP ${testResult.http_status}`}
                 </span>
                 {testResult.http_status && (
                   <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ backgroundColor: testResult.success ? '#d1fae5' : '#fee2e2', color: testResult.success ? '#065f46' : '#991b1b' }}>
@@ -442,7 +446,18 @@ export function AutomationBuilder({ open, automation, onClose, onSave }) {
                 )}
               </div>
 
-              {/* Error */}
+              {/* n8n-specific hint for 404 "not registered" errors */}
+              {!testResult.success && testResult.response_hint && (
+                <div className="px-4 py-3 flex items-start gap-2" style={{ backgroundColor: '#fffbeb', borderBottom: '1px solid #fcd34d' }}>
+                  <AlertTriangle size={14} className="shrink-0 mt-0.5" style={{ color: '#d97706' }} />
+                  <div>
+                    <p className="text-xs font-bold mb-0.5" style={{ color: '#92400e' }}>Webhook hint</p>
+                    <p className="text-xs" style={{ color: '#78350f' }}>{testResult.response_hint}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Error message (timeout etc.) */}
               {testResult.error && (
                 <div className="px-4 py-3" style={{ borderBottom: '1px solid #fecaca' }}>
                   <p className="text-xs font-bold mb-1" style={{ color: '#991b1b' }}>Error</p>
@@ -451,36 +466,49 @@ export function AutomationBuilder({ open, automation, onClose, onSave }) {
               )}
 
               {/* Two columns: payload + response */}
-              <div className="grid grid-cols-2 gap-0 divide-x" style={{ borderColor: testResult.success ? '#a7f3d0' : '#fecaca' }}>
-                <div className="p-4">
-                  <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: testResult.success ? '#065f46' : '#991b1b', opacity: 0.7 }}>
+              <div className="grid grid-cols-2 gap-0" style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+                <div className="p-4" style={{ borderRight: '1px solid rgba(0,0,0,0.06)' }}>
+                  <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: '#030352', opacity: 0.65 }}>
                     Payload Sent
                   </p>
                   <pre
                     className="text-xs overflow-auto rounded-lg p-2.5 max-h-40"
-                    style={{ backgroundColor: 'rgba(0,0,0,0.06)', fontFamily: 'IBM Plex Mono, monospace', color: testResult.success ? '#065f46' : '#991b1b', lineHeight: 1.5 }}
+                    style={{ backgroundColor: 'rgba(3,3,82,0.05)', fontFamily: 'IBM Plex Mono, monospace', color: '#030352', lineHeight: 1.5 }}
                   >
                     {JSON.stringify(testResult.payload, null, 2)}
                   </pre>
                 </div>
                 <div className="p-4">
-                  <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: testResult.success ? '#065f46' : '#991b1b', opacity: 0.7 }}>
+                  <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: testResult.success ? '#065f46' : '#991b1b', opacity: 0.75 }}>
                     Response
                   </p>
                   {testResult.response_body ? (
                     <pre
                       className="text-xs overflow-auto rounded-lg p-2.5 max-h-40"
-                      style={{ backgroundColor: 'rgba(0,0,0,0.06)', fontFamily: 'IBM Plex Mono, monospace', color: testResult.success ? '#065f46' : '#991b1b', lineHeight: 1.5 }}
+                      style={{ backgroundColor: testResult.success ? 'rgba(5,150,105,0.08)' : 'rgba(239,68,68,0.06)', fontFamily: 'IBM Plex Mono, monospace', color: testResult.success ? '#065f46' : '#991b1b', lineHeight: 1.5 }}
                     >
                       {(() => { try { return JSON.stringify(JSON.parse(testResult.response_body), null, 2); } catch { return testResult.response_body; } })()}
                     </pre>
+                  ) : testResult.success ? (
+                    <div className="rounded-lg p-3 text-xs font-medium" style={{ backgroundColor: 'rgba(5,150,105,0.08)', color: '#065f46' }}>
+                      <p className="font-bold mb-1">Webhook acknowledged \u2714</p>
+                      <p className="opacity-80">No response body -- this is normal for n8n and most webhook services. Check your n8n execution view to confirm the data was received.</p>
+                    </div>
                   ) : (
-                    <div className="rounded-lg p-2.5 text-xs" style={{ backgroundColor: 'rgba(0,0,0,0.06)', color: testResult.success ? '#065f46' : '#991b1b', opacity: 0.6 }}>
-                      Empty response body
+                    <div className="rounded-lg p-3 text-xs font-medium" style={{ backgroundColor: 'rgba(0,0,0,0.04)', color: 'var(--text-dim)' }}>
+                      No response body
                     </div>
                   )}
                 </div>
               </div>
+
+              {/* n8n test webhook one-shot reminder */}
+              {!testResult.success && testResult.http_status === null && (
+                <div className="px-4 py-3 flex items-start gap-2 text-xs" style={{ borderTop: '1px solid #fecaca', color: '#78350f', backgroundColor: '#fffbeb' }}>
+                  <span className="font-bold shrink-0">Tip:</span>
+                  <span>For n8n test webhooks: open your n8n workflow, click <strong>Execute Workflow</strong> to activate it, then immediately click Test here. n8n test webhooks only listen for one request at a time.</span>
+                </div>
+              )}
             </div>
           )}
         </div>
