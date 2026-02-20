@@ -604,8 +604,14 @@ def build_tracker_js(backend_url: str) -> str:
     logger('[stitch] ' + childCid + ' → ' + parentCid);
   }
 
-  function logger(msg) {
-    try { if (window.__ST_DEBUG) console.log('[StealthTrack]', msg); } catch(e) {}
+  function logger(msg, data) {
+    try {
+      if (data !== undefined) {
+        console.log('%c[Shumard]%c ' + msg, 'color:#15b8c8;font-weight:bold', 'color:inherit', data);
+      } else {
+        console.log('%c[Shumard]%c ' + msg, 'color:#15b8c8;font-weight:bold', 'color:inherit');
+      }
+    } catch(e) {}
   }
 
   /* ═══════════════════════════════════════════════════════════════
