@@ -1,15 +1,15 @@
 [
   {
     "content": "Add utm_id, campaign_id, adset_id, ad_id to backend Attribution model + safe_attribution known set",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Update tracker captureAttribution() to catch ALL unknown URL params into extra",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Add new explicit fields + extra params display to Attribution tab in modal",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Screenshot and verify end-to-end",
