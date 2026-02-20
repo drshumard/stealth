@@ -236,6 +236,7 @@ export const ContactDetailModal = ({ contactId, open, onClose, onDelete }) => {
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent
+        hideClose
         data-testid="contact-detail-modal"
         className="max-w-3xl p-0 overflow-hidden border"
         style={{
