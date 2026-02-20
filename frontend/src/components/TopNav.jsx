@@ -15,9 +15,10 @@ export const TopNav = ({ stats }) => {
   const navigate = useNavigate();
 
   const active =
-    location.pathname === '/analytics' ? 'analytics' :
-    location.pathname === '/visitors'  ? 'visitors'  :
-    location.pathname === '/logs'      ? 'logs'      : 'leads';
+    location.pathname === '/analytics'   ? 'analytics'   :
+    location.pathname === '/visitors'    ? 'visitors'    :
+    location.pathname === '/automations' ? 'automations' :
+    location.pathname === '/logs'        ? 'logs'        : 'leads';
 
   return (
     <header
