@@ -1,11 +1,11 @@
 [
   {
     "content": "Get design guidelines from design_agent",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Create implementation plan",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Build backend - tracking endpoints, contact model, URL visit model",
