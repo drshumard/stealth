@@ -8,6 +8,7 @@ import AnalyticsPage from '@/components/AnalyticsPage';
 import LeadsPage from '@/components/LeadsPage';
 import VisitorsPage from '@/components/VisitorsPage';
 import LogsPage from '@/components/LogsPage';
+import AutomationsPage from '@/components/AutomationsPage';
 import { ContactDetailModal } from '@/components/ContactDetailModal';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
