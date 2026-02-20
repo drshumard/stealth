@@ -1,18 +1,18 @@
 [
   {
     "content": "Add MongoDB indexes + client_ip + merged_into fields to backend",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Add /api/track/stitch endpoint + IP-based auto-stitch",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Rewrite tracker.js: session_id, postMessage bridge, stitch call",
-    "status": "pending"
+    "status": "completed"
   },
   {
-    "content": "Update dashboard: hide merged contacts, show merged badge",
-    "status": "pending"
+    "content": "Update dashboard: hide merged contacts, show merged/stitched badge + IP + session info in modal",
+    "status": "in_progress"
   }
 ]
