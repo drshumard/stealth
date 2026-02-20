@@ -1,31 +1,23 @@
 [
   {
-    "content": "P0: Test contact deletion (backend curl + frontend UI)",
+    "content": "P0: Add missing DELETE /contacts/{contact_id} endpoint to server.py",
+    "status": "completed"
+  },
+  {
+    "content": "P0: Fix UI flash - show skeletons only when contacts array is empty (initial load)",
+    "status": "in_progress"
+  },
+  {
+    "content": "P1: Verify phone capture works end-to-end (already in code, needs test)",
     "status": "pending"
   },
   {
-    "content": "P0: Test UI flash fix on page reload",
-    "status": "pending"
+    "content": "P2: Rename tracker.js → shumard.js (endpoint + all frontend references)",
+    "status": "in_progress"
   },
   {
-    "content": "P1: Add phone field to backend Contact model",
-    "status": "pending"
-  },
-  {
-    "content": "P1: Update tracker template to capture phone from forms",
-    "status": "pending"
-  },
-  {
-    "content": "P1: Display phone in ContactDetailModal frontend",
-    "status": "pending"
-  },
-  {
-    "content": "P2: Rename tracker.js to shumard.js (endpoint + template + references)",
-    "status": "pending"
-  },
-  {
-    "content": "P2: Add console.log messages for captured events in script",
-    "status": "pending"
+    "content": "P2: Add always-on console.log messages for all captured events",
+    "status": "completed"
   },
   {
     "content": "Run comprehensive testing via testing agent",
