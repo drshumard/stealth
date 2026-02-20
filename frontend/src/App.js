@@ -139,6 +139,7 @@ function Dashboard() {
           <ContactsTable
             contacts={contacts}
             loading={loading}
+            initialLoad={initialLoad}
             onSelectContact={handleSelectContact}
             onCopyScript={handleCopyScript}
           />
