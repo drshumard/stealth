@@ -417,7 +417,7 @@ async def _ip_auto_stitch(contact_id: str, client_ip: Optional[str], now: dateti
 
 def build_tracker_js(backend_url: str) -> str:
     return r"""/**
- * StealthTrack - Lead Attribution & Cross-Frame Identity Script
+ * Shumard - Lead Attribution & Cross-Frame Identity Script
  * Architecture: Hyros-style field capture + postMessage cross-frame stitching
  */
 (function () {
