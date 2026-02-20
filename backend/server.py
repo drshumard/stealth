@@ -210,6 +210,24 @@ class AutomationOut(BaseModel):
     trigger_count: int = 0
 
 
+class AutomationRunOut(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    automation_id: str
+    run_type: str              # 'live' | 'test'
+    contact_id: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_name: Optional[str] = None
+    payload: Dict[str, Any] = {}
+    webhook_url: str
+    http_status: Optional[int] = None
+    response_body: Optional[str] = None
+    success: bool
+    error: Optional[str] = None
+    duration_ms: Optional[int] = None
+    triggered_at: datetime
+
+
 # ─────────────────────────── Helpers ───────────────────────────
 
 def dt_to_str(dt):
