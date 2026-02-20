@@ -275,6 +275,7 @@ export default function AutomationsPage() {
 
   const handleNew = () => { setEditingAuto(null); setBuilderOpen(true); };
   const handleEdit = (auto) => { setEditingAuto(auto); setBuilderOpen(true); };
+  const handleViewRuns = (auto) => { setRunsAuto(auto); };
 
   const activeCount = automations.filter(a => a.enabled).length;
 
