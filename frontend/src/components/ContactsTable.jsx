@@ -24,7 +24,7 @@ function utmSource(contact) {
   return contact?.attribution?.utm_source || null;
 }
 
-export const ContactsTable = ({ contacts, loading, onSelectContact, onCopyScript }) => {
+export const ContactsTable = ({ contacts, loading, initialLoad, onSelectContact, onCopyScript }) => {
   const [search, setSearch] = useState('');
 
   const filtered = contacts.filter(c => {
