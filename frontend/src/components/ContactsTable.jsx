@@ -323,7 +323,13 @@ export const ContactsTable = ({
                     data-testid="contacts-table-row"
                     key={contact.contact_id}
                     className={`contact-row border-b ${isSelected ? 'selected-row' : ''}`}
-                    style={{ borderColor: 'var(--stroke)', cursor: 'pointer' }}
+                    style={{
+                      borderColor: 'var(--stroke)',
+                      cursor: 'pointer',
+                      backgroundColor: isSelected ? '#fdf0ee' : 'transparent',
+                      borderLeft: isSelected ? '3px solid var(--brand-red)' : '3px solid transparent',
+                      transition: 'all 120ms ease',
+                    }}
                     onClick={() => onSelectContact(contact.contact_id)}
                     tabIndex={0}
                     role="button"
