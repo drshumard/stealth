@@ -533,7 +533,14 @@ def build_tracker_js(backend_url: str) -> str:
   /* ─── Attribution capture ─── */
   function captureAttribution() {
     var cached = lsGet(ATTR_KEY);
-    if (cached) { try { Object.assign(store.source, JSON.parse(cached)); return; } catch (e) {} }
+    if (cached) {
+      try {
+        Object.assign(store.source, JSON.parse(cached));
+        var hasCached = Object.values(store.source).some(function(v){ return !!v; });
+        if (hasCached) logger('📌 Attribution loaded from cache', store.source);
+        return;
+      } catch (e) {}
+    }
     var p = getUrlParams();
     var map = {
       utm_source: ['utm_source'], utm_medium: ['utm_medium'],
@@ -551,7 +558,10 @@ def build_tracker_js(backend_url: str) -> str:
         if (p[param]) { store.source[key] = p[param]; found = true; }
       });
     });
-    if (found) { lsSet(ATTR_KEY, JSON.stringify(store.source)); }
+    if (found) {
+      lsSet(ATTR_KEY, JSON.stringify(store.source));
+      logger('📌 Attribution captured from URL', store.source);
+    }
   }
 
   /* ─── Network ─── */
