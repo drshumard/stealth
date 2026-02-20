@@ -835,43 +835,20 @@ def build_tracker_js(backend_url: str) -> str:
   window.addEventListener('message', function (e) {
     if (!e.data || typeof e.data !== 'object') return;
 
-    /* iframe receives parent identity */
+    /*
+     * iframe receives parent session_id — adopt it so the backend can stitch
+     * the two contacts together via _session_auto_stitch when a lead/registration
+     * comes in.  No HTTP request is made here; stitching is purely backend-driven.
+     */
     if (e.data.type === 'st_parent_id' && store.config.isIframe) {
-      var parentCid  = e.data.contactId;
       var parentSess = e.data.sessionId;
-
-      if (parentCid && parentCid !== store.config.contactId) {
-        store.config.parentContactId = parentCid;
-
-        // Adopt parent's session_id
-        if (parentSess) {
-          store.config.sessionId = parentSess;
-          ssSet(SESS_KEY, parentSess);
-        }
-
-        // Stitch: we (iframe/child) merge into parent
-        sendStitch(parentCid, store.config.contactId);
-
-        // Reply so parent can also confirm stitch
-        try {
-          e.source.postMessage({
-            type:      'st_child_id',
-            contactId: store.config.contactId,
-            sessionId: store.config.sessionId
-          }, e.origin || '*');
-        } catch (err) {}
+      if (parentSess && parentSess !== store.config.sessionId) {
+        store.config.sessionId = parentSess;
+        ssSet(SESS_KEY, parentSess);
       }
     }
 
-    /* Parent receives child (iframe) identity */
-    if (e.data.type === 'st_child_id' && !store.config.isIframe) {
-      var childCid = e.data.contactId;
-      if (childCid && childCid !== store.config.contactId) {
-        sendStitch(store.config.contactId, childCid);
-      }
-    }
-
-    /* Legacy / future webinar platform events — capture form data from iframe postMessages */
+    /* Capture form data posted by webinar platform iframes */
     if (e.data.type === 'registration' || e.data.type === 'webinar_registration') {
       var d = e.data.data || e.data;
       if (d.email) sendLead({ email: d.email, name: d.name || null, phone: d.phone || null });
