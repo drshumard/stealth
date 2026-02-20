@@ -136,6 +136,21 @@ function RunCard({ run }) {
             </div>
           )}
 
+          {/* Extracted hint from structured error responses (n8n, etc.) */}
+          {!run.success && run.response_body && (() => {
+            try {
+              const parsed = JSON.parse(run.response_body);
+              const hint = parsed.hint || parsed.message;
+              if (!hint) return null;
+              return (
+                <div className="rounded-xl p-3 flex items-start gap-2" style={{ backgroundColor: '#fffbeb', border: '1px solid #fcd34d' }}>
+                  <span className="text-xs font-bold shrink-0" style={{ color: '#92400e' }}>Hint:</span>
+                  <p className="text-xs" style={{ color: '#78350f' }}>{hint}</p>
+                </div>
+              );
+            } catch { return null; }
+          })()}
+
           {/* Two-column: payload + response */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {/* Payload sent */}
