@@ -933,7 +933,6 @@ def build_tracker_js(backend_url: str) -> str:
     watchDOM();
     logger('🚀 Shumard initialized | contact: ' + store.config.contactId.substring(0,8) + '… | session: ' + store.config.sessionId.substring(0,8) + '… | isIframe: ' + store.config.isIframe);
     sendPageview();
-
     /* Parent page: start broadcasting identity to iframes */
     if (!store.config.isIframe) {
       /* Broadcast immediately after DOM ready, then periodically for 30s to catch lazy iframes */
