@@ -252,6 +252,19 @@ async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = 
     existing = await db.contacts.find_one({"contact_id": cid}, {"_id": 0})
     now_str = dt_to_str(now)
 
+    # ── If this contact was merged into a parent, redirect the update there ──
+    # The browser still holds the old contact_id in localStorage. All future
+    # events for that device should update the visible (parent) contact.
+    if existing and existing.get('merged_into'):
+        parent_id = existing['merged_into']
+        parent = await db.contacts.find_one({"contact_id": parent_id}, {"_id": 0})
+        if parent:
+            redirected = dict(data)
+            redirected['contact_id'] = parent_id
+            await _upsert_contact(redirected, now, client_ip)
+            return
+        # Parent not found (shouldn't happen) — fall through and update child
+
     if existing:
         update = {"updated_at": now_str}
         for field in ['name', 'email', 'phone', 'first_name', 'last_name', 'session_id']:
