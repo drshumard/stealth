@@ -74,12 +74,33 @@ function Dashboard() {
     try {
       const res = await fetch(`${API}/contacts/${contactId}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Delete failed');
-      // Remove from local state immediately (optimistic)
       setContacts(prev => prev.filter(c => c.contact_id !== contactId));
       fetchStats();
       toast.success('Contact deleted');
     } catch {
       toast.error('Failed to delete contact');
+    }
+  };
+
+  const handleBulkDelete = async (contactIds) => {
+    if (!contactIds || contactIds.length === 0) return;
+    try {
+      // Fire all deletes in parallel
+      const results = await Promise.allSettled(
+        contactIds.map(id => fetch(`${API}/contacts/${id}`, { method: 'DELETE' }))
+      );
+      const succeeded = results.filter(r => r.status === 'fulfilled' && r.value.ok).length;
+      const failed = contactIds.length - succeeded;
+      // Optimistic: remove all targeted from state
+      setContacts(prev => prev.filter(c => !contactIds.includes(c.contact_id)));
+      fetchStats();
+      if (failed === 0) {
+        toast.success(`${succeeded} contact${succeeded !== 1 ? 's' : ''} deleted`);
+      } else {
+        toast.warning(`${succeeded} deleted, ${failed} failed`);
+      }
+    } catch {
+      toast.error('Bulk delete failed');
     }
   };
 
