@@ -290,28 +290,49 @@ def main():
     # Test 1: Health check
     tester.test_health_endpoint()
     
-    # Test 2: Tracker.js script
-    tester.test_tracker_js()
+    # Test 2: New shumard.js script (renamed from tracker.js)
+    tester.test_shumard_js()
     
-    # Test 3: Page view tracking
+    # Test 3: Old tracker.js should return 404
+    tester.test_tracker_js_404()
+    
+    # Test 4: Page view tracking
     pageview_success, pageview_contact_id = tester.test_track_pageview()
     
-    # Test 4: Registration tracking
+    # Test 5: Registration tracking
     registration_success, registration_contact_id = tester.test_track_registration()
     
-    # Test 5: Get contacts
+    # Test 6: Get contacts
     tester.test_get_contacts()
     
-    # Test 6: Get contact detail (use registration contact ID if available)
+    # Test 7: Get contact detail (use registration contact ID if available)
     test_contact_id = registration_contact_id or pageview_contact_id
     if test_contact_id:
         tester.test_get_contact_detail(test_contact_id)
     
-    # Test 7: Get stats
+    # Test 8: Get stats
     tester.test_get_stats()
     
-    # Test 8: Search functionality
+    # Test 9: Search functionality
     tester.test_get_contacts_with_search()
+    
+    # Test 10: Delete contact (use a new contact for this test)
+    if test_contact_id:
+        print(f"\n🗑️  Testing delete with contact ID: {test_contact_id}")
+        delete_success = tester.test_delete_contact(test_contact_id)
+        if delete_success:
+            # Verify contact was actually deleted
+            verify_success, verify_response = tester.run_test(
+                "Verify Contact Deleted",
+                "GET", 
+                f"/contacts/{test_contact_id}",
+                404
+            )
+            if not verify_success:
+                print("⚠️  Contact was not properly deleted - still exists")
+    
+    # Test 11: Delete invalid contact should return 404
+    tester.test_delete_invalid_contact()
     
     # Print final results
     print("\n" + "=" * 50)
