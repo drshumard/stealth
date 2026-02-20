@@ -1,22 +1,22 @@
 [
   {
-    "content": "Add Automation models + CRUD + webhook fire + trigger hook to server.py",
-    "status": "completed"
+    "content": "Backend: Create automation_runs collection + store runs on every fire + GET /runs endpoint",
+    "status": "in_progress"
   },
   {
-    "content": "Create AutomationsPage.jsx (list view with cards)",
-    "status": "completed"
+    "content": "Frontend: Create AutomationRuns.jsx - run history sheet with full details per run",
+    "status": "pending"
   },
   {
-    "content": "Create AutomationBuilder.jsx (step-by-step sheet builder)",
-    "status": "completed"
+    "content": "Frontend: Enhance test result in builder with response body + link to runs",
+    "status": "pending"
   },
   {
-    "content": "Update TopNav + App.js with /automations route",
-    "status": "completed"
+    "content": "Frontend: Add 'View Runs' button on automation cards",
+    "status": "pending"
   },
   {
     "content": "Screenshot and verify",
-    "status": "completed"
+    "status": "pending"
   }
 ]
