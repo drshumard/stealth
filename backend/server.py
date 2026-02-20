@@ -350,10 +350,8 @@ async def _log_visit(contact_id: str, session_id: Optional[str],
         attribution=safe_attribution(attribution),
         timestamp=now
     )
-    vdoc = visit.model_dump()
-    vdoc['timestamp'] = dt_to_str(vdoc['timestamp'])
-    if vdoc.get('attribution') and hasattr(vdoc['attribution'], 'model_dump'):
-        vdoc['attribution'] = vdoc['attribution'].model_dump()
+    vdoc = strip_nulls(visit.model_dump())
+    vdoc['timestamp'] = dt_to_str(visit.timestamp)
     await db.page_visits.insert_one(vdoc)
     return visit.id
 
