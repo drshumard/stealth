@@ -776,7 +776,6 @@ def build_tracker_js(backend_url: str) -> str:
     if (e.data.type === 'st_child_id' && !store.config.isIframe) {
       var childCid = e.data.contactId;
       if (childCid && childCid !== store.config.contactId) {
-        logger('📨 [parent] Received child contact ID: ' + childCid.substring(0,8) + '…');
         sendStitch(store.config.contactId, childCid);
       }
     }
