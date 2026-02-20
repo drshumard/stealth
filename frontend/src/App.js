@@ -163,6 +163,7 @@ function Dashboard() {
             initialLoad={initialLoad}
             onSelectContact={handleSelectContact}
             onCopyScript={handleCopyScript}
+            onBulkDelete={handleBulkDelete}
           />
         </div>
       </main>
