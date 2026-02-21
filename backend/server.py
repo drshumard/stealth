@@ -2033,6 +2033,50 @@ async def get_sales(limit: int = 500):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
+# ─────────────────────────── Auth ───────────────────────────────────────────
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+def _make_token(email: str, password: str) -> str:
+    """
+    Daily-rotating HMAC token.  Valid until midnight UTC — users are automatically
+    re-prompted after a day.  Simple enough for a single-user dashboard.
+    """
+    day = str(int(datetime.now(timezone.utc).timestamp()) // 86400)
+    raw = __import__('hmac').new(
+        password.encode(), f"{email.lower()}:{day}".encode(), __import__('hashlib').sha256
+    ).hexdigest()
+    import base64
+    return base64.urlsafe_b64encode(raw.encode()).decode()
+
+@api_router.post("/auth/login")
+async def auth_login(data: LoginRequest):
+    expected_email    = os.environ.get('TETHER_EMAIL',    'admin@tether.com')
+    expected_password = os.environ.get('TETHER_PASSWORD', 'tether2024')
+
+    email_ok    = data.email.strip().lower() == expected_email.strip().lower()
+    password_ok = data.password == expected_password
+
+    if not (email_ok and password_ok):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    token = _make_token(expected_email, expected_password)
+    return {"token": token, "email": expected_email}
+
+@api_router.post("/auth/verify")
+async def auth_verify(payload: dict):
+    expected_email    = os.environ.get('TETHER_EMAIL',    'admin@tether.com')
+    expected_password = os.environ.get('TETHER_PASSWORD', 'tether2024')
+    token = payload.get('token', '')
+    expected = _make_token(expected_email, expected_password)
+    if __import__('hmac').compare_digest(token, expected):
+        return {"valid": True, "email": expected_email}
+    raise HTTPException(status_code=401, detail="Token invalid or expired")
+
+
 # ─────────────────────────── Startup: create indexes ───────────────────────────
 
 @app.on_event("startup")
