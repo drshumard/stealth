@@ -1,22 +1,18 @@
 [
   {
-    "content": "Backend: Create automation_runs collection + store runs on every fire + GET /runs endpoint",
+    "content": "Add tags field to Contact models + TagCreate model + POST /api/track/tag endpoint",
     "status": "in_progress"
   },
   {
-    "content": "Frontend: Create AutomationRuns.jsx - run history sheet with full details per run",
+    "content": "Update shumard.js endpoint to accept ?tag= and embed AUTO_TAG into JS",
     "status": "pending"
   },
   {
-    "content": "Frontend: Enhance test result in builder with response body + link to runs",
+    "content": "Show tag badges in ContactsTable rows + ContactDetailModal Overview tab",
     "status": "pending"
   },
   {
-    "content": "Frontend: Add 'View Runs' button on automation cards",
-    "status": "pending"
-  },
-  {
-    "content": "Screenshot and verify",
+    "content": "Add tag filter to LeadsPage",
     "status": "pending"
   }
 ]
