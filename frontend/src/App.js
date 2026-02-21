@@ -127,7 +127,7 @@ function AppShell() {
         }}
       />
       <div className="main-card">
-        <TopNav stats={stats} />
+        <TopNav stats={stats} onLogout={handleLogout} />
         <Routes>
           <Route path="/"            element={<LeadsPage    {...shared} />} />
           <Route path="/sales"       element={<SalesPage onSelectContact={(id) => handleSelectContact(id, 'sales')} />} />
