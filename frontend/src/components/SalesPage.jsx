@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SaleDetailModal } from '@/components/SaleDetailModal';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
 
