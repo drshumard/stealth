@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Users, Globe, BarChart3, List, Search, Bell, ChevronDown, Zap, DollarSign } from 'lucide-react';
+import { Users, Globe, BarChart3, List, Search, Bell, ChevronDown, Zap, DollarSign, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const NAV_TABS = [
