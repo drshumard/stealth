@@ -89,18 +89,16 @@ function SaleDetail({ sale }) {
 // Shared grid template — header and rows must use the same value
 const SALES_GRID = '1fr 100px 120px 144px 20px';
 
-function SaleRow({ sale, onSelectContact }) {
-  const [open, setOpen] = useState(false);
+function SaleRow({ sale, onSelectContact, onShowDetail }) {
   const sc     = STATUS[sale.status?.toLowerCase()] || defaultStatus;
   const isLinked = !!sale.contact_id;
 
   return (
-    <div className="border-b last:border-0 transition-colors"
-      style={{ borderColor: 'var(--stroke)', backgroundColor: open ? '#faf9f7' : 'transparent' }}>
+    <div className="border-b last:border-0 transition-colors" style={{ borderColor: 'var(--stroke)' }}>
       <div
         className="grid items-center px-6 py-4 cursor-pointer hover:bg-[#faf9f7] transition-colors duration-120"
         style={{ gridTemplateColumns: SALES_GRID, gap: '16px' }}
-        onClick={() => isLinked ? onSelectContact?.(sale.contact_id) : setOpen(v => !v)}
+        onClick={() => isLinked ? onSelectContact?.(sale.contact_id) : onShowDetail?.(sale)}
       >
         {/* Contact / product */}
         <div className="min-w-0 overflow-hidden">
@@ -140,15 +138,11 @@ function SaleRow({ sale, onSelectContact }) {
           <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{fmtDate(sale.created_at)}</div>
         </div>
 
-        {/* Chevron (unmatched only) */}
+        {/* Arrow indicator */}
         <div className="flex justify-end">
-          {!isLinked && (open
-            ? <ChevronUp  size={14} style={{ color: 'var(--text-dim)' }} />
-            : <ChevronDown size={14} style={{ color: 'var(--text-dim)' }} />
-          )}
+          <ChevronDown size={14} style={{ color: 'var(--text-dim)' }} />
         </div>
       </div>
-      {!isLinked && open && <SaleDetail sale={sale} />}
     </div>
   );
 }
