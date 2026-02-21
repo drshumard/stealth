@@ -1,18 +1,18 @@
 [
   {
-    "content": "Add tags field to Contact models + TagCreate model + POST /api/track/tag endpoint",
+    "content": "Backend: Sale model + POST /api/sales/webhook + GET /api/sales + contact detail enrichment",
     "status": "in_progress"
   },
   {
-    "content": "Update shumard.js endpoint to accept ?tag= and embed AUTO_TAG into JS",
+    "content": "Frontend: SalesPage.jsx - table + stats",
     "status": "pending"
   },
   {
-    "content": "Show tag badges in ContactsTable rows + ContactDetailModal Overview tab",
+    "content": "Frontend: ContactDetailModal - Sales tab",
     "status": "pending"
   },
   {
-    "content": "Add tag filter to LeadsPage",
+    "content": "Frontend: TopNav + App.js - add /sales route",
     "status": "pending"
   }
 ]
