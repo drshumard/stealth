@@ -388,7 +388,7 @@ export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, o
           {error ? (
             <div className="flex items-center gap-2 py-4" style={{ color: 'var(--red-error)' }}>
               <AlertCircle size={16} />
-              <span className="text-sm">Failed to load contact data.</span>
+              <span className="text-sm">{error.message || 'Failed to load contact data.'}</span>
             </div>
           ) : (() => {
             const tabs = [
