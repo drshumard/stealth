@@ -261,7 +261,7 @@ const UrlVisitItem = ({ visit, index }) => {
   );
 };
 
-export const ContactDetailModal = ({ contactId, open, onClose, onDelete }) => {
+export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, onClose, onDelete }) => {
   const [contact, setContact] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
