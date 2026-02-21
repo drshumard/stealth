@@ -263,21 +263,24 @@ export const ContactsTable = ({
                 borderColor: '#d2d8ef',
               }}
             >
-              <TableHead className="pl-4 pr-0">
-                <Checkbox
-                  data-testid="contacts-select-all-checkbox"
-                  checked={allSelected}
-                  ref={el => { if (el) el.indeterminate = someSelected && !allSelected; }}
-                  onCheckedChange={toggleAll}
-                  onClick={e => e.stopPropagation()}
-                  aria-label="Select all"
-                />
+              {/* Checkbox — centered */}
+              <TableHead className="pl-4 pr-0 text-center">
+                <div className="flex justify-center">
+                  <Checkbox
+                    data-testid="contacts-select-all-checkbox"
+                    checked={allSelected}
+                    ref={el => { if (el) el.indeterminate = someSelected && !allSelected; }}
+                    onCheckedChange={toggleAll}
+                    onClick={e => e.stopPropagation()}
+                    aria-label="Select all"
+                  />
+                </div>
               </TableHead>
-              <Col label="Name"    col="name"                    className="pl-3" />
-              <Col label="Email"   col="email"                   className="" />
-              <Col label="Created" col="updated_at"              className="hidden md:table-cell" />
-              <Col label="Source"  col="attribution.utm_source"  className="hidden sm:table-cell" />
-              <Col label="Visits"  col="visit_count"             className="text-right pr-6" />
+              <Col label="Name"    col="name"                   className="pl-3" />
+              <Col label="Email"   col="email"                  className="" />
+              <Col label="Created" col="updated_at"             className="hidden md:table-cell" />
+              <Col label="Source"  col="attribution.utm_source" className="hidden sm:table-cell text-center" />
+              <Col label="Visits"  col="visit_count"            className="text-right pr-6" />
             </TableRow>
           </TableHeader>
 
