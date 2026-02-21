@@ -35,10 +35,6 @@ function AppShell() {
   const handleLogin  = (token) => { localStorage.setItem('tether_auth', token); setAuthToken(token); };
   const handleLogout = ()      => { localStorage.removeItem('tether_auth'); setAuthToken(null); };
 
-  // Show login page if not authenticated
-  if (!authToken) {
-    return <LoginPage onLogin={handleLogin} />;
-  }
 
   const selectedContactId = searchParams.get('contact');
   const selectedTab       = searchParams.get('tab') || 'overview';
@@ -56,6 +52,7 @@ function AppShell() {
       return r.json();
     }),
     refetchInterval: 15_000,
+    enabled: !!authToken,
   });
 
   // ── Stats ──────────────────────────────────────────────────
@@ -66,9 +63,13 @@ function AppShell() {
       return r.json();
     }),
     refetchInterval: 15_000,
+    enabled: !!authToken,
   });
 
   // ── Actions ────────────────────────────────────────────────
+  // Show login page if not authenticated — all hooks already called above
+  if (!authToken) return <LoginPage onLogin={handleLogin} />;
+
   const handleRefresh = () => {
     qc.invalidateQueries({ queryKey: ['contacts'] });
     qc.invalidateQueries({ queryKey: ['stats'] });
