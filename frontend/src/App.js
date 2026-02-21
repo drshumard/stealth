@@ -30,6 +30,15 @@ const queryClient = new QueryClient({
 function AppShell() {
   const qc = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [authToken, setAuthToken] = useState(() => localStorage.getItem('tether_auth'));
+
+  const handleLogin  = (token) => { localStorage.setItem('tether_auth', token); setAuthToken(token); };
+  const handleLogout = ()      => { localStorage.removeItem('tether_auth'); setAuthToken(null); };
+
+  // Show login page if not authenticated
+  if (!authToken) {
+    return <LoginPage onLogin={handleLogin} />;
+  }
 
   const selectedContactId = searchParams.get('contact');
   const selectedTab       = searchParams.get('tab') || 'overview';
