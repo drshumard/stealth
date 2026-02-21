@@ -2058,6 +2058,10 @@ async def create_indexes():
         await db.automation_runs.create_index("automation_id")
         await db.automation_runs.create_index("triggered_at")
         await db.automation_runs.create_index([("automation_id", 1), ("triggered_at", -1)])
+        await db.sales.create_index("id",         unique=True, sparse=True)
+        await db.sales.create_index("contact_id", sparse=True)
+        await db.sales.create_index("email",      sparse=True)
+        await db.sales.create_index("created_at")
         logger.info("MongoDB indexes created/verified")
     except Exception as e:
         logger.warning(f"Index creation warning: {e}")
