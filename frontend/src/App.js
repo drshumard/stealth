@@ -101,7 +101,7 @@ function AppShell() {
         <TopNav stats={stats} />
         <Routes>
           <Route path="/"            element={<LeadsPage    {...shared} />} />
-          <Route path="/sales"       element={<SalesPage onSelectContact={handleSelectContact} />} />
+          <Route path="/sales"       element={<SalesPage onSelectContact={(id) => handleSelectContact(id, 'sales')} />} />
           <Route path="/visitors"    element={<VisitorsPage {...shared} />} />
           <Route path="/automations" element={<AutomationsPage />} />
           <Route path="/analytics"   element={<AnalyticsPage stats={stats} contacts={contacts} />} />
