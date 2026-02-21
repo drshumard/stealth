@@ -1,4 +1,5 @@
 import '@/App.css';
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useSearchParams } from 'react-router-dom';
 import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/sonner';
@@ -10,6 +11,7 @@ import VisitorsPage from '@/components/VisitorsPage';
 import LogsPage from '@/components/LogsPage';
 import AutomationsPage from '@/components/AutomationsPage';
 import SalesPage from '@/components/SalesPage';
+import LoginPage from '@/components/LoginPage';
 import { ContactDetailModal } from '@/components/ContactDetailModal';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
