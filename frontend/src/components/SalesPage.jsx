@@ -236,13 +236,13 @@ export default function SalesPage({ onSelectContact }) {
 
       <div className="rounded-2xl border overflow-hidden"
         style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff', boxShadow: '0 4px 20px rgba(3,3,82,0.06)' }}>
-        <div className="flex items-center gap-4 px-6 py-4 border-b"
-          style={{ borderColor: 'var(--stroke)', background: 'linear-gradient(to bottom, #eef0f8, #f4f5fb)' }}>
-          <span className="flex-1 text-xs font-bold uppercase tracking-wide" style={{ color: '#030352', opacity: 0.65 }}>Contact / Product</span>
-          <span className="text-xs font-bold uppercase tracking-wide text-right min-w-[80px]" style={{ color: '#030352', opacity: 0.65 }}>Amount</span>
-          <span className="text-xs font-bold uppercase tracking-wide text-right w-28" style={{ color: '#030352', opacity: 0.65 }}>Status</span>
-          <span className="text-xs font-bold uppercase tracking-wide text-right w-36 hidden md:block" style={{ color: '#030352', opacity: 0.65 }}>Date</span>
-          <span className="w-4" />
+        <div className="grid items-center px-6 py-4 border-b"
+          style={{ gridTemplateColumns: SALES_GRID, gap: '16px', borderColor: 'var(--stroke)', background: 'linear-gradient(to bottom, #eef0f8, #f4f5fb)' }}>
+          <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#030352', opacity: 0.65 }}>Contact / Product</span>
+          <span className="text-xs font-bold uppercase tracking-wide text-right" style={{ color: '#030352', opacity: 0.65 }}>Amount</span>
+          <span className="text-xs font-bold uppercase tracking-wide text-right" style={{ color: '#030352', opacity: 0.65 }}>Status</span>
+          <span className="text-xs font-bold uppercase tracking-wide text-right hidden md:block" style={{ color: '#030352', opacity: 0.65 }}>Date</span>
+          <span />
         </div>
         {loading ? (
           <div className="p-5 space-y-3">
