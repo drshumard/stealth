@@ -562,8 +562,8 @@ export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, o
 
             return (
               <>
-                {/* Spring pill tab bar */}
-                <div className="flex items-center gap-0.5 p-1 rounded-xl mb-6 relative"
+                {/* Spring pill tab bar — shrink-0 so it never flexes */}
+                <div className="flex items-center gap-0.5 p-1 rounded-xl mb-5 relative shrink-0"
                   style={{ backgroundColor: '#f0f1f8', border: '1px solid var(--stroke)', width: 'fit-content' }}>
                   {tabs.map(tab => (
                     <button
