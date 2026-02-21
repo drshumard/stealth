@@ -276,16 +276,29 @@ export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, o
   useEffect(() => {
     setError(null);
     if (!open || !contactId) return;
+
+    // Clear loadedContactId immediately so safeContact → null THIS render cycle,
+    // not after the async fetch returns. Prevents any stale-data window.
+    setLoadedContactId(null);
     setLoading(true);
+
     fetch(`${BACKEND_URL}/api/contacts/${contactId}`)
       .then(r => { if (!r.ok) throw new Error('Failed'); return r.json(); })
       .then(data => {
         setContact(data);
-        setLoadedContactId(contactId); // mark which ID this data is for
+        setLoadedContactId(contactId);
         setLoading(false);
       })
       .catch(e => { setError(e.message); setLoading(false); });
   }, [open, contactId]);
+
+  // Reset everything on close so reopening the same contact doesn't flash cached data
+  useEffect(() => {
+    if (!open) {
+      setContact(null);
+      setLoadedContactId(null);
+    }
+  }, [open]);
 
   // Only use contact data when it matches the CURRENT contactId.
   // If they differ (still loading new contact) safeContact is null →
