@@ -418,19 +418,6 @@ export const ContactsTable = ({
                         </span>
                       </div>
                     </TableCell>
-
-                    <TableCell className="py-4 pr-4 text-right" onClick={e => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          className="p-1.5 rounded-lg transition-colors duration-120"
-                          style={{ color: 'var(--text-dim)' }}
-                          onClick={e => { e.stopPropagation(); onSelectContact(contact.contact_id); }}
-                          title="View details"
-                        >
-                          <Pencil size={13} />
-                        </button>
-                      </div>
-                    </TableCell>
                   </TableRow>
                 );
               })
