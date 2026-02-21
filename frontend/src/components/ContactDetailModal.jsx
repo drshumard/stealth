@@ -556,6 +556,74 @@ export const ContactDetailModal = ({ contactId, open, onClose, onDelete }) => {
                   </div>
                 )}
               </TabsContent>
+
+              {/* Sales */}
+              <TabsContent value="sales">
+                {loading ? (
+                  <div className="space-y-3">{[...Array(2)].map((_, i) => <Skeleton key={i} className="h-20 w-full" style={{ backgroundColor: 'var(--stroke)' }} />)}</div>
+                ) : contact?.sales && contact.sales.length > 0 ? (
+                  <div className="space-y-3">
+                    {contact.sales.map(sale => {
+                      const statusColors = {
+                        completed: { bg: '#ecfdf5', text: '#065f46', border: '#a7f3d0', icon: CheckCircle2 },
+                        paid:      { bg: '#ecfdf5', text: '#065f46', border: '#a7f3d0', icon: CheckCircle2 },
+                        refunded:  { bg: '#fef2f2', text: '#991b1b', border: '#fecaca', icon: XCircle },
+                        failed:    { bg: '#fef2f2', text: '#991b1b', border: '#fecaca', icon: XCircle },
+                      };
+                      const sc = statusColors[sale.status?.toLowerCase()] || { bg: '#fffbeb', text: '#92400e', border: '#fcd34d', icon: Clock };
+                      const StatusIcon = sc.icon;
+                      return (
+                        <div key={sale.id} className="rounded-2xl border overflow-hidden"
+                          style={{ borderColor: sc.border, backgroundColor: sc.bg }}>
+                          {/* Header row */}
+                          <div className="flex items-start justify-between gap-4 px-5 py-4">
+                            <div className="flex items-start gap-3">
+                              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+                                style={{ backgroundColor: 'rgba(3,3,82,0.10)' }}>
+                                <ShoppingCart size={17} style={{ color: '#030352' }} />
+                              </div>
+                              <div>
+                                <p className="text-sm font-bold" style={{ color: '#030352', fontFamily: 'Space Grotesk, sans-serif' }}>
+                                  {sale.product || 'Purchase'}
+                                </p>
+                                {sale.source && (
+                                  <p className="text-xs font-medium mt-0.5" style={{ color: 'var(--text-dim)' }}>
+                                    via {sale.source}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="text-xl font-bold tabular-nums"
+                                style={{ color: '#030352', fontFamily: 'Space Grotesk, sans-serif', letterSpacing: '-0.02em' }}>
+                                {sale.amount != null
+                                  ? new Intl.NumberFormat('en-US', { style: 'currency', currency: sale.currency || 'USD', minimumFractionDigits: 0 }).format(sale.amount)
+                                  : '—'}
+                              </p>
+                              <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full mt-1"
+                                style={{ backgroundColor: 'rgba(3,3,82,0.08)', color: sc.text }}>
+                                <StatusIcon size={10} />
+                                {sale.status || 'completed'}
+                              </span>
+                            </div>
+                          </div>
+                          {/* Date footer */}
+                          <div className="px-5 pb-3">
+                            <p className="text-xs font-medium" style={{ color: sc.text, opacity: 0.7 }}>
+                              {new Date(sale.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 gap-2" style={{ color: 'var(--text-dim)' }}>
+                    <ShoppingCart size={32} />
+                    <p className="text-sm">No purchases recorded yet.</p>
+                  </div>
+                )}
+              </TabsContent>
             </Tabs>
           )}
         </div>
