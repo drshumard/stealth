@@ -305,7 +305,7 @@ export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, o
           boxShadow: 'var(--shadow)',
         }}
       >
-        <DialogHeader className="px-8 pt-6 pb-0" style={{ background: 'linear-gradient(135deg, #e8ebf5 0%, #f2f3f9 60%, #f9f8f5 100%)', borderBottom: '1.5px solid #d2d8ef', paddingBottom: '20px' }}>
+        <DialogHeader className="px-8 pt-6 pb-0 shrink-0" style={{ background: 'linear-gradient(135deg, #e8ebf5 0%, #f2f3f9 60%, #f9f8f5 100%)', borderBottom: '1.5px solid #d2d8ef', paddingBottom: '20px' }}>
           <div className="flex items-start justify-between gap-4">
             <div>
               <DialogTitle
