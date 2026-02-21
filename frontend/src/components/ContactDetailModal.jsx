@@ -273,9 +273,11 @@ export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, o
   }, [open, contactId, defaultTab]);
 
   useEffect(() => {
-    if (!open || !contactId) { setContact(null); return; }
-    setLoading(true);
+    // Reset immediately — never show a previous contact's data while the new one loads
+    setContact(null);
     setError(null);
+    if (!open || !contactId) return;
+    setLoading(true);
     fetch(`${BACKEND_URL}/api/contacts/${contactId}`)
       .then(r => { if (!r.ok) throw new Error('Failed'); return r.json(); })
       .then(data => { setContact(data); setLoading(false); })
