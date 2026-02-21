@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   Search, Users, Copy, GitMerge, ArrowUpDown, ArrowUp, ArrowDown,
-  ChevronLeft, ChevronRight, Pencil, Trash2, ChevronsLeft, ChevronsRight,
+  ChevronLeft, ChevronRight, Trash2, ChevronsLeft, ChevronsRight,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
