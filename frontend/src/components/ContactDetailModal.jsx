@@ -396,6 +396,14 @@ export const ContactDetailModal = ({ contactId, open, onClose, onDelete }) => {
                     </span>
                   )}
                 </TabsTrigger>
+                <TabsTrigger data-testid="contact-sales-tab" value="sales" className="text-sm font-medium px-5">
+                  Sales
+                  {contact?.sales?.length > 0 && (
+                    <span className="ml-2 inline-flex items-center justify-center text-xs font-bold w-5 h-5 rounded-full" style={{ backgroundColor: '#A31800', color: '#fff' }}>
+                      {contact.sales.length}
+                    </span>
+                  )}
+                </TabsTrigger>
               </TabsList>
 
               {/* Overview */}
