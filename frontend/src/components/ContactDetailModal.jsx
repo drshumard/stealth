@@ -318,25 +318,27 @@ export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, o
       >
         <DialogHeader className="px-8 pt-6 pb-0 shrink-0" style={{ background: 'linear-gradient(135deg, #e8ebf5 0%, #f2f3f9 60%, #f9f8f5 100%)', borderBottom: '1.5px solid #d2d8ef', paddingBottom: '20px' }}>
           <div className="flex items-start justify-between gap-4">
-            <div>
+            <div className="min-w-0 flex-1">
               <DialogTitle
                 className="text-xl font-bold mb-0.5"
                 style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--brand-navy)', letterSpacing: '-0.02em' }}
               >
-                {loading ? (
-                  <Skeleton className="h-5 w-40" style={{ backgroundColor: 'var(--stroke)' }} />
+                {isLoading ? (
+                  <Skeleton className="h-6 w-44" style={{ backgroundColor: 'rgba(3,3,82,0.12)' }} />
                 ) : (
-                  contact?.name || contact?.email || 'Anonymous Contact'
+                  safeContact?.name || safeContact?.email || 'Anonymous Contact'
                 )}
               </DialogTitle>
-              {contact && (
+              {isLoading ? (
+                <Skeleton className="h-3 w-72 mt-1.5" style={{ backgroundColor: 'rgba(3,3,82,0.08)' }} />
+              ) : safeContact ? (
                 <p className="text-xs font-mono" style={{ color: 'var(--text-dim)', fontFamily: 'IBM Plex Mono, monospace' }}>
-                  ID: {contact.contact_id}
+                  ID: {safeContact.contact_id}
                 </p>
-              )}
+              ) : null}
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
-              {contact && onDelete && (
+              {safeContact && onDelete && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <button
@@ -355,19 +357,17 @@ export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, o
                     <AlertDialogHeader>
                       <AlertDialogTitle style={{ color: 'var(--text)' }}>Delete Contact</AlertDialogTitle>
                       <AlertDialogDescription style={{ color: 'var(--text-muted)' }}>
-                        Are you sure you want to delete <strong style={{ color: 'var(--text)' }}>{contact.name || contact.email || 'this contact'}</strong>?
+                        Are you sure you want to delete <strong style={{ color: 'var(--text)' }}>{safeContact.name || safeContact.email || 'this contact'}</strong>?
                         This will permanently remove the contact and all their visit history.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel
-                        style={{ backgroundColor: '#ffffff', borderColor: 'var(--stroke)', color: 'var(--text)' }}
-                      >
+                      <AlertDialogCancel style={{ backgroundColor: '#ffffff', borderColor: 'var(--stroke)', color: 'var(--text)' }}>
                         Cancel
                       </AlertDialogCancel>
                       <AlertDialogAction
                         data-testid="contact-detail-confirm-delete-button"
-                        onClick={() => { onDelete(contact.contact_id); onClose(); }}
+                        onClick={() => { onDelete(safeContact.contact_id); onClose(); }}
                         style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none' }}
                       >
                         Delete
