@@ -1307,13 +1307,62 @@ async def root():
 
 
 @api_router.get("/shumard.js", response_class=PlainTextResponse)
-async def get_shumard_js():
+async def get_shumard_js(tag: Optional[str] = None):
     backend_url = os.environ.get('REACT_APP_BACKEND_URL', '')
+    # Sanitise tag: alphanumeric + dash/underscore, max 64 chars, no JS injection
+    safe_tag = ''
+    if tag:
+        import re
+        safe_tag = re.sub(r'[^a-zA-Z0-9_\-]', '', tag)[:64]
     return PlainTextResponse(
-        content=build_tracker_js(backend_url),
+        content=build_tracker_js(backend_url, auto_tag=safe_tag),
         media_type="application/javascript",
         headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Access-Control-Allow-Origin": "*"}
     )
+
+
+@api_router.post("/track/tag")
+async def track_tag(data: TagCreate, request: Request):
+    """
+    Add a tag to a contact.  Called automatically by the script when loaded with ?tag=...
+    Uses $addToSet so the tag is stored exactly once no matter how many times the page loads.
+    """
+    try:
+        now = datetime.now(timezone.utc)
+        ip  = get_client_ip(request)
+        eid = await _resolve_contact_id(data.contact_id)
+
+        # Create the contact if it doesn't exist yet (e.g. thank-you page without prior pageview)
+        existing = await db.contacts.find_one({"contact_id": eid}, {"_id": 0})
+        if existing:
+            await db.contacts.update_one(
+                {"contact_id": eid},
+                {"$addToSet": {"tags": data.tag},
+                 "$set":      {"updated_at": dt_to_str(now)}}
+            )
+        else:
+            # Minimal contact — no email yet, but we have a contact_id and tag
+            contact = Contact(
+                contact_id=eid,
+                session_id=data.session_id,
+                client_ip=ip,
+                tags=[data.tag],
+                created_at=now,
+                updated_at=now,
+            )
+            cdoc = strip_nulls(contact.model_dump())
+            cdoc['created_at'] = dt_to_str(now)
+            cdoc['updated_at'] = dt_to_str(now)
+            cdoc['tags']       = [data.tag]
+            await db.contacts.insert_one(cdoc)
+
+        logger.info(f"Tag '{data.tag}' applied to contact {eid[:12]}...")
+        # Attempt to stitch by IP in case this is a thank-you page visit
+        await _ip_auto_stitch(eid, ip, now)
+        return {"status": "ok", "contact_id": data.contact_id, "tag": data.tag}
+    except Exception as e:
+        logger.error(f"Error applying tag: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @api_router.post("/track/pageview")
