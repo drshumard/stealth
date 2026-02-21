@@ -236,7 +236,7 @@ export default function SalesPage({ onSelectContact }) {
           style={{ gridTemplateColumns: SALES_GRID, gap: '16px', borderColor: 'var(--stroke)', background: 'linear-gradient(to bottom, #eef0f8, #f4f5fb)' }}>
           <span className="text-xs font-bold uppercase tracking-wide" style={{ color: '#030352', opacity: 0.65 }}>Contact / Product</span>
           <span className="text-xs font-bold uppercase tracking-wide text-right" style={{ color: '#030352', opacity: 0.65 }}>Amount</span>
-          <span className="text-xs font-bold uppercase tracking-wide text-right" style={{ color: '#030352', opacity: 0.65 }}>Status</span>
+          <span className="text-xs font-bold uppercase tracking-wide text-center" style={{ color: '#030352', opacity: 0.65 }}>Status</span>
           <span className="text-xs font-bold uppercase tracking-wide text-right hidden md:block" style={{ color: '#030352', opacity: 0.65 }}>Date</span>
           <span />
         </div>
