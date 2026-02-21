@@ -345,7 +345,7 @@ export const ContactsTable = ({
                     onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectContact(contact.contact_id); } }}
                     aria-label={`View ${contact.name || contact.email || 'Anonymous'}`}
                   >
-                    <TableCell className="w-10 pl-4 pr-0" onClick={e => toggleOne(contact.contact_id, e)}>
+                    <TableCell className="pl-4 pr-0" onClick={e => toggleOne(contact.contact_id, e)}>
                       <Checkbox
                         data-testid={`contact-checkbox-${contact.contact_id}`}
                         checked={isSelected}
