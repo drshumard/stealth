@@ -808,18 +808,51 @@ async def _run_automations(contact_id: str) -> None:
     contact = await db.contacts.find_one({"contact_id": contact_id}, {"_id": 0})
     if not contact or not (contact.get('email') or contact.get('phone')):
         return
+
+    # Extract the fbclid from attribution — used as dedup key.
+    # The same Facebook ad click (same fbclid) should never fire the same
+    # automation twice, even if the lead visits the page multiple times.
+    fbclid = (contact.get('attribution') or {}).get('fbclid') or None
+
     automations = await db.automations.find({"enabled": True}, {"_id": 0}).to_list(100)
     for auto in automations:
         try:
             if not _evaluate_filters(contact, auto.get('filters', [])):
                 continue
+
+            # ── Dedup check ──────────────────────────────────────────────────
+            # Build a query that uniquely identifies this delivery attempt:
+            #   automation + contact + fbclid (when present)
+            # If a previous successful live run exists with the same key, skip.
+            dedup_q: dict = {
+                "automation_id": auto['id'],
+                "contact_id":    contact_id,
+                "run_type":      "live",
+            }
+            if fbclid:
+                # Strict match: same Facebook click ID → definitely the same visit
+                dedup_q["fbclid"] = fbclid
+            else:
+                # No click ID available — fall back to contact-level dedup:
+                # only send once per contact per automation regardless
+                pass
+
+            existing = await db.automation_runs.find_one(dedup_q, {"_id": 0, "id": 1})
+            if existing:
+                logger.info(
+                    f"Automation {auto['id'][:8]} skipped for {contact_id[:8]}: "
+                    f"already fired (fbclid={fbclid[:12] if fbclid else 'none'})"
+                )
+                continue
+            # ─────────────────────────────────────────────────────────────────
+
             payload = _build_webhook_payload(contact, auto.get('field_map', []))
             hdrs = {"Content-Type": "application/json"}
             if auto.get('custom_headers'):
                 hdrs.update(auto['custom_headers'])
             asyncio.create_task(
                 _fire_webhook_task(auto['id'], auto['webhook_url'], payload, hdrs,
-                                   run_type="live", contact=contact)
+                                   run_type="live", contact=contact, fbclid=fbclid)
             )
         except Exception as e:
             logger.error(f"Automation eval error {auto.get('id','?')}: {e}")
