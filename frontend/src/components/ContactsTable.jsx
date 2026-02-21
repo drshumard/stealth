@@ -239,7 +239,16 @@ export const ContactsTable = ({
 
       {/* Table */}
       <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--stroke)' }}>
-        <Table data-testid="contacts-table">
+        <Table data-testid="contacts-table" style={{ tableLayout: 'fixed', width: '100%' }}>
+          <colgroup>
+            <col style={{ width: '40px' }} />          {/* Checkbox */}
+            <col style={{ width: '28%' }} />            {/* Name + tags */}
+            <col style={{ width: '27%' }} />            {/* Email */}
+            <col style={{ width: '16%' }} />            {/* Created (md+) */}
+            <col style={{ width: '14%' }} />            {/* Source (sm+) */}
+            <col style={{ width: '9%' }} />             {/* Visits */}
+            <col style={{ width: '56px' }} />           {/* Actions */}
+          </colgroup>
           <TableHeader>
             <TableRow
               className="hover:bg-transparent"
@@ -248,7 +257,7 @@ export const ContactsTable = ({
                 borderColor: '#d2d8ef',
               }}
             >
-              <TableHead className="w-10 pl-4 pr-0">
+              <TableHead className="pl-4 pr-0">
                 <Checkbox
                   data-testid="contacts-select-all-checkbox"
                   checked={allSelected}
@@ -258,12 +267,12 @@ export const ContactsTable = ({
                   aria-label="Select all"
                 />
               </TableHead>
-              <Col label="Name"    col="name"       className="pl-3 w-44" />
-              <Col label="Email"   col="email"      className="min-w-[180px]" />
-              <Col label="Created" col="updated_at" className="hidden md:table-cell w-36" />
-              <Col label="Source"  col="attribution.utm_source" className="hidden sm:table-cell w-32" />
-              <Col label="Visits"  col="visit_count" className="text-right pr-6 w-20" />
-              <TableHead className="w-20 pr-4 text-right text-xs uppercase tracking-wide" style={{ color: '#030352', opacity: 0.65, fontWeight: 700 }}>
+              <Col label="Name"    col="name"                    className="pl-3" />
+              <Col label="Email"   col="email"                   className="" />
+              <Col label="Created" col="updated_at"              className="hidden md:table-cell" />
+              <Col label="Source"  col="attribution.utm_source"  className="hidden sm:table-cell" />
+              <Col label="Visits"  col="visit_count"             className="text-right pr-6" />
+              <TableHead className="pr-4 text-right text-xs uppercase tracking-wide" style={{ color: '#030352', opacity: 0.65, fontWeight: 700 }}>
                 Actions
               </TableHead>
             </TableRow>
@@ -273,13 +282,13 @@ export const ContactsTable = ({
             {showSkeletons ? (
               Array.from({ length: pageSize }).map((_, i) => (
                 <TableRow key={i} style={{ borderColor: 'var(--stroke)' }}>
-                  <TableCell className="w-10 pl-4 pr-0"><Skeleton className="h-4 w-4" /></TableCell>
-                  <TableCell className="pl-3"><Skeleton className="h-4 w-32" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-44" /></TableCell>
-                  <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell className="hidden sm:table-cell"><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
+                  <TableCell className="pl-4 pr-0"><Skeleton className="h-4 w-4" /></TableCell>
+                  <TableCell className="pl-3"><Skeleton className="h-4 w-4/5" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-4/5" /></TableCell>
+                  <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-3/4" /></TableCell>
+                  <TableCell className="hidden sm:table-cell"><Skeleton className="h-5 w-3/4 rounded-full" /></TableCell>
                   <TableCell className="text-right pr-6"><Skeleton className="h-4 w-6 ml-auto" /></TableCell>
-                  <TableCell className="pr-4 text-right"><Skeleton className="h-4 w-12 ml-auto" /></TableCell>
+                  <TableCell className="pr-4 text-right"><Skeleton className="h-4 w-8 ml-auto" /></TableCell>
                 </TableRow>
               ))
             ) : sliced.length === 0 ? (
