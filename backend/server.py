@@ -1019,7 +1019,7 @@ def build_tracker_js(backend_url: str, auto_tag: str = '') -> str:
       var parts = [];
       if (email) parts.push('email: ' + email);
       if (phone) parts.push('phone: ' + phone);
-      logger('Contact captured -- ' + parts.join(' | '));
+      logger('Tethered!');
     }
     send('/track/lead', buildPayload(fields));
   }
@@ -1029,7 +1029,7 @@ def build_tracker_js(backend_url: str, auto_tag: str = '') -> str:
     if (fields && fields.email) parts.push('email: ' + fields.email);
     if (fields && fields.phone) parts.push('phone: ' + fields.phone);
     if (fields && fields.name)  parts.push('name: ' + fields.name);
-    if (parts.length) logger('Contact captured -- ' + parts.join(' | '));
+    if (parts.length) logger('Tethered!');
     send('/track/registration', buildPayload(fields));
   }
 
@@ -1275,7 +1275,7 @@ def build_tracker_js(backend_url: str, auto_tag: str = '') -> str:
         session_id: store.config.sessionId || null,
         tag:        AUTO_TAG
       });
-      logger('Contact captured — tag: ' + AUTO_TAG);
+      logger('Tethered!');
     }
 
     /* Parent page: broadcast session identity to iframes */
