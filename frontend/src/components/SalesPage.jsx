@@ -168,6 +168,7 @@ function StatCard({ icon: Icon, label, value, accent }) {
 
 export default function SalesPage({ onSelectContact }) {
   const qc = useQueryClient();
+  const [detailSale, setDetailSale] = useState(null);
 
   const { data: sales = [], isLoading: loading } = useQuery({
     queryKey: ['sales'],
