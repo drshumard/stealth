@@ -29,6 +29,7 @@ export default function LeadsPage({ contacts, loading, initialLoad, stats, onRef
   const [search,    setSearch] = useState('');
   const [srcFilter, setSrc]   = useState('all');
   const [dateFilter, setDate] = useState('all');
+  const [tagFilter,  setTag]  = useState('all');
 
   const handleCopyScript = () =>
     navigator.clipboard.writeText(`<script src="${BACKEND_URL}/api/shumard.js"></script>`)
