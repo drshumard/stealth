@@ -271,9 +271,6 @@ export const ContactsTable = ({
               <Col label="Created" col="updated_at"              className="hidden md:table-cell" />
               <Col label="Source"  col="attribution.utm_source"  className="hidden sm:table-cell" />
               <Col label="Visits"  col="visit_count"             className="text-right pr-6" />
-              <TableHead className="pr-4 text-right text-xs uppercase tracking-wide" style={{ color: '#030352', opacity: 0.65, fontWeight: 700 }}>
-                Actions
-              </TableHead>
             </TableRow>
           </TableHeader>
 
