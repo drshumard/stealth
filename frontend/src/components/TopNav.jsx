@@ -18,6 +18,7 @@ export const TopNav = ({ stats }) => {
   const active =
     location.pathname === '/analytics'   ? 'analytics'   :
     location.pathname === '/visitors'    ? 'visitors'    :
+    location.pathname === '/sales'       ? 'sales'       :
     location.pathname === '/automations' ? 'automations' :
     location.pathname === '/logs'        ? 'logs'        : 'leads';
 
