@@ -137,6 +137,7 @@ class ContactWithStats(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     attribution: Optional[Attribution] = None
+    tags: Optional[List[str]] = None
     merged_into: Optional[str] = None
     merged_children: Optional[List[str]] = None
     created_at: datetime
@@ -156,11 +157,18 @@ class ContactDetail(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     attribution: Optional[Attribution] = None
+    tags: Optional[List[str]] = None
     merged_into: Optional[str] = None
     merged_children: Optional[List[str]] = None
     created_at: datetime
     updated_at: datetime
     visits: List[PageVisit] = []
+
+
+class TagCreate(BaseModel):
+    contact_id: str
+    tag: str                  # e.g. "registered", "attended", "thank-you"
+    session_id: Optional[str] = None
 
 
 # ─────────────────────────── Automation Models ───────────────────────────
