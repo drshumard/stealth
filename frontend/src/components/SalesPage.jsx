@@ -258,13 +258,12 @@ export default function SalesPage({ onSelectContact }) {
           sales.map(sale => <SaleRow key={sale.id} sale={sale} onSelectContact={onSelectContact} onShowDetail={setDetailSale} />)
         )}
       </div>
+
+      <SaleDetailModal
+        sale={detailSale}
+        open={!!detailSale}
+        onClose={() => setDetailSale(null)}
+      />
     </div>
-
-    <SaleDetailModal
-      sale={detailSale}
-      open={!!detailSale}
-      onClose={() => setDetailSale(null)}
-    />
-
   );
 }
