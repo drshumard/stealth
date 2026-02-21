@@ -412,6 +412,27 @@ export const ContactDetailModal = ({ contactId, open, onClose, onDelete }) => {
                     <InfoRow icon={Layers}   label="Session ID" value={contact.session_id} mono copyable />
                     <InfoRow icon={Calendar} label="First Seen" value={formatDateTime(contact.created_at)} />
                     <InfoRow icon={Calendar} label="Last Updated" value={formatDateTime(contact.updated_at)} />
+                    {contact.tags && contact.tags.length > 0 && (
+                      <div className="flex items-start gap-4 py-4 px-5">
+                        <div className="mt-0.5 shrink-0">
+                          <Tag size={15} style={{ color: 'var(--brand-navy)' }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-dim)' }}>Tags</div>
+                          <div className="flex flex-wrap gap-2">
+                            {contact.tags.map(tag => (
+                              <span
+                                key={tag}
+                                className="inline-flex items-center text-sm font-bold px-3 py-1 rounded-full"
+                                style={{ backgroundColor: 'rgba(3,3,82,0.08)', color: '#030352', border: '1.5px solid rgba(3,3,82,0.18)' }}
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     {contact.merged_children && contact.merged_children.length > 0 && (
                       <div className="flex items-start gap-3 py-2.5 px-4">
                         <div className="mt-0.5 shrink-0"><GitMerge size={14} style={{ color: 'var(--mint-success)' }} /></div>
