@@ -320,19 +320,19 @@ export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, o
                 {isLoading ? (
                   <Skeleton className="h-6 w-44" style={{ backgroundColor: 'rgba(3,3,82,0.12)' }} />
                 ) : (
-                  safeContact?.name || safeContact?.email || 'Anonymous Contact'
+                  contact?.name || contact?.email || 'Anonymous Contact'
                 )}
               </DialogTitle>
               {isLoading ? (
                 <Skeleton className="h-3 w-72 mt-1.5" style={{ backgroundColor: 'rgba(3,3,82,0.08)' }} />
-              ) : safeContact ? (
+              ) : contact ? (
                 <p className="text-xs font-mono" style={{ color: 'var(--text-dim)', fontFamily: 'IBM Plex Mono, monospace' }}>
-                  ID: {safeContact.contact_id}
+                  ID: {contact.contact_id}
                 </p>
               ) : null}
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
-              {safeContact && onDelete && (
+              {contact && onDelete && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <button
@@ -351,7 +351,7 @@ export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, o
                     <AlertDialogHeader>
                       <AlertDialogTitle style={{ color: 'var(--text)' }}>Delete Contact</AlertDialogTitle>
                       <AlertDialogDescription style={{ color: 'var(--text-muted)' }}>
-                        Are you sure you want to delete <strong style={{ color: 'var(--text)' }}>{safeContact.name || safeContact.email || 'this contact'}</strong>?
+                        Are you sure you want to delete <strong style={{ color: 'var(--text)' }}>{contact.name || contact.email || 'this contact'}</strong>?
                         This will permanently remove the contact and all their visit history.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
@@ -361,7 +361,7 @@ export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, o
                       </AlertDialogCancel>
                       <AlertDialogAction
                         data-testid="contact-detail-confirm-delete-button"
-                        onClick={() => { onDelete(safeContact.contact_id); onClose(); }}
+                        onClick={() => { onDelete(contact.contact_id); onClose(); }}
                         style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none' }}
                       >
                         Delete
@@ -394,8 +394,8 @@ export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, o
             const tabs = [
               { id: 'overview',    label: 'Overview' },
               { id: 'attribution', label: 'Attribution', badge: hasAttribution ? '●' : null, badgeGreen: true },
-              { id: 'urls',        label: 'URL History', badge: safeContact?.visits?.length || null },
-              { id: 'sales',       label: 'Sales',       badge: safeContact?.sales?.length  || null, badgeRed: true },
+              { id: 'urls',        label: 'URL History', badge: contact?.visits?.length || null },
+              { id: 'sales',       label: 'Sales',       badge: contact?.sales?.length  || null, badgeRed: true },
             ];
 
             const tabContent = () => {
@@ -404,25 +404,25 @@ export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, o
                   {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-xl" style={{ backgroundColor: 'var(--stroke)' }} />)}
                 </div>
               );
-              if (!safeContact) return null;
+              if (!contact) return null;
 
               if (activeTab === 'overview') return (
                 <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff' }}>
-                  <InfoRow icon={User}     label="Full Name"    value={safeContact.name}  />
-                  <InfoRow icon={Mail}     label="Email"        value={safeContact.email} copyable />
-                  <InfoRow icon={Phone}    label="Phone"        value={safeContact.phone} />
-                  <InfoRow icon={Hash}     label="Contact ID"   value={safeContact.contact_id} mono copyable />
-                  <InfoRow icon={Wifi}     label="IP Address"   value={safeContact.client_ip} mono />
-                  <InfoRow icon={Layers}   label="Session ID"   value={safeContact.session_id} mono copyable />
-                  <InfoRow icon={Calendar} label="First Seen"   value={formatDateTime(safeContact.created_at)} />
-                  <InfoRow icon={Calendar} label="Last Updated" value={formatDateTime(safeContact.updated_at)} />
-                  {safeContact.tags?.length > 0 && (
+                  <InfoRow icon={User}     label="Full Name"    value={contact.name}  />
+                  <InfoRow icon={Mail}     label="Email"        value={contact.email} copyable />
+                  <InfoRow icon={Phone}    label="Phone"        value={contact.phone} />
+                  <InfoRow icon={Hash}     label="Contact ID"   value={contact.contact_id} mono copyable />
+                  <InfoRow icon={Wifi}     label="IP Address"   value={contact.client_ip} mono />
+                  <InfoRow icon={Layers}   label="Session ID"   value={contact.session_id} mono copyable />
+                  <InfoRow icon={Calendar} label="First Seen"   value={formatDateTime(contact.created_at)} />
+                  <InfoRow icon={Calendar} label="Last Updated" value={formatDateTime(contact.updated_at)} />
+                  {contact.tags?.length > 0 && (
                     <div className="flex items-start gap-4 py-4 px-5">
                       <div className="mt-0.5 shrink-0"><Tag size={15} style={{ color: 'var(--brand-navy)' }} /></div>
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-dim)' }}>Tags</div>
                         <div className="flex flex-wrap gap-2">
-                          {safeContact.tags.map(tag => (
+                          {contact.tags.map(tag => (
                             <span key={tag} className="inline-flex items-center text-sm font-bold px-3 py-1 rounded-full"
                               style={{ backgroundColor: 'rgba(3,3,82,0.08)', color: '#030352', border: '1.5px solid rgba(3,3,82,0.18)' }}>
                               {tag}
@@ -432,13 +432,13 @@ export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, o
                       </div>
                     </div>
                   )}
-                  {safeContact.merged_children?.length > 0 && (
+                  {contact.merged_children?.length > 0 && (
                     <div className="flex items-start gap-3 py-2.5 px-4">
                       <div className="mt-0.5 shrink-0"><GitMerge size={14} style={{ color: 'var(--mint-success)' }} /></div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-xs mb-1" style={{ color: 'var(--text-dim)' }}>Stitched Identities ({safeContact.merged_children.length})</div>
+                        <div className="text-xs mb-1" style={{ color: 'var(--text-dim)' }}>Stitched Identities ({contact.merged_children.length})</div>
                         <div className="flex flex-col gap-1">
-                          {safeContact.merged_children.map(cid => (
+                          {contact.merged_children.map(cid => (
                             <span key={cid} className="text-xs font-mono break-all" style={{ color: 'var(--mint-success)', fontFamily: 'IBM Plex Mono, monospace' }}>{cid}</span>
                           ))}
                         </div>
@@ -451,62 +451,62 @@ export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, o
               if (activeTab === 'attribution') return (
                 <div className="space-y-4">
                   {hasAttribution ? (<>
-                    {(safeContact.attribution?.utm_source || safeContact.attribution?.utm_medium || safeContact.attribution?.utm_campaign || safeContact.attribution?.utm_term || safeContact.attribution?.utm_content || safeContact.attribution?.utm_id) && (
+                    {(contact.attribution?.utm_source || contact.attribution?.utm_medium || contact.attribution?.utm_campaign || contact.attribution?.utm_term || contact.attribution?.utm_content || contact.attribution?.utm_id) && (
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-widest mb-2 px-1" style={{ color: 'var(--text-dim)' }}>UTM Parameters</p>
                         <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff' }}>
-                          <AttrRow label="utm_source" value={safeContact.attribution?.utm_source} />
-                          <AttrRow label="utm_medium" value={safeContact.attribution?.utm_medium} />
-                          <AttrRow label="utm_campaign" value={safeContact.attribution?.utm_campaign} />
-                          <AttrRow label="utm_term" value={safeContact.attribution?.utm_term} />
-                          <AttrRow label="utm_content" value={safeContact.attribution?.utm_content} />
-                          <AttrRow label="utm_id" value={safeContact.attribution?.utm_id} />
+                          <AttrRow label="utm_source" value={contact.attribution?.utm_source} />
+                          <AttrRow label="utm_medium" value={contact.attribution?.utm_medium} />
+                          <AttrRow label="utm_campaign" value={contact.attribution?.utm_campaign} />
+                          <AttrRow label="utm_term" value={contact.attribution?.utm_term} />
+                          <AttrRow label="utm_content" value={contact.attribution?.utm_content} />
+                          <AttrRow label="utm_id" value={contact.attribution?.utm_id} />
                         </div>
                       </div>
                     )}
-                    {(safeContact.attribution?.campaign_id || safeContact.attribution?.adset_id || safeContact.attribution?.ad_id || safeContact.attribution?.fb_ad_set_id || safeContact.attribution?.google_campaign_id) && (
+                    {(contact.attribution?.campaign_id || contact.attribution?.adset_id || contact.attribution?.ad_id || contact.attribution?.fb_ad_set_id || contact.attribution?.google_campaign_id) && (
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-widest mb-2 px-1" style={{ color: 'var(--text-dim)' }}>Ad Platform IDs</p>
                         <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff' }}>
-                          <AttrRow label="campaign_id" value={safeContact.attribution?.campaign_id} />
-                          <AttrRow label="adset_id" value={safeContact.attribution?.adset_id} />
-                          <AttrRow label="ad_id" value={safeContact.attribution?.ad_id} />
-                          <AttrRow label="fb_ad_set_id" value={safeContact.attribution?.fb_ad_set_id} />
-                          <AttrRow label="google_campaign_id" value={safeContact.attribution?.google_campaign_id} />
+                          <AttrRow label="campaign_id" value={contact.attribution?.campaign_id} />
+                          <AttrRow label="adset_id" value={contact.attribution?.adset_id} />
+                          <AttrRow label="ad_id" value={contact.attribution?.ad_id} />
+                          <AttrRow label="fb_ad_set_id" value={contact.attribution?.fb_ad_set_id} />
+                          <AttrRow label="google_campaign_id" value={contact.attribution?.google_campaign_id} />
                         </div>
                       </div>
                     )}
-                    {(safeContact.attribution?.fbclid || safeContact.attribution?.gclid || safeContact.attribution?.ttclid || safeContact.attribution?.source_link_tag) && (
+                    {(contact.attribution?.fbclid || contact.attribution?.gclid || contact.attribution?.ttclid || contact.attribution?.source_link_tag) && (
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-widest mb-2 px-1" style={{ color: 'var(--text-dim)' }}>Click IDs</p>
                         <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff' }}>
-                          <AttrRow label="fbclid" value={safeContact.attribution?.fbclid} />
-                          <AttrRow label="gclid" value={safeContact.attribution?.gclid} />
-                          <AttrRow label="ttclid" value={safeContact.attribution?.ttclid} />
-                          <AttrRow label="source_link_tag" value={safeContact.attribution?.source_link_tag} />
+                          <AttrRow label="fbclid" value={contact.attribution?.fbclid} />
+                          <AttrRow label="gclid" value={contact.attribution?.gclid} />
+                          <AttrRow label="ttclid" value={contact.attribution?.ttclid} />
+                          <AttrRow label="source_link_tag" value={contact.attribution?.source_link_tag} />
                         </div>
                       </div>
                     )}
-                    {safeContact.attribution?.extra && Object.keys(safeContact.attribution.extra).length > 0 && (
+                    {contact.attribution?.extra && Object.keys(contact.attribution.extra).length > 0 && (
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-widest mb-2 px-1" style={{ color: 'var(--text-dim)' }}>Other Parameters</p>
                         <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff' }}>
-                          {Object.entries(safeContact.attribution.extra).map(([k, v]) => <AttrRow key={k} label={k} value={v} />)}
+                          {Object.entries(contact.attribution.extra).map(([k, v]) => <AttrRow key={k} label={k} value={v} />)}
                         </div>
                       </div>
                     )}
                   </>) : (
                     <div className="flex flex-col items-center justify-center py-12 gap-2" style={{ color: 'var(--text-dim)' }}>
-                      <TrendingUp size={32} /><p className="text-sm">No attribution data for this safeContact.</p>
+                      <TrendingUp size={32} /><p className="text-sm">No attribution data for this contact.</p>
                     </div>
                   )}
                 </div>
               );
 
-              if (activeTab === 'urls') return safeContact.visits?.length > 0 ? (
+              if (activeTab === 'urls') return contact.visits?.length > 0 ? (
                 <ScrollArea className="h-[400px]">
                   <div className="url-timeline-rail pr-4">
-                    {safeContact.visits.map((visit, i) => <UrlVisitItem key={visit.id} visit={visit} index={i} />)}
+                    {contact.visits.map((visit, i) => <UrlVisitItem key={visit.id} visit={visit} index={i} />)}
                   </div>
                 </ScrollArea>
               ) : (
@@ -515,9 +515,9 @@ export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, o
                 </div>
               );
 
-              if (activeTab === 'sales') return safeContact.sales?.length > 0 ? (
+              if (activeTab === 'sales') return contact.sales?.length > 0 ? (
                 <div className="space-y-3">
-                  {safeContact.sales.map(sale => {
+                  {contact.sales.map(sale => {
                     const scMap = {
                       completed: { bg: '#ecfdf5', text: '#065f46', border: '#a7f3d0', icon: CheckCircle2 },
                       paid:      { bg: '#ecfdf5', text: '#065f46', border: '#a7f3d0', icon: CheckCircle2 },
