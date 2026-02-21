@@ -270,29 +270,20 @@ const UrlVisitItem = ({ visit, index }) => {
   );
 };
 
-export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, onClose, onDelete }) => {
-  const [activeTab, setActiveTab] = useState(defaultTab);
+// ── ModalInner — keyed per contact ───────────────────────────────────────────
+// Owns all state, fetch, and UI. The key={contactId} on this component means it
+// remounts on every contact switch. The outer Dialog shell (and its overlay)
+// stays mounted, so the overlay never flashes.
+const ModalInner = ({ contactId, defaultTab, onClose, onDelete }) => {
+  const [activeTab, setActiveTab] = useState(defaultTab || 'overview');
 
-  // Reset tab when the modal opens or target contact changes.
-  // key={selectedContactId} in App.js already remounts this component on contact change,
-  // so this handles only the defaultTab prop changing while the same contact is open.
-  useEffect(() => {
-    setActiveTab(defaultTab);
-  }, [defaultTab]);
+  useEffect(() => { setActiveTab(defaultTab || 'overview'); }, [defaultTab]);
 
-  // React Query owns all fetch/loading/error state.
-  // enabled: open && !!contactId ensures nothing fires until the modal is actually open.
-  // With key={selectedContactId} in App.js each contact gets a fresh component instance,
-  // so there is zero possibility of stale data leaking from a previous contact.
-  const {
-    data:      contact,
-    isLoading,
-    error,
-  } = useQuery({
+  const { data: contact, isLoading, error } = useQuery({
     queryKey: ['contact', contactId],
     queryFn:  () => fetch(`${BACKEND_URL}/api/contacts/${contactId}`)
       .then(r => { if (!r.ok) throw new Error('Failed'); return r.json(); }),
-    enabled: open && !!contactId,
+    enabled: !!contactId,
   });
 
   const hasAttribution = contact?.attribution && (
@@ -303,21 +294,7 @@ export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, o
   );
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent
-        hideClose
-        data-testid="contact-detail-modal"
-        className="max-w-4xl p-0 border flex flex-col overflow-hidden"
-        style={{
-          backgroundColor: '#ffffff',
-          borderColor: 'var(--stroke)',
-          color: 'var(--text)',
-          /* Fixed height — never grows or shrinks regardless of content */
-          height: '680px',
-          maxHeight: '92vh',
-          boxShadow: 'var(--shadow)',
-        }}
-      >
+    <>
         <DialogHeader className="px-8 pt-6 pb-0 shrink-0" style={{ background: 'linear-gradient(135deg, #e8ebf5 0%, #f2f3f9 60%, #f9f8f5 100%)', borderBottom: '1.5px solid #d2d8ef', paddingBottom: '20px' }}>
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
@@ -672,7 +649,38 @@ export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, o
             );
           })()}
         </div>
-      </DialogContent>
-    </Dialog>
+    </>
   );
 };
+
+
+// ── ContactDetailModal — stable Dialog shell ──────────────────────────────────
+// Dialog + DialogContent stay mounted for the entire open → close lifecycle.
+// Only ModalInner remounts when contactId changes, keeping the overlay stable.
+export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, onClose, onDelete }) => (
+  <Dialog open={open} onOpenChange={onClose}>
+    <DialogContent
+      hideClose
+      data-testid="contact-detail-modal"
+      className="max-w-4xl p-0 border flex flex-col overflow-hidden"
+      style={{
+        backgroundColor: '#ffffff',
+        borderColor: 'var(--stroke)',
+        color: 'var(--text)',
+        height: '680px',
+        maxHeight: '92vh',
+        boxShadow: 'var(--shadow)',
+      }}
+    >
+      {open && contactId ? (
+        <ModalInner
+          key={contactId}
+          contactId={contactId}
+          defaultTab={defaultTab}
+          onClose={onClose}
+          onDelete={onDelete}
+        />
+      ) : null}
+    </DialogContent>
+  </Dialog>
+);
