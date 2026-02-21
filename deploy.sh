@@ -64,7 +64,7 @@ CURRENT_SHA=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 info "Current commit: $CURRENT_SHA"
 
 git fetch origin
-c    # hard reset to HEAD of main — discards local changes
+git reset --hard origin/main    # hard reset to HEAD of main — discards local changes
 
 NEW_SHA=$(git rev-parse --short HEAD)
 if [[ "$CURRENT_SHA" == "$NEW_SHA" ]]; then
