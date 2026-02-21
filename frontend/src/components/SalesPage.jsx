@@ -128,8 +128,8 @@ function SaleRow({ sale, onSelectContact, onShowDetail }) {
           {sale.source && <div className="text-xs" style={{ color: 'var(--text-dim)' }}>{sale.source}</div>}
         </div>
 
-        {/* Status */}
-        <div className="text-right">
+        {/* Status — centered */}
+        <div className="flex justify-center">
           <StatusPill status={sale.status} />
         </div>
 
