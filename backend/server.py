@@ -163,6 +163,7 @@ class ContactDetail(BaseModel):
     created_at: datetime
     updated_at: datetime
     visits: List[PageVisit] = []
+    sales: List['SaleBasic'] = []
 
 
 class TagCreate(BaseModel):
@@ -171,7 +172,35 @@ class TagCreate(BaseModel):
     session_id: Optional[str] = None
 
 
-# ─────────────────────────── Automation Models ───────────────────────────
+# ─────────────────────────── Sale Models ───────────────────────────
+
+class SaleBasic(BaseModel):
+    """Embedded inside ContactDetail — no circular reference."""
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    amount: Optional[float] = None
+    currency: Optional[str] = None
+    product: Optional[str] = None
+    status: Optional[str] = None
+    source: Optional[str] = None
+    created_at: datetime
+
+
+class SaleOut(BaseModel):
+    """Full sale record returned from GET /api/sales."""
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    contact_id: Optional[str] = None
+    contact_name: Optional[str] = None
+    contact_email: Optional[str] = None
+    email: Optional[str] = None
+    amount: Optional[float] = None
+    currency: Optional[str] = None
+    product: Optional[str] = None
+    status: Optional[str] = None
+    source: Optional[str] = None
+    raw_data: Dict[str, Any] = {}
+    created_at: datetime
 
 class AutomationFilter(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
