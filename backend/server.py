@@ -2133,6 +2133,11 @@ async def create_indexes():
         await db.automation_runs.create_index("automation_id")
         await db.automation_runs.create_index("triggered_at")
         await db.automation_runs.create_index([("automation_id", 1), ("triggered_at", -1)])
+        # Compound index for fast dedup lookups in _run_automations
+        await db.automation_runs.create_index(
+            [("automation_id", 1), ("contact_id", 1), ("run_type", 1), ("fbclid", 1)],
+            sparse=True
+        )
         await db.sales.create_index("id",         unique=True, sparse=True)
         await db.sales.create_index("contact_id", sparse=True)
         await db.sales.create_index("email",      sparse=True)
