@@ -137,6 +137,25 @@ export default function LeadsPage({ contacts, loading, initialLoad, stats, onRef
             </SelectContent>
           </Select>
 
+          {allTags.length > 0 && (
+            <Select value={tagFilter} onValueChange={setTag}>
+              <SelectTrigger data-testid="leads-filter-tag" className="h-10 text-sm w-36 font-medium bg-white" style={{ borderColor: 'var(--stroke)' }}>
+                <SelectValue placeholder="All tags" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-sm">All tags</SelectItem>
+                {allTags.map(t => (
+                  <SelectItem key={t} value={t} className="text-sm">
+                    <span className="flex items-center gap-2">
+                      <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--brand-navy)' }} />
+                      {t}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
           {(activeFilters > 0 || search) && (
             <button
               onClick={() => { setSrc('all'); setDate('all'); setSearch(''); }}
