@@ -1,18 +1,14 @@
 [
   {
-    "content": "Backend: Sale model + POST /api/sales/webhook + GET /api/sales + contact detail enrichment",
+    "content": "Backend: POST /api/auth/login + token generation using env vars",
     "status": "in_progress"
   },
   {
-    "content": "Frontend: SalesPage.jsx - table + stats",
+    "content": "Frontend: LoginPage.jsx matching the design",
     "status": "pending"
   },
   {
-    "content": "Frontend: ContactDetailModal - Sales tab",
-    "status": "pending"
-  },
-  {
-    "content": "Frontend: TopNav + App.js - add /sales route",
+    "content": "Frontend: Auth gate in App.js + logout in TopNav",
     "status": "pending"
   }
 ]
