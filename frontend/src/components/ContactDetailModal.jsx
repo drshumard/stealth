@@ -598,15 +598,16 @@ export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, o
                   ))}
                 </div>
 
-                {/* Fixed-height animated content — no resize between tabs */}
-                <div className="relative" style={{ minHeight: '420px' }}>
+                {/* Fixed-height animated content — flex-1 min-h-0 fills remaining space, overflow-y-auto scrolls */}
+                <div className="flex-1 min-h-0 overflow-y-auto relative">
                   <AnimatePresence mode="wait" initial={false}>
                     <motion.div
                       key={activeTab}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
-                      transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.15, ease: 'easeInOut' }}
+                      className="h-full"
                     >
                       {tabContent()}
                     </motion.div>
