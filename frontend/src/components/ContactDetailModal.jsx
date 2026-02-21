@@ -410,7 +410,7 @@ export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, o
                   {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-xl" style={{ backgroundColor: 'var(--stroke)' }} />)}
                 </div>
               );
-              if (!contact) return null;
+              if (!safeContact) return null;
 
               if (activeTab === 'overview') return (
                 <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff' }}>
