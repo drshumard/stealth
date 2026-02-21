@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
-const BG_IMAGE    = 'https://portal-drshumard.b-cdn.net/Gemini_Generated_Image_2muj7a2muj7a2muj.jpeg';
+const BG_IMAGE    = 'https://portal-drshumard.b-cdn.net/Gemini_Generated_Image_q2vumoq2vumoq2vu.jpeg';
 
 export default function LoginPage({ onLogin }) {
   const [email,     setEmail]     = useState('');
