@@ -1800,6 +1800,7 @@ async def create_indexes():
         await db.contacts.create_index("client_ip",    sparse=True)
         await db.contacts.create_index("merged_into",  sparse=True)
         await db.contacts.create_index("created_at")
+        await db.contacts.create_index("tags",         sparse=True)
         await db.page_visits.create_index("contact_id")
         await db.page_visits.create_index("session_id", sparse=True)
         await db.page_visits.create_index("timestamp")
