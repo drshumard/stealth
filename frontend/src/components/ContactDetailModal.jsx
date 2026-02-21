@@ -382,8 +382,237 @@ export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, o
               <AlertCircle size={16} />
               <span className="text-sm">Failed to load contact data.</span>
             </div>
-          ) : (
-            <Tabs key={`${contactId}-${defaultTab}`} defaultValue={defaultTab}>
+          ) : (() => {
+            const tabs = [
+              { id: 'overview',    label: 'Overview' },
+              { id: 'attribution', label: 'Attribution', badge: hasAttribution ? '●' : null, badgeGreen: true },
+              { id: 'urls',        label: 'URL History', badge: contact?.visits?.length || null },
+              { id: 'sales',       label: 'Sales',       badge: contact?.sales?.length  || null, badgeRed: true },
+            ];
+
+            const tabContent = () => {
+              if (loading) return (
+                <div className="space-y-3 pt-2">
+                  {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-xl" style={{ backgroundColor: 'var(--stroke)' }} />)}
+                </div>
+              );
+              if (!contact) return null;
+
+              if (activeTab === 'overview') return (
+                <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff' }}>
+                  <InfoRow icon={User}     label="Full Name"    value={contact.name}  />
+                  <InfoRow icon={Mail}     label="Email"        value={contact.email} copyable />
+                  <InfoRow icon={Phone}    label="Phone"        value={contact.phone} />
+                  <InfoRow icon={Hash}     label="Contact ID"   value={contact.contact_id} mono copyable />
+                  <InfoRow icon={Wifi}     label="IP Address"   value={contact.client_ip} mono />
+                  <InfoRow icon={Layers}   label="Session ID"   value={contact.session_id} mono copyable />
+                  <InfoRow icon={Calendar} label="First Seen"   value={formatDateTime(contact.created_at)} />
+                  <InfoRow icon={Calendar} label="Last Updated" value={formatDateTime(contact.updated_at)} />
+                  {contact.tags?.length > 0 && (
+                    <div className="flex items-start gap-4 py-4 px-5">
+                      <div className="mt-0.5 shrink-0"><Tag size={15} style={{ color: 'var(--brand-navy)' }} /></div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-dim)' }}>Tags</div>
+                        <div className="flex flex-wrap gap-2">
+                          {contact.tags.map(tag => (
+                            <span key={tag} className="inline-flex items-center text-sm font-bold px-3 py-1 rounded-full"
+                              style={{ backgroundColor: 'rgba(3,3,82,0.08)', color: '#030352', border: '1.5px solid rgba(3,3,82,0.18)' }}>
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {contact.merged_children?.length > 0 && (
+                    <div className="flex items-start gap-3 py-2.5 px-4">
+                      <div className="mt-0.5 shrink-0"><GitMerge size={14} style={{ color: 'var(--mint-success)' }} /></div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs mb-1" style={{ color: 'var(--text-dim)' }}>Stitched Identities ({contact.merged_children.length})</div>
+                        <div className="flex flex-col gap-1">
+                          {contact.merged_children.map(cid => (
+                            <span key={cid} className="text-xs font-mono break-all" style={{ color: 'var(--mint-success)', fontFamily: 'IBM Plex Mono, monospace' }}>{cid}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+
+              if (activeTab === 'attribution') return (
+                <div className="space-y-4">
+                  {hasAttribution ? (<>
+                    {(contact.attribution?.utm_source || contact.attribution?.utm_medium || contact.attribution?.utm_campaign || contact.attribution?.utm_term || contact.attribution?.utm_content || contact.attribution?.utm_id) && (
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-widest mb-2 px-1" style={{ color: 'var(--text-dim)' }}>UTM Parameters</p>
+                        <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff' }}>
+                          <AttrRow label="utm_source" value={contact.attribution?.utm_source} />
+                          <AttrRow label="utm_medium" value={contact.attribution?.utm_medium} />
+                          <AttrRow label="utm_campaign" value={contact.attribution?.utm_campaign} />
+                          <AttrRow label="utm_term" value={contact.attribution?.utm_term} />
+                          <AttrRow label="utm_content" value={contact.attribution?.utm_content} />
+                          <AttrRow label="utm_id" value={contact.attribution?.utm_id} />
+                        </div>
+                      </div>
+                    )}
+                    {(contact.attribution?.campaign_id || contact.attribution?.adset_id || contact.attribution?.ad_id || contact.attribution?.fb_ad_set_id || contact.attribution?.google_campaign_id) && (
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-widest mb-2 px-1" style={{ color: 'var(--text-dim)' }}>Ad Platform IDs</p>
+                        <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff' }}>
+                          <AttrRow label="campaign_id" value={contact.attribution?.campaign_id} />
+                          <AttrRow label="adset_id" value={contact.attribution?.adset_id} />
+                          <AttrRow label="ad_id" value={contact.attribution?.ad_id} />
+                          <AttrRow label="fb_ad_set_id" value={contact.attribution?.fb_ad_set_id} />
+                          <AttrRow label="google_campaign_id" value={contact.attribution?.google_campaign_id} />
+                        </div>
+                      </div>
+                    )}
+                    {(contact.attribution?.fbclid || contact.attribution?.gclid || contact.attribution?.ttclid || contact.attribution?.source_link_tag) && (
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-widest mb-2 px-1" style={{ color: 'var(--text-dim)' }}>Click IDs</p>
+                        <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff' }}>
+                          <AttrRow label="fbclid" value={contact.attribution?.fbclid} />
+                          <AttrRow label="gclid" value={contact.attribution?.gclid} />
+                          <AttrRow label="ttclid" value={contact.attribution?.ttclid} />
+                          <AttrRow label="source_link_tag" value={contact.attribution?.source_link_tag} />
+                        </div>
+                      </div>
+                    )}
+                    {contact.attribution?.extra && Object.keys(contact.attribution.extra).length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-widest mb-2 px-1" style={{ color: 'var(--text-dim)' }}>Other Parameters</p>
+                        <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff' }}>
+                          {Object.entries(contact.attribution.extra).map(([k, v]) => <AttrRow key={k} label={k} value={v} />)}
+                        </div>
+                      </div>
+                    )}
+                  </>) : (
+                    <div className="flex flex-col items-center justify-center py-12 gap-2" style={{ color: 'var(--text-dim)' }}>
+                      <TrendingUp size={32} /><p className="text-sm">No attribution data for this contact.</p>
+                    </div>
+                  )}
+                </div>
+              );
+
+              if (activeTab === 'urls') return contact.visits?.length > 0 ? (
+                <ScrollArea className="h-[400px]">
+                  <div className="url-timeline-rail pr-4">
+                    {contact.visits.map((visit, i) => <UrlVisitItem key={visit.id} visit={visit} index={i} />)}
+                  </div>
+                </ScrollArea>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 gap-2" style={{ color: 'var(--text-dim)' }}>
+                  <Globe size={32} /><p className="text-sm">No URL visits recorded yet.</p>
+                </div>
+              );
+
+              if (activeTab === 'sales') return contact.sales?.length > 0 ? (
+                <div className="space-y-3">
+                  {contact.sales.map(sale => {
+                    const scMap = {
+                      completed: { bg: '#ecfdf5', text: '#065f46', border: '#a7f3d0', icon: CheckCircle2 },
+                      paid:      { bg: '#ecfdf5', text: '#065f46', border: '#a7f3d0', icon: CheckCircle2 },
+                      refunded:  { bg: '#fef2f2', text: '#991b1b', border: '#fecaca', icon: XCircle },
+                      failed:    { bg: '#fef2f2', text: '#991b1b', border: '#fecaca', icon: XCircle },
+                    };
+                    const sc = scMap[sale.status?.toLowerCase()] || { bg: '#fffbeb', text: '#92400e', border: '#fcd34d', icon: Clock };
+                    const SI = sc.icon;
+                    return (
+                      <div key={sale.id} className="rounded-2xl border overflow-hidden" style={{ borderColor: sc.border, backgroundColor: sc.bg }}>
+                        <div className="flex items-start justify-between gap-4 px-5 py-4">
+                          <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: 'rgba(3,3,82,0.10)' }}>
+                              <ShoppingCart size={17} style={{ color: '#030352' }} />
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold" style={{ color: '#030352', fontFamily: 'Space Grotesk, sans-serif' }}>{sale.product || 'Purchase'}</p>
+                              {sale.source && <p className="text-xs font-medium mt-0.5" style={{ color: 'var(--text-dim)' }}>via {sale.source}</p>}
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-xl font-bold tabular-nums" style={{ color: '#030352', fontFamily: 'Space Grotesk, sans-serif', letterSpacing: '-0.02em' }}>
+                              {sale.amount != null ? new Intl.NumberFormat('en-US', { style: 'currency', currency: sale.currency || 'USD', minimumFractionDigits: 0 }).format(sale.amount) : '—'}
+                            </p>
+                            <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full mt-1" style={{ backgroundColor: 'rgba(3,3,82,0.08)', color: sc.text }}>
+                              <SI size={10} />{sale.status || 'completed'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="px-5 pb-3">
+                          <p className="text-xs font-medium" style={{ color: sc.text, opacity: 0.7 }}>
+                            {new Date(sale.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 gap-2" style={{ color: 'var(--text-dim)' }}>
+                  <ShoppingCart size={32} /><p className="text-sm">No purchases recorded yet.</p>
+                </div>
+              );
+
+              return null;
+            };
+
+            return (
+              <>
+                {/* Spring pill tab bar */}
+                <div className="flex items-center gap-0.5 p-1 rounded-xl mb-6 relative"
+                  style={{ backgroundColor: '#f0f1f8', border: '1px solid var(--stroke)', width: 'fit-content' }}>
+                  {tabs.map(tab => (
+                    <button
+                      key={tab.id}
+                      data-testid={`contact-${tab.id}-tab`}
+                      onClick={() => setActiveTab(tab.id)}
+                      className="relative px-4 py-1.5 text-sm font-medium rounded-lg z-10 flex items-center gap-1.5"
+                      style={{ color: activeTab === tab.id ? '#ffffff' : 'var(--text-muted)' }}
+                    >
+                      {activeTab === tab.id && (
+                        <motion.div
+                          layoutId="modal-tab-pill"
+                          className="absolute inset-0 rounded-lg"
+                          style={{ backgroundColor: 'var(--brand-navy)' }}
+                          transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+                        />
+                      )}
+                      <span className="relative z-10">{tab.label}</span>
+                      {tab.badge && (
+                        <span className="relative z-10 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-xs font-bold rounded-full"
+                          style={{
+                            backgroundColor: activeTab === tab.id
+                              ? (tab.badgeRed ? '#A31800' : 'rgba(255,255,255,0.25)')
+                              : (tab.badgeGreen ? 'rgba(5,150,105,0.15)' : tab.badgeRed ? 'rgba(163,24,0,0.12)' : 'rgba(3,3,82,0.12)'),
+                            color: activeTab === tab.id ? '#fff'
+                              : (tab.badgeGreen ? '#059669' : tab.badgeRed ? '#A31800' : '#030352'),
+                          }}>
+                          {tab.badge === '●' ? '●' : tab.badge}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Fixed-height animated content — no resize between tabs */}
+                <div className="relative" style={{ minHeight: '420px' }}>
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.div
+                      key={activeTab}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                    >
+                      {tabContent()}
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+              </>
+            );
+          })()}
+        </div>
               <TabsList className="h-10 mb-5 gap-1 p-1" style={{ backgroundColor: '#f5f3ef', border: '1px solid var(--stroke)' }}>
                 <TabsTrigger data-testid="contact-overview-tab" value="overview" className="text-sm font-medium px-5">
                   Overview
