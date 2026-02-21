@@ -65,7 +65,7 @@ CURRENT_SHA=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 info "Current commit: $CURRENT_SHA"
 
 git fetch origin
-git reset --hard origin/main    # hard reset to HEAD of main — discards local changes
+c    # hard reset to HEAD of main — discards local changes
 
 NEW_SHA=$(git rev-parse --short HEAD)
 if [[ "$CURRENT_SHA" == "$NEW_SHA" ]]; then
@@ -110,12 +110,6 @@ deactivate
 # ──────────────────── 3. FRONTEND BUILD ────────────────────
 echo -e "\n${BOLD}Step 3/4 — Frontend build${RESET}"
 cd "$FRONTEND_DIR"
-
-# Write production env for the build
-cat > .env.production << PRODENV
-REACT_APP_BACKEND_URL=$BACKEND_URL
-PRODENV
-info "REACT_APP_BACKEND_URL set to $BACKEND_URL"
 
 info "Installing JS dependencies (yarn install)…"
 yarn install --frozen-lockfile --silent
