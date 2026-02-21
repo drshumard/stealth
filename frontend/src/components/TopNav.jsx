@@ -11,7 +11,7 @@ const NAV_TABS = [
   { id: 'logs',        label: 'Logs',        icon: List,        path: '/logs' },
 ];
 
-export const TopNav = ({ stats }) => {
+export const TopNav = ({ stats, onLogout }) => {
   const location = useLocation();
   const navigate = useNavigate();
 
