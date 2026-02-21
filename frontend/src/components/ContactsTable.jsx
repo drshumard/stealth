@@ -348,11 +348,22 @@ export const ContactsTable = ({
 
                     <TableCell className="py-4 pl-3">
                       <div>
-                        <div
-                          className="text-sm font-semibold"
-                          style={{ color: contact.name ? 'var(--text)' : 'var(--text-dim)', fontStyle: contact.name ? 'normal' : 'italic' }}
-                        >
-                          {contact.name || 'Anonymous'}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className="text-sm font-semibold"
+                            style={{ color: contact.name ? 'var(--text)' : 'var(--text-dim)', fontStyle: contact.name ? 'normal' : 'italic' }}
+                          >
+                            {contact.name || 'Anonymous'}
+                          </span>
+                          {contact.tags?.map(tag => (
+                            <span
+                              key={tag}
+                              className="inline-flex items-center text-xs font-bold px-2 py-0.5 rounded-full"
+                              style={{ backgroundColor: 'rgba(3,3,82,0.08)', color: '#030352', border: '1px solid rgba(3,3,82,0.15)' }}
+                            >
+                              {tag}
+                            </span>
+                          ))}
                         </div>
                         <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-dim)', fontFamily: 'IBM Plex Mono, monospace' }}>
                           {contact.contact_id.substring(0, 8)}…
