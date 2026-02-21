@@ -402,7 +402,8 @@ export const ContactsTable = ({
                       </div>
                     </TableCell>
 
-                    <TableCell className="py-3 hidden sm:table-cell">
+                    {/* Source — centered to match header */}
+                    <TableCell className="py-3 hidden sm:table-cell text-center">
                       {src ? (
                         <span
                           className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full font-medium border"
