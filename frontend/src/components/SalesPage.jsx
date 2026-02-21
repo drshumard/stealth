@@ -87,7 +87,7 @@ function SaleDetail({ sale }) {
 }
 
 // Shared grid template — header and rows must use the same value
-const SALES_GRID = '1fr 100px 120px 144px 20px';
+const SALES_GRID = '2fr 1fr 1.3fr 1.5fr 24px';
 
 function SaleRow({ sale, onSelectContact, onShowDetail }) {
   const sc     = STATUS[sale.status?.toLowerCase()] || defaultStatus;
