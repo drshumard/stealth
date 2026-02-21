@@ -377,7 +377,7 @@ export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, o
               <span className="text-sm">Failed to load contact data.</span>
             </div>
           ) : (
-            <Tabs defaultValue={defaultTab}>
+            <Tabs key={`${contactId}-${defaultTab}`} defaultValue={defaultTab}>
               <TabsList className="h-10 mb-5 gap-1 p-1" style={{ backgroundColor: '#f5f3ef', border: '1px solid var(--stroke)' }}>
                 <TabsTrigger data-testid="contact-overview-tab" value="overview" className="text-sm font-medium px-5">
                   Overview
