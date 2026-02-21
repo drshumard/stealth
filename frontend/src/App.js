@@ -23,6 +23,7 @@ function AppShell() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const selectedContactId = searchParams.get('contact');
+  const selectedTab       = searchParams.get('tab') || 'overview';
   const modalOpen = !!selectedContactId;
 
   const fetchContacts = useCallback(async () => {
