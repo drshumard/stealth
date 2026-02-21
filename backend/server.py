@@ -796,7 +796,7 @@ async def _run_automations(contact_id: str) -> None:
 
 # ─────────────────────────── Tracker JS ───────────────────────────
 
-def build_tracker_js(backend_url: str) -> str:
+def build_tracker_js(backend_url: str, auto_tag: str = '') -> str:
     return r"""/**
  * Shumard - Lead Attribution & Cross-Frame Identity Script
  * Architecture: Hyros-style field capture + postMessage cross-frame stitching
