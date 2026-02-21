@@ -110,6 +110,7 @@ function AppShell() {
       </div>
       <ContactDetailModal
         contactId={selectedContactId}
+        defaultTab={selectedTab}
         open={modalOpen}
         onClose={handleCloseModal}
         onDelete={handleDeleteContact}
