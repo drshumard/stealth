@@ -749,7 +749,7 @@ def _build_webhook_payload(contact: dict, field_map: list) -> dict:
 
 async def _fire_webhook_task(
     auto_id: str, url: str, payload: dict, headers: dict,
-    run_type: str = "live", contact: Optional[dict] = None
+    run_type: str = "live", contact: Optional[dict] = None, fbclid: Optional[str] = None
 ) -> None:
     """Fire a webhook, persist the run record, and update automation stats."""
     import time
