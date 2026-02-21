@@ -9,62 +9,42 @@ const DialogTrigger = DialogPrimitive.Trigger
 const DialogPortal  = DialogPrimitive.Portal
 const DialogClose   = DialogPrimitive.Close
 
-// ── Motion-wrapped Radix primitives ──────────────────────────────────────────
-// motion.create() is the v11+ API for wrapping non-HTML components.
-const MotionOverlay = motion.create(DialogPrimitive.Overlay)
-const MotionContent = motion.create(DialogPrimitive.Content)
-
 // ── Overlay ───────────────────────────────────────────────────────────────────
+// asChild merges Radix's overlay behaviour (data-state, aria, role) onto
+// the motion.div so Framer Motion can animate it freely.
 const DialogOverlay = React.forwardRef(({ className, ...props }, ref) => (
-  <MotionOverlay
-    ref={ref}
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    exit={{ opacity: 0 }}
-    transition={{ duration: 0.18, ease: "easeOut" }}
-    // No Radix CSS animation classes — Framer Motion owns the transition
-    className={cn("fixed inset-0 z-50 bg-black/60", className)}
-    {...props}
-  />
+  <DialogPrimitive.Overlay asChild {...props}>
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18, ease: "easeOut" }}
+      // No Radix animation classes — Framer Motion owns the transition
+      className={cn("fixed inset-0 z-50 bg-black/60", className)}
+    />
+  </DialogPrimitive.Overlay>
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
 // ── Content ───────────────────────────────────────────────────────────────────
-const DialogContent = React.forwardRef(({ className, children, hideClose, ...props }, ref) => {
-  // Radix passes `data-state` via context; we read `open` directly from props
-  // so AnimatePresence can control mount/unmount timing.
-  // Strategy: forceMount keeps the portal in the DOM; AnimatePresence with
-  // the boolean `open` key handles enter/exit.  This gives us smooth exits
-  // without needing to thread `open` through every call site.
-  const [isOpen, setIsOpen] = React.useState(false)
-
-  // Detect open state from Radix data-state attribute via a tiny MutationObserver
-  // — simplest way that doesn't require changing DialogContent's public API.
-  // Instead, we rely on the Dialog root's open prop via context.
-  // Simpler: just use forceMount + let AnimatePresence key on the content itself.
-  // Radix fires unmount immediately; we intercept with forceMount and animate out.
-
-  return (
-    <DialogPortal forceMount>
-      <AnimatePresence>
-        {/* Radix keeps the Portal mounted (forceMount), but the children
-            are only rendered when the Dialog is open — Radix gates this
-            internally.  AnimatePresence wraps both so exit plays before DOM removal. */}
-        <DialogOverlay key="overlay" />
-        <MotionContent
-          key="content"
+const DialogContent = React.forwardRef(({ className, children, hideClose, ...props }, ref) => (
+  <DialogPortal forceMount>
+    <AnimatePresence>
+      <DialogOverlay key="overlay" />
+      <DialogPrimitive.Content asChild {...props}>
+        <motion.div
           ref={ref}
-          // Enter: fade in + gentle scale-up from 96% + slide up 2%
+          // Enter: fade + scale + 2px slide up
           initial={{ opacity: 0, scale: 0.97, x: "-50%", y: "-48%" }}
           animate={{ opacity: 1, scale: 1,    x: "-50%", y: "-50%" }}
           exit={{    opacity: 0, scale: 0.97, x: "-50%", y: "-48%" }}
           transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          // No Radix animation classes — remove ALL data-[state=*]:animate-* classes
           className={cn(
-            // Remove ALL Radix animation classes — Framer Motion owns transitions
             "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg sm:rounded-lg",
             className
           )}
-          {...props}
         >
           {children}
           {!hideClose && (
@@ -73,11 +53,11 @@ const DialogContent = React.forwardRef(({ className, children, hideClose, ...pro
               <span className="sr-only">Close</span>
             </DialogPrimitive.Close>
           )}
-        </MotionContent>
-      </AnimatePresence>
-    </DialogPortal>
-  )
-})
+        </motion.div>
+      </DialogPrimitive.Content>
+    </AnimatePresence>
+  </DialogPortal>
+))
 DialogContent.displayName = DialogPrimitive.Content.displayName
 
 // ── Unchanged helpers ─────────────────────────────────────────────────────────
