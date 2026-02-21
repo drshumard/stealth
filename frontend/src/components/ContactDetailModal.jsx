@@ -264,7 +264,13 @@ const UrlVisitItem = ({ visit, index }) => {
 export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, onClose, onDelete }) => {
   const [contact, setContact] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error,   setError]   = useState(null);
+  const [activeTab, setActiveTab] = useState(defaultTab);
+
+  // Reset active tab whenever the modal opens or target contact changes
+  useEffect(() => {
+    if (open) setActiveTab(defaultTab);
+  }, [open, contactId, defaultTab]);
 
   useEffect(() => {
     if (!open || !contactId) { setContact(null); return; }
