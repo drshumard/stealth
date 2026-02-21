@@ -108,6 +108,19 @@ export const TopNav = ({ stats, onLogout }) => {
           </div>
           <ChevronDown size={14} style={{ color: 'var(--text-dim)' }} />
         </button>
+
+        {onLogout && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onLogout}
+            className="w-8 h-8 p-0 rounded-full ml-1"
+            style={{ color: 'var(--text-dim)' }}
+            title="Log out"
+          >
+            <LogOut size={15} />
+          </Button>
+        )}
       </div>
     </header>
   );
