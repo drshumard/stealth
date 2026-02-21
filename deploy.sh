@@ -11,7 +11,6 @@ APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$APP_DIR/backend"
 FRONTEND_DIR="$APP_DIR/frontend"
 PM2_APP_NAME="tether-backend"
-BACKEND_URL="https://tether.drshumard.com"
 LOG_DIR="/var/log/tether"
 
 # ──────────────────── COLOURS ────────────────────
