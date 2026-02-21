@@ -1536,6 +1536,20 @@ async def get_contact_detail(contact_id: str):
         fix_contact_doc(contact)
         visits_raw = await db.page_visits.find({"contact_id": contact_id}, {"_id": 0}).sort("timestamp", 1).to_list(500)
         contact['visits'] = [PageVisit(**fix_visit_doc(v)) for v in visits_raw]
+        # Attach linked sales
+        sales_raw = await db.sales.find({"contact_id": contact_id}, {"_id": 0}).sort("created_at", -1).to_list(100)
+        contact['sales'] = [
+            SaleBasic(
+                id         = s["id"],
+                amount     = s.get("amount"),
+                currency   = s.get("currency", "USD"),
+                product    = s.get("product"),
+                status     = s.get("status"),
+                source     = s.get("source"),
+                created_at = str_to_dt(s["created_at"]),
+            )
+            for s in sales_raw
+        ]
         return ContactDetail(**contact)
     except HTTPException:
         raise
