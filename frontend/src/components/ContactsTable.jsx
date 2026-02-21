@@ -243,11 +243,10 @@ export const ContactsTable = ({
           <colgroup>
             <col style={{ width: '40px' }} />          {/* Checkbox */}
             <col style={{ width: '28%' }} />            {/* Name + tags */}
-            <col style={{ width: '27%' }} />            {/* Email */}
-            <col style={{ width: '16%' }} />            {/* Created (md+) */}
-            <col style={{ width: '14%' }} />            {/* Source (sm+) */}
-            <col style={{ width: '9%' }} />             {/* Visits */}
-            <col style={{ width: '56px' }} />           {/* Actions */}
+            <col style={{ width: '29%' }} />            {/* Email */}
+            <col style={{ width: '17%' }} />            {/* Created (md+) */}
+            <col style={{ width: '15%' }} />            {/* Source (sm+) */}
+            <col style={{ width: '11%' }} />            {/* Visits */}
           </colgroup>
           <TableHeader>
             <TableRow
