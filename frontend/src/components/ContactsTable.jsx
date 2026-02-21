@@ -284,7 +284,6 @@ export const ContactsTable = ({
                   <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-3/4" /></TableCell>
                   <TableCell className="hidden sm:table-cell"><Skeleton className="h-5 w-3/4 rounded-full" /></TableCell>
                   <TableCell className="text-right pr-6"><Skeleton className="h-4 w-6 ml-auto" /></TableCell>
-                  <TableCell className="pr-4 text-right"><Skeleton className="h-4 w-8 ml-auto" /></TableCell>
                 </TableRow>
               ))
             ) : sliced.length === 0 ? (
