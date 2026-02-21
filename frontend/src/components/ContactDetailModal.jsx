@@ -415,42 +415,84 @@ export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, o
               if (!contact) return null;
 
               if (activeTab === 'overview') return (
-                <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff' }}>
-                  <InfoRow icon={User}     label="Full Name"    value={contact.name}  />
-                  <InfoRow icon={Mail}     label="Email"        value={contact.email} copyable />
-                  <InfoRow icon={Phone}    label="Phone"        value={contact.phone} />
-                  <InfoRow icon={Hash}     label="Contact ID"   value={contact.contact_id} mono copyable />
-                  <InfoRow icon={Wifi}     label="IP Address"   value={contact.client_ip} mono />
-                  <InfoRow icon={Layers}   label="Session ID"   value={contact.session_id} mono copyable />
-                  <InfoRow icon={Calendar} label="First Seen"   value={formatDateTime(contact.created_at)} />
-                  <InfoRow icon={Calendar} label="Last Updated" value={formatDateTime(contact.updated_at)} />
-                  {contact.tags?.length > 0 && (
-                    <div className="flex items-start gap-4 py-4 px-5">
-                      <div className="mt-0.5 shrink-0"><Tag size={15} style={{ color: 'var(--brand-navy)' }} /></div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-dim)' }}>Tags</div>
-                        <div className="flex flex-wrap gap-2">
+                <div className="space-y-4">
+                  {/* Compact grid info table */}
+                  <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff' }}>
+                    <InfoRow icon={User}     label="Full Name"    value={contact.name}  />
+                    <InfoRow icon={Mail}     label="Email"        value={contact.email} copyable />
+                    <InfoRow icon={Phone}    label="Phone"        value={contact.phone} />
+                    <InfoRow icon={Hash}     label="Contact ID"   value={contact.contact_id} mono copyable />
+                    <InfoRow icon={Wifi}     label="IP Address"   value={contact.client_ip} mono />
+                    <InfoRow icon={Layers}   label="Session ID"   value={contact.session_id} mono copyable />
+                    <InfoRow icon={Calendar} label="First Seen"   value={formatDateTime(contact.created_at)} />
+                    <InfoRow icon={Calendar} label="Last Updated" value={formatDateTime(contact.updated_at)} />
+                    {contact.tags?.length > 0 && (
+                      <div className="grid items-start border-t" style={{ gridTemplateColumns: '148px 1fr auto', borderColor: 'var(--stroke)' }}>
+                        <div className="flex items-center gap-2 px-4 py-3" style={{ backgroundColor: '#fafaf8' }}>
+                          <Tag size={13} style={{ color: 'var(--brand-navy)' }} />
+                          <span className="text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--text-dim)' }}>Tags</span>
+                        </div>
+                        <div className="px-4 py-3 flex flex-wrap gap-1.5">
                           {contact.tags.map(tag => (
-                            <span key={tag} className="inline-flex items-center text-sm font-bold px-3 py-1 rounded-full"
+                            <span key={tag} className="inline-flex items-center text-xs font-bold px-2.5 py-1 rounded-full"
                               style={{ backgroundColor: 'rgba(3,3,82,0.08)', color: '#030352', border: '1.5px solid rgba(3,3,82,0.18)' }}>
                               {tag}
                             </span>
                           ))}
                         </div>
+                        <div />
                       </div>
-                    </div>
-                  )}
-                  {contact.merged_children?.length > 0 && (
-                    <div className="flex items-start gap-3 py-2.5 px-4">
-                      <div className="mt-0.5 shrink-0"><GitMerge size={14} style={{ color: 'var(--mint-success)' }} /></div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs mb-1" style={{ color: 'var(--text-dim)' }}>Stitched Identities ({contact.merged_children.length})</div>
-                        <div className="flex flex-col gap-1">
+                    )}
+                    {contact.merged_children?.length > 0 && (
+                      <div className="grid items-start border-t" style={{ gridTemplateColumns: '148px 1fr auto', borderColor: 'var(--stroke)' }}>
+                        <div className="flex items-center gap-2 px-4 py-3" style={{ backgroundColor: '#fafaf8' }}>
+                          <GitMerge size={13} style={{ color: 'var(--mint-success)' }} />
+                          <span className="text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--text-dim)' }}>Stitched</span>
+                        </div>
+                        <div className="px-4 py-3 flex flex-col gap-1">
                           {contact.merged_children.map(cid => (
                             <span key={cid} className="text-xs font-mono break-all" style={{ color: 'var(--mint-success)', fontFamily: 'IBM Plex Mono, monospace' }}>{cid}</span>
                           ))}
                         </div>
+                        <div />
                       </div>
+                    )}
+                  </div>
+
+                  {/* Sale flashcard — green highlight with $ icon */}
+                  {contact.sales?.length > 0 && (
+                    <div className="space-y-2">
+                      {contact.sales.map(sale => {
+                        const fmtAmt = sale.amount != null
+                          ? new Intl.NumberFormat('en-US', { style: 'currency', currency: sale.currency || 'USD', minimumFractionDigits: 0 }).format(sale.amount)
+                          : null;
+                        return (
+                          <div key={sale.id} className="relative rounded-2xl overflow-hidden border px-5 py-4"
+                            style={{ backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }}>
+                            <div className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center"
+                              style={{ backgroundColor: 'rgba(5,150,105,0.15)' }}>
+                              <DollarSign size={16} style={{ color: '#059669' }} />
+                            </div>
+                            {fmtAmt && (
+                              <div className="text-2xl font-bold tabular-nums mb-0.5 pr-12"
+                                style={{ color: '#065f46', fontFamily: 'Space Grotesk, sans-serif', letterSpacing: '-0.03em' }}>
+                                {fmtAmt}
+                              </div>
+                            )}
+                            <div className="text-sm font-semibold pr-12" style={{ color: '#065f46' }}>{sale.product || 'Purchase'}</div>
+                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                              <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full"
+                                style={{ backgroundColor: 'rgba(5,150,105,0.15)', color: '#065f46' }}>
+                                <CheckCircle2 size={10} />{sale.status || 'completed'}
+                              </span>
+                              {sale.source && <span className="text-xs font-medium" style={{ color: '#059669', opacity: 0.75 }}>via {sale.source}</span>}
+                              <span className="text-xs" style={{ color: '#059669', opacity: 0.6 }}>
+                                {new Date(sale.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
