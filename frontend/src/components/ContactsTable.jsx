@@ -146,17 +146,24 @@ export const ContactsTable = ({
     return [1, '...', safePage - 1, safePage, safePage + 1, '...', totalPages];
   }, [totalPages, safePage]);
 
-  const Col = ({ label, col: colKey, className = '' }) => (
-    <TableHead
-      className={`text-xs uppercase tracking-wide cursor-pointer select-none h-11 ${className}`}
-      style={{ color: '#030352', opacity: 0.65, fontFamily: 'Work Sans, sans-serif', fontWeight: 700 }}
-      onClick={() => toggleSort(colKey)}
-    >
-      <div className="flex items-center">
-        {label}<SortIcon col={colKey} sort={sort} />
-      </div>
-    </TableHead>
-  );
+  // Derive flex-justification from the className so the sort icon
+  // and label always sit on the same side as the cell content.
+  const Col = ({ label, col: colKey, className = '' }) => {
+    const justify = className.includes('text-right')  ? 'justify-end'
+                  : className.includes('text-center') ? 'justify-center'
+                  : 'justify-start';
+    return (
+      <TableHead
+        className={`text-xs uppercase tracking-wide cursor-pointer select-none h-11 ${className}`}
+        style={{ color: '#030352', opacity: 0.65, fontFamily: 'Work Sans, sans-serif', fontWeight: 700 }}
+        onClick={() => toggleSort(colKey)}
+      >
+        <div className={`flex items-center gap-0.5 ${justify}`}>
+          {label}<SortIcon col={colKey} sort={sort} />
+        </div>
+      </TableHead>
+    );
+  };
 
   const showSkeletons = loading && initialLoad;
 
