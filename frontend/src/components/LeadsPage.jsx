@@ -41,17 +41,24 @@ export default function LeadsPage({ contacts, loading, initialLoad, stats, onRef
     return Array.from(s).sort();
   }, [identified]);
 
+  // Collect all distinct tags across identified contacts
+  const allTags = useMemo(() => {
+    const t = new Set(identified.flatMap(c => c.tags || []));
+    return Array.from(t).sort();
+  }, [identified]);
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return identified.filter(c => {
       if (srcFilter !== 'all' && c.attribution?.utm_source !== srcFilter) return false;
       if (!passesDate(c, dateFilter)) return false;
+      if (tagFilter !== 'all' && !(c.tags || []).includes(tagFilter)) return false;
       if (q) return c.name?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q) || c.phone?.toLowerCase().includes(q);
       return true;
     });
-  }, [identified, srcFilter, dateFilter, search]);
+  }, [identified, srcFilter, dateFilter, tagFilter, search]);
 
-  const activeFilters = (srcFilter !== 'all' ? 1 : 0) + (dateFilter !== 'all' ? 1 : 0);
+  const activeFilters = (srcFilter !== 'all' ? 1 : 0) + (dateFilter !== 'all' ? 1 : 0) + (tagFilter !== 'all' ? 1 : 0);
 
   return (
     <div className="p-8 md:p-10">
