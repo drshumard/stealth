@@ -1818,6 +1818,211 @@ async def get_automation_runs(auto_id: str, limit: int = 50):
     return result
 
 
+
+# ─────────────────────────── Sales ───────────────────────────
+
+def _nested_get(obj: Any, path: str) -> Any:
+    """Get a value from a nested dict/list using dot notation, e.g. 'customer.email'."""
+    if not isinstance(obj, (dict, list)):
+        return None
+    if '.' not in path:
+        if isinstance(obj, dict):
+            return obj.get(path)
+        try:
+            return obj[int(path)]
+        except Exception:
+            return None
+    head, tail = path.split('.', 1)
+    child = obj.get(head) if isinstance(obj, dict) else None
+    if child is None and isinstance(obj, list):
+        try:
+            child = obj[int(head)]
+        except Exception:
+            return None
+    return _nested_get(child, tail) if child is not None else None
+
+
+def _extract_sale_fields(payload: dict) -> dict:
+    """
+    Extract standardised sale fields from any webhook payload.
+    Handles Stripe, Kajabi, GoHighLevel, generic CRMs, etc.
+    """
+    # ── email ──────────────────────────────────────────────────
+    email = None
+    for path in [
+        'email', 'Email', 'customer_email', 'buyer_email', 'contact_email',
+        'customer.email', 'customer_details.email', 'billing_details.email',
+        'contact.email', 'metadata.email', 'data.email',
+    ]:
+        v = _nested_get(payload, path)
+        if v and isinstance(v, str) and '@' in v:
+            email = v.strip().lower()
+            break
+
+    # ── amount ─────────────────────────────────────────────────
+    amount = None
+    for key in ['amount', 'amount_total', 'amount_paid', 'total', 'price',
+                'value', 'revenue', 'subtotal', 'grand_total', 'Amount']:
+        v = _nested_get(payload, key)
+        if v is not None:
+            try:
+                amt = float(v)
+                # Stripe sends amounts in smallest currency unit (cents)
+                if key in ('amount', 'amount_total', 'amount_paid') and amt >= 100:
+                    amt = amt / 100
+                amount = round(amt, 2)
+                break
+            except Exception:
+                pass
+
+    # ── currency ───────────────────────────────────────────────
+    currency = 'USD'
+    for key in ['currency', 'Currency']:
+        v = _nested_get(payload, key)
+        if v and isinstance(v, str):
+            currency = v.upper()[:3]
+            break
+
+    # ── product name ───────────────────────────────────────────
+    product = None
+    for path in [
+        'product', 'product_name', 'plan', 'plan_name', 'item_name',
+        'description', 'name', 'offer_name', 'product.name',
+        'line_items.0.description', 'line_items.0.name',
+        'display_items.0.custom.name',
+    ]:
+        v = _nested_get(payload, path)
+        if v and isinstance(v, str):
+            product = v[:200]
+            break
+
+    # ── status ─────────────────────────────────────────────────
+    status = 'completed'
+    for key in ['status', 'Status', 'state', 'payment_status', 'fulfillment_status']:
+        v = _nested_get(payload, key)
+        if v and isinstance(v, str):
+            status = v.lower()
+            break
+
+    # ── source/platform hint ───────────────────────────────────
+    source = None
+    for key in ['source', 'platform', 'type', 'event_type', 'object']:
+        v = _nested_get(payload, key)
+        if v and isinstance(v, str):
+            source = v[:100]
+            break
+
+    return {
+        'email':    email,
+        'amount':   amount,
+        'currency': currency,
+        'product':  product,
+        'status':   status,
+        'source':   source,
+    }
+
+
+@api_router.post("/sales/webhook", status_code=201)
+async def sales_webhook(request: Request):
+    """
+    Universal sale ingestion endpoint.
+    POST any JSON payload from Stripe, Kajabi, GoHighLevel, n8n, Zapier, etc.
+    Tether extracts the sale fields, matches the email to an existing contact,
+    and links the sale record to that contact.
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Request body must be valid JSON")
+
+    try:
+        fields    = _extract_sale_fields(body)
+        now       = datetime.now(timezone.utc)
+        sale_id   = str(uuid.uuid4())
+        email     = fields['email']
+
+        # Match to an existing contact by email
+        contact_id = None
+        if email:
+            contact = await db.contacts.find_one(
+                {"email": {"$regex": f"^{email}$", "$options": "i"}, "merged_into": None},
+                {"_id": 0, "contact_id": 1}
+            )
+            if contact:
+                contact_id = contact['contact_id']
+
+        sale_doc = {
+            "id":         sale_id,
+            "contact_id": contact_id,
+            "email":      email,
+            "amount":     fields['amount'],
+            "currency":   fields['currency'],
+            "product":    fields['product'],
+            "status":     fields['status'],
+            "source":     fields['source'],
+            "raw_data":   body,
+            "created_at": dt_to_str(now),
+        }
+        await db.sales.insert_one(sale_doc)
+
+        logger.info(
+            f"Sale {sale_id[:8]} ingested — "
+            f"email={email} amount={fields['amount']} "
+            f"linked_to={contact_id[:12] if contact_id else 'none'}..."
+        )
+        return {
+            "status":     "ok",
+            "sale_id":    sale_id,
+            "contact_id": contact_id,
+            "matched":    contact_id is not None,
+            "email":      email,
+            "amount":     fields['amount'],
+            "product":    fields['product'],
+        }
+    except Exception as e:
+        logger.error(f"Error ingesting sale: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/sales", response_model=List[SaleOut])
+async def get_sales(limit: int = 500):
+    """All sales, newest first, enriched with contact name."""
+    try:
+        sales_raw = await db.sales.find({}, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+
+        # Batch-enrich with contact data
+        contact_ids = list({s["contact_id"] for s in sales_raw if s.get("contact_id")})
+        contacts_map: dict = {}
+        if contact_ids:
+            contacts_raw = await db.contacts.find(
+                {"contact_id": {"$in": contact_ids}},
+                {"_id": 0, "contact_id": 1, "name": 1, "email": 1}
+            ).to_list(len(contact_ids))
+            contacts_map = {c["contact_id"]: c for c in contacts_raw}
+
+        result = []
+        for s in sales_raw:
+            c = contacts_map.get(s.get("contact_id") or "", {})
+            result.append(SaleOut(
+                id            = s["id"],
+                contact_id    = s.get("contact_id"),
+                contact_name  = c.get("name"),
+                contact_email = c.get("email") or s.get("email"),
+                email         = s.get("email"),
+                amount        = s.get("amount"),
+                currency      = s.get("currency", "USD"),
+                product       = s.get("product"),
+                status        = s.get("status"),
+                source        = s.get("source"),
+                raw_data      = s.get("raw_data", {}),
+                created_at    = str_to_dt(s["created_at"]),
+            ))
+        return result
+    except Exception as e:
+        logger.error(f"Error fetching sales: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ─────────────────────────── Startup: create indexes ───────────────────────────
 
 @app.on_event("startup")
