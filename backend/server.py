@@ -809,9 +809,6 @@ async def _run_automations(contact_id: str) -> None:
     if not contact or not (contact.get('email') or contact.get('phone')):
         return
 
-    # Extract the fbclid from attribution — used as dedup key.
-    # The same Facebook ad click (same fbclid) should never fire the same
-    # automation twice, even if the lead visits the page multiple times.
     fbclid = (contact.get('attribution') or {}).get('fbclid') or None
 
     automations = await db.automations.find({"enabled": True}, {"_id": 0}).to_list(100)
@@ -820,28 +817,31 @@ async def _run_automations(contact_id: str) -> None:
             if not _evaluate_filters(contact, auto.get('filters', [])):
                 continue
 
-            # ── Dedup check ──────────────────────────────────────────────────
-            # Build a query that uniquely identifies this delivery attempt:
-            #   automation + contact + fbclid (when present)
-            # If a previous successful live run exists with the same key, skip.
-            dedup_q: dict = {
-                "automation_id": auto['id'],
-                "contact_id":    contact_id,
-                "run_type":      "live",
-            }
-            if fbclid:
-                # Strict match: same Facebook click ID → definitely the same visit
-                dedup_q["fbclid"] = fbclid
-            else:
-                # No click ID available — fall back to contact-level dedup:
-                # only send once per contact per automation regardless
-                pass
+            # ── Atomic dedup via unique upsert ───────────────────────────────
+            # Build the dedup key. When fbclid is present, dedup per-click so
+            # a new ad click (new fbclid) is allowed to fire again.
+            # When absent, dedup per contact so each contact fires at most once.
+            dedup_key = f"{auto['id']}:{contact_id}:{fbclid or 'nofbclid'}"
 
-            existing = await db.automation_runs.find_one(dedup_q, {"_id": 0, "id": 1})
-            if existing:
+            now_str = dt_to_str(datetime.now(timezone.utc))
+            result = await db.automation_dedup.find_one_and_update(
+                {"dedup_key": dedup_key},
+                {"$setOnInsert": {
+                    "dedup_key":    dedup_key,
+                    "automation_id": auto['id'],
+                    "contact_id":   contact_id,
+                    "fbclid":       fbclid,
+                    "created_at":   now_str,
+                }},
+                upsert=True,
+                return_document=False,   # returns pre-update doc; None = just inserted
+            )
+
+            if result is not None:
+                # Record already existed — this delivery has already happened
                 logger.info(
-                    f"Automation {auto['id'][:8]} skipped for {contact_id[:8]}: "
-                    f"already fired (fbclid={fbclid[:12] if fbclid else 'none'})"
+                    f"Automation {auto['id'][:8]} deduped for {contact_id[:8]} "
+                    f"(fbclid={fbclid[:12] if fbclid else 'none'})"
                 )
                 continue
             # ─────────────────────────────────────────────────────────────────
