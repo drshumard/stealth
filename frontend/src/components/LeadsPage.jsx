@@ -158,7 +158,7 @@ export default function LeadsPage({ contacts, loading, initialLoad, stats, onRef
 
           {(activeFilters > 0 || search) && (
             <button
-              onClick={() => { setSrc('all'); setDate('all'); setSearch(''); }}
+              onClick={() => { setSrc('all'); setDate('all'); setSearch(''); setTag('all'); }}
               className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border transition-colors font-medium bg-white"
               style={{ color: 'var(--text-muted)', borderColor: 'var(--stroke)' }}
             >
