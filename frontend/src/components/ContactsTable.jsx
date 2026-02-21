@@ -362,7 +362,6 @@ export const ContactsTable = ({
                         />
                       </div>
                     </TableCell>
-                    </TableCell>
 
                     <TableCell className="py-4 pl-3 overflow-hidden">
                       <div>
