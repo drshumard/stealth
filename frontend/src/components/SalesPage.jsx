@@ -85,6 +85,9 @@ function SaleDetail({ sale }) {
   );
 }
 
+// Shared grid template — header and rows must use the same value
+const SALES_GRID = '1fr 100px 120px 144px 20px';
+
 function SaleRow({ sale, onSelectContact }) {
   const [open, setOpen] = useState(false);
   const sc     = STATUS[sale.status?.toLowerCase()] || defaultStatus;
@@ -94,39 +97,55 @@ function SaleRow({ sale, onSelectContact }) {
     <div className="border-b last:border-0 transition-colors"
       style={{ borderColor: 'var(--stroke)', backgroundColor: open ? '#faf9f7' : 'transparent' }}>
       <div
-        className="flex items-center gap-4 px-6 py-4 cursor-pointer hover:bg-[#faf9f7] transition-colors duration-120"
+        className="grid items-center px-6 py-4 cursor-pointer hover:bg-[#faf9f7] transition-colors duration-120"
+        style={{ gridTemplateColumns: SALES_GRID, gap: '16px' }}
         onClick={() => isLinked ? onSelectContact?.(sale.contact_id) : setOpen(v => !v)}
       >
-        <div className="flex-1 min-w-0">
+        {/* Contact / product */}
+        <div className="min-w-0 overflow-hidden">
           <div className="flex items-center gap-2 flex-wrap">
             <User size={13} style={{ color: isLinked ? 'var(--brand-navy)' : 'var(--text-dim)', opacity: 0.5, flexShrink: 0 }} />
-            <span className="text-sm font-bold" style={{ color: isLinked ? 'var(--brand-navy)' : 'var(--text-muted)' }}>
+            <span className="text-sm font-bold truncate" style={{ color: isLinked ? 'var(--brand-navy)' : 'var(--text-muted)' }}>
               {sale.contact_name || sale.contact_email || sale.email || 'Unknown'}
             </span>
             {sale.contact_name && sale.contact_email && (
-              <span className="text-xs" style={{ color: 'var(--text-dim)' }}>{sale.contact_email}</span>
+              <span className="text-xs truncate hidden lg:inline" style={{ color: 'var(--text-dim)' }}>{sale.contact_email}</span>
             )}
             {isLinked && (
-              <span className="text-xs font-medium px-1.5 py-0.5 rounded-full"
+              <span className="text-xs font-medium px-1.5 py-0.5 rounded-full shrink-0"
                 style={{ backgroundColor: 'rgba(3,3,82,0.07)', color: '#030352' }}>view →</span>
             )}
           </div>
-          {sale.product && <div className="text-xs font-medium mt-0.5" style={{ color: 'var(--text-muted)' }}>{sale.product}</div>}
+          {sale.product && (
+            <div className="text-xs font-medium mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>{sale.product}</div>
+          )}
         </div>
-        <div className="text-right shrink-0 min-w-[80px]">
+
+        {/* Amount */}
+        <div className="text-right">
           <div className="text-base font-bold tabular-nums" style={{ color: '#030352', fontFamily: 'Space Grotesk, sans-serif' }}>
             {fmtCurrency(sale.amount, sale.currency)}
           </div>
           {sale.source && <div className="text-xs" style={{ color: 'var(--text-dim)' }}>{sale.source}</div>}
         </div>
-        <div className="shrink-0 w-28 text-right"><StatusPill status={sale.status} /></div>
-        <div className="text-right shrink-0 hidden md:block w-36">
+
+        {/* Status */}
+        <div className="text-right">
+          <StatusPill status={sale.status} />
+        </div>
+
+        {/* Date */}
+        <div className="text-right hidden md:block">
           <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{fmtDate(sale.created_at)}</div>
         </div>
-        {!isLinked && (open
-          ? <ChevronUp  size={14} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
-          : <ChevronDown size={14} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
-        )}
+
+        {/* Chevron (unmatched only) */}
+        <div className="flex justify-end">
+          {!isLinked && (open
+            ? <ChevronUp  size={14} style={{ color: 'var(--text-dim)' }} />
+            : <ChevronDown size={14} style={{ color: 'var(--text-dim)' }} />
+          )}
+        </div>
       </div>
       {!isLinked && open && <SaleDetail sale={sale} />}
     </div>
