@@ -109,6 +109,7 @@ function AppShell() {
         </Routes>
       </div>
       <ContactDetailModal
+        key={selectedContactId}
         contactId={selectedContactId}
         defaultTab={selectedTab}
         open={modalOpen}
