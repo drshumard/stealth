@@ -781,6 +781,7 @@ async def _fire_webhook_task(
         "contact_id":    contact.get("contact_id")  if contact else None,
         "contact_email": contact.get("email")        if contact else None,
         "contact_name":  contact.get("name")         if contact else None,
+        "fbclid":        fbclid,
         "payload":       payload,
         "webhook_url":   url,
         "http_status":   http_status,
