@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { X, Copy, Check, ExternalLink, Clock, Globe, User, Mail, Phone, Hash, Calendar, Tag, TrendingUp, AlertCircle, Wifi, GitMerge, Layers, Trash2, ShoppingCart, DollarSign, CheckCircle2, XCircle } from 'lucide-react';
 import {
   Dialog,
@@ -17,7 +18,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
