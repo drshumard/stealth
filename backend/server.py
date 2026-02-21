@@ -1880,11 +1880,7 @@ def _extract_sale_fields(payload: dict) -> dict:
         v = _nested_get(payload, key)
         if v is not None:
             try:
-                amt = float(v)
-                # Stripe sends amounts in smallest currency unit (cents)
-                if key in ('amount', 'amount_total', 'amount_paid') and amt >= 100:
-                    amt = amt / 100
-                amount = round(amt, 2)
+                amount = round(float(v), 2)
                 break
             except Exception:
                 pass
