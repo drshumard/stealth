@@ -256,6 +256,7 @@ class AutomationRunOut(BaseModel):
     contact_id: Optional[str] = None
     contact_email: Optional[str] = None
     contact_name: Optional[str] = None
+    fbclid: Optional[str] = None   # stored for dedup — same click never fires twice
     payload: Dict[str, Any] = {}
     webhook_url: str
     http_status: Optional[int] = None
