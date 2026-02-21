@@ -70,24 +70,32 @@ const CopyButton = ({ text, label }) => {
 };
 
 const InfoRow = ({ icon: Icon, label, value, mono, copyable, accent }) => (
-  <div className="flex items-start gap-4 py-4 px-5">
-    <div className="mt-0.5 shrink-0">
-      <Icon size={15} style={{ color: accent || 'var(--text-dim)' }} />
+  <div
+    className="grid items-center border-b last:border-0"
+    style={{ gridTemplateColumns: '148px 1fr auto', borderColor: 'var(--stroke)' }}
+  >
+    {/* Label */}
+    <div className="flex items-center gap-2 px-4 py-3 shrink-0" style={{ backgroundColor: '#fafaf8' }}>
+      <Icon size={13} style={{ color: accent || 'var(--text-dim)', flexShrink: 0 }} />
+      <span className="text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--text-dim)' }}>{label}</span>
     </div>
-    <div className="flex-1 min-w-0">
-      <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--text-dim)' }}>{label}</div>
-      <div
-        className={`text-sm font-medium break-all ${mono ? 'font-mono' : ''}`}
-        style={{
-          color: value ? 'var(--text)' : 'var(--text-dim)',
-          fontFamily: mono ? 'IBM Plex Mono, monospace' : undefined,
-          fontStyle: !value ? 'italic' : undefined,
-        }}
-      >
-        {value || 'Not provided'}
-      </div>
+    {/* Value */}
+    <div
+      className={`px-4 py-3 text-sm font-medium overflow-hidden ${mono ? 'break-all' : 'truncate'}`}
+      style={{
+        color:       value ? 'var(--text)' : 'var(--text-dim)',
+        fontFamily:  mono ? 'IBM Plex Mono, monospace' : undefined,
+        fontStyle:   !value ? 'italic' : undefined,
+        fontSize:    mono ? '0.72rem' : undefined,
+      }}
+      title={value || undefined}
+    >
+      {value || 'Not provided'}
     </div>
-    {copyable && value && <CopyButton text={value} label={`Copy ${label}`} />}
+    {/* Copy */}
+    <div className="px-3 py-3">
+      {copyable && value && <CopyButton text={value} label={`Copy ${label}`} />}
+    </div>
   </div>
 );
 
