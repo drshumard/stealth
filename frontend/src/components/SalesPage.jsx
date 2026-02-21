@@ -255,7 +255,7 @@ export default function SalesPage({ onSelectContact }) {
             </div>
           </div>
         ) : (
-          sales.map(sale => <SaleRow key={sale.id} sale={sale} onSelectContact={onSelectContact} />)
+          sales.map(sale => <SaleRow key={sale.id} sale={sale} onSelectContact={onSelectContact} onShowDetail={setDetailSale} />)
         )}
       </div>
     </div>
