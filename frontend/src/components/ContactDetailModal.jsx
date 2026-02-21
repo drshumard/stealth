@@ -263,35 +263,32 @@ const UrlVisitItem = ({ visit, index }) => {
 };
 
 export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, onClose, onDelete }) => {
-  const [contact,         setContact]         = useState(null);
-  const [loadedContactId, setLoadedContactId] = useState(null); // which ID the loaded data belongs to
-  const [loading,         setLoading]         = useState(false);
-  const [error,           setError]           = useState(null);
-  const [activeTab,       setActiveTab]       = useState(defaultTab);
+  const [activeTab, setActiveTab] = useState(defaultTab);
 
-  // Reset tab when contactId or defaultTab changes
+  // Reset tab when the modal opens or target contact changes.
+  // key={selectedContactId} in App.js already remounts this component on contact change,
+  // so this handles only the defaultTab prop changing while the same contact is open.
   useEffect(() => {
-    if (open) setActiveTab(defaultTab);
-  }, [open, contactId, defaultTab]);
+    setActiveTab(defaultTab);
+  }, [defaultTab]);
 
-  useEffect(() => {
-    setError(null);
-    if (!open || !contactId) return;
-    setLoading(true);
-    fetch(`${BACKEND_URL}/api/contacts/${contactId}`)
-      .then(r => { if (!r.ok) throw new Error('Failed'); return r.json(); })
-      .then(data => { setContact(data); setLoadedContactId(contactId); setLoading(false); })
-      .catch(e => { setError(e.message); setLoading(false); });
-  }, [open, contactId]);
+  // React Query owns all fetch/loading/error state.
+  // enabled: open && !!contactId ensures nothing fires until the modal is actually open.
+  // With key={selectedContactId} in App.js each contact gets a fresh component instance,
+  // so there is zero possibility of stale data leaking from a previous contact.
+  const {
+    data:      contact,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['contact', contactId],
+    queryFn:  () => fetch(`${BACKEND_URL}/api/contacts/${contactId}`)
+      .then(r => { if (!r.ok) throw new Error('Failed'); return r.json(); }),
+    enabled: open && !!contactId,
+  });
 
-  // Only use contact data when it matches the CURRENT contactId.
-  // If they differ (still loading new contact) safeContact is null →
-  // the modal shows skeletons instead of flashing the previous contact's data.
-  const safeContact  = loadedContactId === contactId ? contact : null;
-  const isLoading    = loading || (open && !!contactId && loadedContactId !== contactId);
-
-  const hasAttribution = safeContact?.attribution && (
-    Object.entries(safeContact.attribution).some(([k, v]) => {
+  const hasAttribution = contact?.attribution && (
+    Object.entries(contact.attribution).some(([k, v]) => {
       if (k === 'extra') return v && typeof v === 'object' && Object.keys(v).length > 0;
       return v && typeof v !== 'object';
     })
