@@ -294,11 +294,13 @@ export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, o
       <DialogContent
         hideClose
         data-testid="contact-detail-modal"
-        className="max-w-4xl p-0 overflow-hidden border"
+        className="max-w-4xl p-0 border flex flex-col overflow-hidden"
         style={{
           backgroundColor: '#ffffff',
           borderColor: 'var(--stroke)',
           color: 'var(--text)',
+          /* Fixed height — never grows or shrinks regardless of content */
+          height: '680px',
           maxHeight: '92vh',
           boxShadow: 'var(--shadow)',
         }}
