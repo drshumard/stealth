@@ -806,6 +806,7 @@ def build_tracker_js(backend_url: str, auto_tag: str = '') -> str:
 
   var BACKEND_URL = '""" + backend_url + r"""';
   var API_BASE    = BACKEND_URL + '/api';
+  var AUTO_TAG    = '""" + auto_tag + r"""';   /* injected by server when ?tag=... is in script src */
 
   /* ─── Central store ─── */
   var store = {
