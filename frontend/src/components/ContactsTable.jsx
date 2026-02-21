@@ -380,8 +380,8 @@ export const ContactsTable = ({
                       </div>
                     </TableCell>
 
-                    <TableCell className="py-4">
-                      <span className="text-sm" style={{ color: contact.email ? 'var(--text-muted)' : 'var(--text-dim)', fontStyle: contact.email ? 'normal' : 'italic' }}>
+                    <TableCell className="py-4 overflow-hidden">
+                      <span className="text-sm truncate block" style={{ color: contact.email ? 'var(--text-muted)' : 'var(--text-dim)', fontStyle: contact.email ? 'normal' : 'italic' }}>
                         {contact.email || '—'}
                       </span>
                     </TableCell>
