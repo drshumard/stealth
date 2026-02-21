@@ -55,7 +55,7 @@ function AppShell() {
   }, [fetchContacts, fetchStats]);
 
   const handleRefresh       = () => { fetchContacts(); fetchStats(); };
-  const handleSelectContact = (id) => setSearchParams({ contact: id });
+  const handleSelectContact = (id, tab = 'overview') => setSearchParams({ contact: id, tab });
   const handleCloseModal    = () => setSearchParams({});
 
   const handleDeleteContact = async (contactId) => {
