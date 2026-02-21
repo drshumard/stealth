@@ -1267,9 +1267,19 @@ def build_tracker_js(backend_url: str, auto_tag: str = '') -> str:
     bindLooseInputs();
     watchDOM();
     sendPageview();
-    /* Parent page: start broadcasting identity to iframes */
+
+    /* ─── Auto-tag: fire when script was loaded with ?tag=... ─── */
+    if (AUTO_TAG) {
+      send('/track/tag', {
+        contact_id: store.config.contactId,
+        session_id: store.config.sessionId || null,
+        tag:        AUTO_TAG
+      });
+      logger('Contact captured — tag: ' + AUTO_TAG);
+    }
+
+    /* Parent page: broadcast session identity to iframes */
     if (!store.config.isIframe) {
-      /* Broadcast immediately after DOM ready, then periodically for 30s to catch lazy iframes */
       var broadcastCount = 0;
       var broadcastInterval = setInterval(function () {
         broadcastToIframes();
