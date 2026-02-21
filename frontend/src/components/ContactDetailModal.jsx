@@ -262,30 +262,39 @@ const UrlVisitItem = ({ visit, index }) => {
 };
 
 export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, onClose, onDelete }) => {
-  const [contact, setContact] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState(null);
-  const [activeTab, setActiveTab] = useState(defaultTab);
+  const [contact,         setContact]         = useState(null);
+  const [loadedContactId, setLoadedContactId] = useState(null); // which ID the loaded data belongs to
+  const [loading,         setLoading]         = useState(false);
+  const [error,           setError]           = useState(null);
+  const [activeTab,       setActiveTab]       = useState(defaultTab);
 
-  // Reset active tab whenever the modal opens or target contact changes
+  // Reset tab when contactId or defaultTab changes
   useEffect(() => {
     if (open) setActiveTab(defaultTab);
   }, [open, contactId, defaultTab]);
 
   useEffect(() => {
-    // Reset immediately — never show a previous contact's data while the new one loads
-    setContact(null);
     setError(null);
     if (!open || !contactId) return;
     setLoading(true);
     fetch(`${BACKEND_URL}/api/contacts/${contactId}`)
       .then(r => { if (!r.ok) throw new Error('Failed'); return r.json(); })
-      .then(data => { setContact(data); setLoading(false); })
+      .then(data => {
+        setContact(data);
+        setLoadedContactId(contactId); // mark which ID this data is for
+        setLoading(false);
+      })
       .catch(e => { setError(e.message); setLoading(false); });
   }, [open, contactId]);
 
-  const hasAttribution = contact?.attribution && (
-    Object.entries(contact.attribution).some(([k, v]) => {
+  // Only use contact data when it matches the CURRENT contactId.
+  // If they differ (still loading new contact) safeContact is null →
+  // the modal shows skeletons instead of flashing the previous contact's data.
+  const safeContact  = loadedContactId === contactId ? contact : null;
+  const isLoading    = loading || (open && !!contactId && loadedContactId !== contactId);
+
+  const hasAttribution = safeContact?.attribution && (
+    Object.entries(safeContact.attribution).some(([k, v]) => {
       if (k === 'extra') return v && typeof v === 'object' && Object.keys(v).length > 0;
       return v && typeof v !== 'object';
     })
