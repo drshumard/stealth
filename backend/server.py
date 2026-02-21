@@ -74,8 +74,9 @@ class Contact(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     attribution: Optional[Attribution] = None
-    merged_into: Optional[str] = None   # contact_id this was merged into
-    merged_children: Optional[List[str]] = None  # child contact_ids merged into this
+    tags: Optional[List[str]] = None          # e.g. ["registered", "attended"]
+    merged_into: Optional[str] = None
+    merged_children: Optional[List[str]] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
