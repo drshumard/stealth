@@ -259,5 +259,12 @@ export default function SalesPage({ onSelectContact }) {
         )}
       </div>
     </div>
+
+    <SaleDetailModal
+      sale={detailSale}
+      open={!!detailSale}
+      onClose={() => setDetailSale(null)}
+    />
+
   );
 }
