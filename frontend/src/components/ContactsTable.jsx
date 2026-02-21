@@ -355,11 +355,11 @@ export const ContactsTable = ({
                       />
                     </TableCell>
 
-                    <TableCell className="py-4 pl-3">
+                    <TableCell className="py-4 pl-3 overflow-hidden">
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
                           <span
-                            className="text-sm font-semibold"
+                            className="text-sm font-semibold truncate max-w-[180px]"
                             style={{ color: contact.name ? 'var(--text)' : 'var(--text-dim)', fontStyle: contact.name ? 'normal' : 'italic' }}
                           >
                             {contact.name || 'Anonymous'}
