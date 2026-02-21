@@ -378,7 +378,8 @@ export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, o
           </div>
         </DialogHeader>
 
-        <div className="px-8 pb-8 mt-5 overflow-y-auto" style={{ maxHeight: 'calc(92vh - 130px)' }}>
+        {/* flex-1 min-h-0 = fills remaining height without ever growing the modal */}
+        <div className="flex-1 min-h-0 flex flex-col px-8 pb-8 mt-5 overflow-hidden">
           {error ? (
             <div className="flex items-center gap-2 py-4" style={{ color: 'var(--red-error)' }}>
               <AlertCircle size={16} />
