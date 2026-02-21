@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
 import '@/App.css';
 import { BrowserRouter, Routes, Route, useSearchParams } from 'react-router-dom';
+import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 import { TopNav } from '@/components/TopNav';
@@ -15,46 +15,54 @@ import { ContactDetailModal } from '@/components/ContactDetailModal';
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
 const API = `${BACKEND_URL}/api`;
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 10_000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
 function AppShell() {
-  const [contacts, setContacts] = useState([]);
-  const [stats, setStats] = useState({ total_contacts: 0, total_visits: 0, today_visits: 0 });
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [loading, setLoading] = useState(false);
+  const qc = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const selectedContactId = searchParams.get('contact');
   const selectedTab       = searchParams.get('tab') || 'overview';
-  const modalOpen = !!selectedContactId;
+  const modalOpen         = !!selectedContactId;
 
-  const fetchContacts = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${API}/contacts`);
-      if (!res.ok) throw new Error('Failed');
-      setContacts(await res.json());
-    } catch {
-      toast.error('Failed to load contacts');
-    } finally {
-      setLoading(false);
-      setInitialLoad(false);
-    }
-  }, []);
+  // ── Contacts list ──────────────────────────────────────────
+  const {
+    data:      contacts  = [],
+    isLoading: initialLoad,
+    isFetching: loading,
+  } = useQuery({
+    queryKey: ['contacts'],
+    queryFn:  () => fetch(`${API}/contacts`).then(r => {
+      if (!r.ok) throw new Error('Failed to load contacts');
+      return r.json();
+    }),
+    refetchInterval: 15_000,
+  });
 
-  const fetchStats = useCallback(async () => {
-    try {
-      const res = await fetch(`${API}/stats`);
-      if (res.ok) setStats(await res.json());
-    } catch {}
-  }, []);
+  // ── Stats ──────────────────────────────────────────────────
+  const { data: stats = { total_contacts: 0, total_visits: 0, today_visits: 0 } } = useQuery({
+    queryKey: ['stats'],
+    queryFn:  () => fetch(`${API}/stats`).then(r => {
+      if (!r.ok) throw new Error('Failed to load stats');
+      return r.json();
+    }),
+    refetchInterval: 15_000,
+  });
 
-  useEffect(() => {
-    fetchContacts();
-    fetchStats();
-    const t = setInterval(() => { fetchContacts(); fetchStats(); }, 15000);
-    return () => clearInterval(t);
-  }, [fetchContacts, fetchStats]);
+  // ── Actions ────────────────────────────────────────────────
+  const handleRefresh = () => {
+    qc.invalidateQueries({ queryKey: ['contacts'] });
+    qc.invalidateQueries({ queryKey: ['stats'] });
+  };
 
-  const handleRefresh       = () => { fetchContacts(); fetchStats(); };
   const handleSelectContact = (id, tab = 'overview') => setSearchParams({ contact: id, tab });
   const handleCloseModal    = () => setSearchParams({});
 
@@ -62,10 +70,12 @@ function AppShell() {
     try {
       const res = await fetch(`${API}/contacts/${contactId}`, { method: 'DELETE' });
       if (!res.ok) throw new Error();
-      setContacts(prev => prev.filter(c => c.contact_id !== contactId));
-      fetchStats();
+      qc.invalidateQueries({ queryKey: ['contacts'] });
+      qc.invalidateQueries({ queryKey: ['stats'] });
       toast.success('Contact deleted');
-    } catch { toast.error('Failed to delete contact'); }
+    } catch {
+      toast.error('Failed to delete contact');
+    }
   };
 
   const handleBulkDelete = async (ids) => {
@@ -75,13 +85,21 @@ function AppShell() {
         ids.map(id => fetch(`${API}/contacts/${id}`, { method: 'DELETE' }))
       );
       const ok = results.filter(r => r.status === 'fulfilled' && r.value.ok).length;
-      setContacts(prev => prev.filter(c => !ids.includes(c.contact_id)));
-      fetchStats();
+      qc.invalidateQueries({ queryKey: ['contacts'] });
+      qc.invalidateQueries({ queryKey: ['stats'] });
       toast.success(`${ok} contact${ok !== 1 ? 's' : ''} deleted`);
-    } catch { toast.error('Bulk delete failed'); }
+    } catch {
+      toast.error('Bulk delete failed');
+    }
   };
 
-  const shared = { contacts, loading, initialLoad, stats, onRefresh: handleRefresh, onSelectContact: handleSelectContact, onDeleteContact: handleDeleteContact, onBulkDelete: handleBulkDelete };
+  const shared = {
+    contacts, loading, initialLoad, stats,
+    onRefresh:       handleRefresh,
+    onSelectContact: handleSelectContact,
+    onDeleteContact: handleDeleteContact,
+    onBulkDelete:    handleBulkDelete,
+  };
 
   return (
     <div className="app-canvas">
@@ -108,6 +126,7 @@ function AppShell() {
           <Route path="/logs"        element={<LogsPage />} />
         </Routes>
       </div>
+
       <ContactDetailModal
         key={selectedContactId}
         contactId={selectedContactId}
@@ -122,8 +141,10 @@ function AppShell() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AppShell />
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AppShell />
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }
