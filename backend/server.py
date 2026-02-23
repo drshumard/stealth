@@ -1564,7 +1564,7 @@ async def get_contacts(search: Optional[str] = None, include_merged: bool = Fals
             ]}
             query = {"$and": [query, search_filter]} if query else search_filter
 
-        contacts_raw = await db.contacts.find(query, {"_id": 0}).sort("updated_at", -1).to_list(1000)
+        contacts_raw = await db.contacts.find(query, {"_id": 0}).sort("updated_at", -1).to_list(10000)
         result = []
         for c in contacts_raw:
             fix_contact_doc(c)
