@@ -1565,10 +1565,23 @@ async def get_contacts(search: Optional[str] = None, include_merged: bool = Fals
             query = {"$and": [query, search_filter]} if query else search_filter
 
         contacts_raw = await db.contacts.find(query, {"_id": 0}).sort("updated_at", -1).to_list(10000)
+        if not contacts_raw:
+            return []
+
+        # Batch all visit counts in ONE aggregation instead of one query per contact.
+        # With thousands of contacts the per-contact approach times out.
+        contact_ids   = [c['contact_id'] for c in contacts_raw]
+        visit_pipeline = [
+            {"$match":   {"contact_id": {"$in": contact_ids}}},
+            {"$group":   {"_id": "$contact_id", "count": {"$sum": 1}}},
+        ]
+        visit_counts_raw = await db.page_visits.aggregate(visit_pipeline).to_list(len(contact_ids) + 1)
+        visit_count_map  = {v["_id"]: v["count"] for v in visit_counts_raw}
+
         result = []
         for c in contacts_raw:
             fix_contact_doc(c)
-            c['visit_count'] = await db.page_visits.count_documents({"contact_id": c['contact_id']})
+            c['visit_count'] = visit_count_map.get(c['contact_id'], 0)
             result.append(ContactWithStats(**c))
         return result
     except Exception as e:
