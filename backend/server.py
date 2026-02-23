@@ -445,7 +445,20 @@ async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = 
         cdoc = strip_nulls(contact.model_dump())
         cdoc['created_at'] = dt_to_str(contact.created_at)
         cdoc['updated_at'] = dt_to_str(contact.updated_at)
-        await db.contacts.insert_one(cdoc)
+        try:
+            await db.contacts.insert_one(cdoc)
+        except DuplicateKeyError:
+            # Race condition: two concurrent requests both saw "no existing document"
+            # and both tried to insert. The second one wins with a graceful update
+            # instead of crashing the endpoint with a 500.
+            logger.info(f"DuplicateKey on insert for {cid[:12]} — falling back to update")
+            update: dict = {"updated_at": dt_to_str(now)}
+            for field in ['name', 'email', 'phone', 'first_name', 'last_name', 'session_id']:
+                if data.get(field):
+                    update[field] = data[field]
+            if client_ip:
+                update.setdefault('client_ip', client_ip)
+            await db.contacts.update_one({"contact_id": cid}, {"$set": update})
 
 
 async def _log_visit(contact_id: str, session_id: Optional[str],
