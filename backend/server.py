@@ -1881,25 +1881,46 @@ async def test_automation(auto_id: str):
 @api_router.get("/automations/{auto_id}/runs", response_model=List[AutomationRunOut])
 async def get_automation_runs(
     auto_id: str,
-    limit: int = 2000,        # generous default — front-end does date filtering
-    since: Optional[str] = None,   # ISO date string  e.g. 2026-01-01
-    until: Optional[str] = None,   # ISO date string  e.g. 2026-12-31
-    run_type: Optional[str] = None, # 'live' | 'test' | None (all)
+    limit: int = 2000,
+    since: Optional[str] = None,    # YYYY-MM-DD in user's timezone
+    until: Optional[str] = None,    # YYYY-MM-DD in user's timezone
+    run_type: Optional[str] = None, # 'live' | 'test' | None
+    tz: Optional[str] = None,       # IANA timezone name, e.g. "America/New_York"
 ):
     """Return execution history for a specific automation, newest first.
-    Optional filters: since, until (ISO date strings), run_type."""
+    since/until are date strings in the user's timezone; tz converts them to
+    exact UTC bounds so the filter matches the user's local day correctly."""
     auto = await db.automations.find_one({"id": auto_id}, {"_id": 0, "id": 1})
     if not auto:
         raise HTTPException(status_code=404, detail="Automation not found")
+
+    def _day_start_utc(date_str: str, tz_name: Optional[str]) -> str:
+        """ISO UTC string for 00:00:00 of date_str in tz_name."""
+        try:
+            from zoneinfo import ZoneInfo
+            z = ZoneInfo(tz_name) if tz_name else timezone.utc
+            d = datetime.strptime(date_str, "%Y-%m-%d")
+            return dt_to_str(datetime(d.year, d.month, d.day, 0, 0, 0, tzinfo=z).astimezone(timezone.utc))
+        except Exception:
+            return date_str  # fallback: treat as UTC day start
+
+    def _day_end_utc(date_str: str, tz_name: Optional[str]) -> str:
+        """ISO UTC string for 23:59:59.999999 of date_str in tz_name."""
+        try:
+            from zoneinfo import ZoneInfo
+            z = ZoneInfo(tz_name) if tz_name else timezone.utc
+            d = datetime.strptime(date_str, "%Y-%m-%d")
+            return dt_to_str(datetime(d.year, d.month, d.day, 23, 59, 59, 999999, tzinfo=z).astimezone(timezone.utc))
+        except Exception:
+            return date_str.split("T")[0] + "T23:59:59.999999+00:00"
 
     match: dict = {"automation_id": auto_id}
     if since or until:
         ts_filter: dict = {}
         if since:
-            ts_filter["$gte"] = since
+            ts_filter["$gte"] = _day_start_utc(since, tz)
         if until:
-            # include the full until day by appending end-of-day
-            ts_filter["$lte"] = until.split("T")[0] + "T23:59:59Z"
+            ts_filter["$lte"] = _day_end_utc(until, tz)
         match["triggered_at"] = ts_filter
     if run_type in ("live", "test"):
         match["run_type"] = run_type

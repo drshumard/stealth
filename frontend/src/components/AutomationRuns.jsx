@@ -28,26 +28,38 @@ const DATE_OPTIONS = [
   { value: 'custom', label: 'Custom range…' },
 ];
 
+/**
+ * Extract YYYY-MM-DD using LOCAL clock — NOT d.toISOString() which is UTC.
+ * For UTC+ timezones, toISOString() would give the previous day.
+ */
+function localDateStr(d) {
+  const y   = d.getFullYear();
+  const m   = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function dateRangeToParams(range, customRange, todayString) {
   if (range === 'all') return {};
   if (range === 'custom' && customRange?.from) {
-    const fmt = d => d.toISOString().split('T')[0];
-    return { since: fmt(customRange.from), until: fmt(customRange.to || customRange.from) };
+    return {
+      since: localDateStr(customRange.from),
+      until: localDateStr(customRange.to || customRange.from),
+    };
   }
-  const today = todayString();
+  const today = todayString();   // YYYY-MM-DD in user's configured timezone
   if (range === 'today') return { since: today, until: today };
   const now  = new Date();
   const days = range === '7d' ? 7 : range === '30d' ? 30 : 90;
   const from = new Date(now); from.setDate(from.getDate() - days);
-  const pad  = n => String(n).padStart(2, '0');
-  const fmt  = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-  return { since: fmt(from), until: today };
+  return { since: localDateStr(from), until: today };
 }
 
 function fmtRangeLabel(customRange, formatDate) {
   if (!customRange?.from) return 'Custom range…';
   const from = formatDate(customRange.from, { month: 'short', day: 'numeric' });
-  if (!customRange.to || customRange.from.toDateString() === customRange.to.toDateString()) return from;
+  if (!customRange.to || customRange.from.toDateString() === customRange.to.toDateString())
+    return from;
   const to = formatDate(customRange.to, { month: 'short', day: 'numeric' });
   return `${from} – ${to}`;
 }
@@ -261,6 +273,8 @@ export function AutomationRuns({ open, automation, onClose }) {
   const queryParams = new URLSearchParams({ limit: '2000' });
   if (dateParams.since) queryParams.set('since', dateParams.since);
   if (dateParams.until) queryParams.set('until', dateParams.until);
+  // Always send timezone so the backend converts dates to exact UTC bounds
+  if (dateParams.since || dateParams.until) queryParams.set('tz', timezone);
   if (typeFilter !== 'all') queryParams.set('run_type', typeFilter);
 
   const queryKey = ['automation-runs', automation?.id, dateRange, typeFilter,
