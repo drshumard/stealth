@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTimezone } from '@/components/TimezoneContext';
 import { Globe, RefreshCw, User, Mail, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,7 +13,7 @@ function timeAgo(ts) {
   if (s < 60) return `${s}s ago`;
   if (s < 3600) return `${Math.floor(s/60)}m ago`;
   if (s < 86400) return `${Math.floor(s/3600)}h ago`;
-  return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return new Intl.DateTimeFormat('en-US', { timeZone: timezone || 'UTC', month: 'short', day: 'numeric' }).format(new Date(ts));
 }
 
 function shortUrl(url) {
@@ -75,6 +76,7 @@ function LogRow({ item }) {
 }
 
 export default function LogsPage() {
+  const { timezone } = useTimezone();
   const qc = useQueryClient();
 
   const { data: logs = [], isLoading: loading, dataUpdatedAt } = useQuery({

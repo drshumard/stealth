@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, useSearchParams } from 'react-router-dom'
 import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
+import { TimezoneProvider } from '@/components/TimezoneContext';
 import { TopNav } from '@/components/TopNav';
 import AnalyticsPage from '@/components/AnalyticsPage';
 import LeadsPage from '@/components/LeadsPage';
@@ -153,9 +154,11 @@ function AppShell() {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AppShell />
-      </BrowserRouter>
+      <TimezoneProvider>
+        <BrowserRouter>
+          <AppShell />
+        </BrowserRouter>
+      </TimezoneProvider>
     </QueryClientProvider>
   );
 }

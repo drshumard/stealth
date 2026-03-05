@@ -1,14 +1,18 @@
 [
   {
-    "content": "Backend: POST /api/auth/login + token generation using env vars",
+    "content": "Create TimezoneContext - persisted preference + formatDate helper",
     "status": "in_progress"
   },
   {
-    "content": "Frontend: LoginPage.jsx matching the design",
+    "content": "Add timezone selector to TopNav user menu",
     "status": "pending"
   },
   {
-    "content": "Frontend: Auth gate in App.js + logout in TopNav",
+    "content": "Replace preset-only date filter in AutomationRuns with calendar range picker + timezone",
+    "status": "pending"
+  },
+  {
+    "content": "Update all timestamp displays throughout the app to respect timezone",
     "status": "pending"
   }
 ]

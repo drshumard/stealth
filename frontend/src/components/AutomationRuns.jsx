@@ -4,49 +4,62 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   CheckCircle2, XCircle, Clock, RefreshCw, Zap, FlaskConical,
   Activity, Timer, ChevronDown, ChevronUp, Filter, X,
-  Download, ArrowLeft,
+  Download, ArrowLeft, CalendarDays,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { useTimezone } from '@/components/TimezoneContext';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
 const API = `${BACKEND_URL}/api`;
 
 // ── date range helpers ────────────────────────────────────────────────────────
 const DATE_OPTIONS = [
-  { value: 'all',   label: 'All time' },
-  { value: 'today', label: 'Today' },
-  { value: '7d',    label: 'Last 7 days' },
-  { value: '30d',   label: 'Last 30 days' },
-  { value: '90d',   label: 'Last 90 days' },
+  { value: 'all',    label: 'All time' },
+  { value: 'today',  label: 'Today' },
+  { value: '7d',     label: 'Last 7 days' },
+  { value: '30d',    label: 'Last 30 days' },
+  { value: '90d',    label: 'Last 90 days' },
+  { value: 'custom', label: 'Custom range…' },
 ];
 
-function dateRangeToParams(range) {
+function dateRangeToParams(range, customRange, todayString) {
   if (range === 'all') return {};
-  const now = new Date();
-  const pad = n => String(n).padStart(2, '0');
-  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-  const until = fmt(now);
-  if (range === 'today') return { since: until, until };
+  if (range === 'custom' && customRange?.from) {
+    const fmt = d => d.toISOString().split('T')[0];
+    return { since: fmt(customRange.from), until: fmt(customRange.to || customRange.from) };
+  }
+  const today = todayString();
+  if (range === 'today') return { since: today, until: today };
+  const now  = new Date();
   const days = range === '7d' ? 7 : range === '30d' ? 30 : 90;
   const from = new Date(now); from.setDate(from.getDate() - days);
-  return { since: fmt(from), until };
+  const pad  = n => String(n).padStart(2, '0');
+  const fmt  = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  return { since: fmt(from), until: today };
 }
 
-function timeAgo(ts) {
+function fmtRangeLabel(customRange, formatDate) {
+  if (!customRange?.from) return 'Custom range…';
+  const from = formatDate(customRange.from, { month: 'short', day: 'numeric' });
+  if (!customRange.to || customRange.from.toDateString() === customRange.to.toDateString()) return from;
+  const to = formatDate(customRange.to, { month: 'short', day: 'numeric' });
+  return `${from} – ${to}`;
+}
+
+function timeAgo(ts, formatDateTime) {
   if (!ts) return '—';
   const s = Math.floor((Date.now() - new Date(ts)) / 1000);
-  if (s < 5)    return 'just now';
-  if (s < 60)   return `${s}s ago`;
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 5)     return 'just now';
+  if (s < 60)    return `${s}s ago`;
+  if (s < 3600)  return `${Math.floor(s / 60)}m ago`;
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return new Date(ts).toLocaleString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
+  return formatDateTime(ts);
 }
 
 // ── CSV export ────────────────────────────────────────────────────────────────
@@ -118,6 +131,7 @@ function RunTypeBadge({ type }) {
 
 function RunCard({ run }) {
   const [open, setOpen] = useState(false);
+  const { formatDateTime, formatTime } = useTimezone();
   const ok = run.success || (run.http_status >= 200 && run.http_status < 300);
   let prettyResponse = run.response_body;
   try { if (run.response_body) prettyResponse = JSON.stringify(JSON.parse(run.response_body), null, 2); }
@@ -150,9 +164,9 @@ function RunCard({ run }) {
           </div>
         </div>
         <div className="text-right shrink-0">
-          <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{timeAgo(run.triggered_at)}</div>
+          <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{timeAgo(run.triggered_at, formatDateTime)}</div>
           <div className="text-xs" style={{ color: 'var(--text-dim)', fontFamily: 'IBM Plex Mono, monospace' }}>
-            {new Date(run.triggered_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            {formatTime(run.triggered_at)}
           </div>
         </div>
         {open
@@ -231,16 +245,26 @@ function RunCard({ run }) {
 // ── main export ───────────────────────────────────────────────────────────────
 export function AutomationRuns({ open, automation, onClose }) {
   const qc = useQueryClient();
-  const [dateRange,  setDateRange]  = useState('all');
-  const [typeFilter, setTypeFilter] = useState('all');
+  const { timezone, formatDate, formatDateTime, todayString } = useTimezone();
+  const [dateRange,   setDateRange]   = useState('all');
+  const [typeFilter,  setTypeFilter]  = useState('all');
+  const [customRange, setCustomRange] = useState(null);
+  const [calOpen,     setCalOpen]     = useState(false);
 
-  const dateParams  = dateRangeToParams(dateRange);
+  const handleDateRangeChange = (val) => {
+    setDateRange(val);
+    if (val !== 'custom') setCustomRange(null);
+    if (val === 'custom') setCalOpen(true);
+  };
+
+  const dateParams  = dateRangeToParams(dateRange, customRange, todayString);
   const queryParams = new URLSearchParams({ limit: '2000' });
   if (dateParams.since) queryParams.set('since', dateParams.since);
   if (dateParams.until) queryParams.set('until', dateParams.until);
   if (typeFilter !== 'all') queryParams.set('run_type', typeFilter);
 
-  const queryKey = ['automation-runs', automation?.id, dateRange, typeFilter];
+  const queryKey = ['automation-runs', automation?.id, dateRange, typeFilter,
+                    customRange?.from?.toISOString(), customRange?.to?.toISOString()];
 
   const { data: runs = [], isLoading } = useQuery({
     queryKey,
@@ -252,6 +276,7 @@ export function AutomationRuns({ open, automation, onClose }) {
 
   const handleRefresh = () => qc.invalidateQueries({ queryKey });
   const activeFilters = (dateRange !== 'all' ? 1 : 0) + (typeFilter !== 'all' ? 1 : 0);
+
 
   const successCount = runs.filter(r => r.success).length;
   const failCount    = runs.filter(r => !r.success).length;
@@ -370,9 +395,14 @@ export function AutomationRuns({ open, automation, onClose }) {
                 )}
               </div>
 
-              <Select value={dateRange} onValueChange={setDateRange}>
-                <SelectTrigger className="h-9 text-sm w-40" style={{ borderColor: 'var(--stroke)' }}>
-                  <SelectValue placeholder="All time" />
+              {/* Date range select */}
+              <Select value={dateRange} onValueChange={handleDateRangeChange}>
+                <SelectTrigger className="h-9 text-sm w-44" style={{ borderColor: 'var(--stroke)' }}>
+                  <SelectValue>
+                    {dateRange === 'custom'
+                      ? fmtRangeLabel(customRange, formatDate)
+                      : DATE_OPTIONS.find(o => o.value === dateRange)?.label || 'All time'}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {DATE_OPTIONS.map(o => (
@@ -381,6 +411,54 @@ export function AutomationRuns({ open, automation, onClose }) {
                 </SelectContent>
               </Select>
 
+              {/* Calendar popover for custom range */}
+              <Popover open={calOpen} onOpenChange={setCalOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    className="h-9 px-3 text-sm font-medium rounded-lg border flex items-center gap-1.5 transition-colors"
+                    style={{ borderColor: dateRange === 'custom' && customRange ? 'var(--brand-navy)' : 'var(--stroke)',
+                             color: dateRange === 'custom' && customRange ? 'var(--brand-navy)' : 'var(--text-dim)',
+                             backgroundColor: '#ffffff' }}
+                    onClick={() => { setDateRange('custom'); setCalOpen(true); }}
+                  >
+                    <CalendarDays size={14} />
+                    {dateRange === 'custom' && customRange
+                      ? fmtRangeLabel(customRange, formatDate)
+                      : 'Pick dates'}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start"
+                  style={{ backgroundColor: '#ffffff', border: '1.5px solid var(--stroke)', borderRadius: '16px', boxShadow: 'var(--shadow)' }}>
+                  <Calendar
+                    mode="range"
+                    selected={customRange}
+                    onSelect={range => {
+                      setCustomRange(range);
+                      if (range?.from) {
+                        setDateRange('custom');
+                        if (range.to) setCalOpen(false);
+                      }
+                    }}
+                    numberOfMonths={2}
+                    initialFocus
+                  />
+                  <div className="px-4 pb-3 flex items-center justify-between">
+                    <span className="text-xs" style={{ color: 'var(--text-dim)' }}>
+                      {customRange?.from
+                        ? `${formatDate(customRange.from)}${customRange.to ? ' → ' + formatDate(customRange.to) : ' → pick end'}`
+                        : 'Select start date'}
+                    </span>
+                    {customRange && (
+                      <button className="text-xs font-semibold" style={{ color: 'var(--brand-red)' }}
+                        onClick={() => { setCustomRange(null); setDateRange('all'); setCalOpen(false); }}>
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+
+              {/* Run type */}
               <Select value={typeFilter} onValueChange={setTypeFilter}>
                 <SelectTrigger className="h-9 text-sm w-32" style={{ borderColor: 'var(--stroke)' }}>
                   <SelectValue placeholder="All types" />
@@ -394,16 +472,23 @@ export function AutomationRuns({ open, automation, onClose }) {
 
               {activeFilters > 0 && (
                 <button
-                  onClick={() => { setDateRange('all'); setTypeFilter('all'); }}
+                  onClick={() => { setDateRange('all'); setTypeFilter('all'); setCustomRange(null); }}
                   className="flex items-center gap-1 text-sm font-medium px-3 py-2 rounded-lg border transition-colors"
                   style={{ color: 'var(--text-muted)', borderColor: 'var(--stroke)' }}>
                   <X size={12} /> Clear
                 </button>
               )}
 
-              <span className="ml-auto text-sm font-bold tabular-nums" style={{ color: 'var(--brand-navy)' }}>
-                {runs.length} run{runs.length !== 1 ? 's' : ''}
-              </span>
+              <div className="ml-auto flex items-center gap-3">
+                {/* Timezone indicator */}
+                <span className="text-xs font-medium hidden sm:flex items-center gap-1" style={{ color: 'var(--text-dim)' }}>
+                  <Clock size={11} />
+                  {timezone.split('/').pop().replace(/_/g, ' ')}
+                </span>
+                <span className="text-sm font-bold tabular-nums" style={{ color: 'var(--brand-navy)' }}>
+                  {runs.length} run{runs.length !== 1 ? 's' : ''}
+                </span>
+              </div>
             </div>
 
             {/* ── Runs list ── */}

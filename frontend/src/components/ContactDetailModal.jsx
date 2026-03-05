@@ -28,6 +28,8 @@ import { toast } from 'sonner';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
 
+import { useTimezone } from '@/components/TimezoneContext';
+
 function formatDateTime(dt) {
   if (!dt) return '—';
   const d = new Date(dt);
@@ -144,7 +146,7 @@ const UrlVisitItem = ({ visit, index }) => {
         <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
           <div className="flex items-center gap-1.5 shrink-0">
             <Clock size={11} style={{ color: 'var(--text-dim)' }} />
-            <span className="text-xs" style={{ color: 'var(--text-dim)' }}>{formatDateTime(visit.timestamp)}</span>
+            <span className="text-xs" style={{ color: 'var(--text-dim)' }}>{fmt(visit.timestamp)}</span>
           </div>
           {visit.page_title && (
             <Badge variant="secondary" className="text-xs px-2 py-0 max-w-[160px] truncate shrink-0"
@@ -276,6 +278,9 @@ const UrlVisitItem = ({ visit, index }) => {
 // stays mounted, so the overlay never flashes.
 const ModalInner = ({ contactId, defaultTab, onClose, onDelete }) => {
   const [activeTab, setActiveTab] = useState(defaultTab || 'overview');
+  const { formatDateTime: tzFmt } = useTimezone();
+  // Override the module-level helper with the timezone-aware one
+  const fmt = (dt) => tzFmt(dt) || formatDateTime(dt);
 
   useEffect(() => { setActiveTab(defaultTab || 'overview'); }, [defaultTab]);
 
@@ -401,8 +406,8 @@ const ModalInner = ({ contactId, defaultTab, onClose, onDelete }) => {
                     <InfoRow icon={Hash}     label="Contact ID"   value={contact.contact_id} mono copyable />
                     <InfoRow icon={Wifi}     label="IP Address"   value={contact.client_ip} mono />
                     <InfoRow icon={Layers}   label="Session ID"   value={contact.session_id} mono copyable />
-                    <InfoRow icon={Calendar} label="First Seen"   value={formatDateTime(contact.created_at)} />
-                    <InfoRow icon={Calendar} label="Last Updated" value={formatDateTime(contact.updated_at)} />
+                    <InfoRow icon={Calendar} label="First Seen"   value={fmt(contact.created_at)} />
+                    <InfoRow icon={Calendar} label="Last Updated" value={fmt(contact.updated_at)} />
                     {contact.tags?.length > 0 && (
                       <div className="grid items-start border-t" style={{ gridTemplateColumns: '148px 1fr auto', borderColor: 'var(--stroke)' }}>
                         <div className="flex items-center gap-2 px-4 py-3" style={{ backgroundColor: '#fafaf8' }}>
