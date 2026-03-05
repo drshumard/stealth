@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
 import { RefreshCw, Copy, Filter, X, CalendarDays, Loader2, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
@@ -30,18 +29,6 @@ function localDateStr(d) {
   return `${y}-${m}-${day}`;
 }
 
-function dateRangeToParams(range, customRange, todayString) {
-  if (range === 'all') return {};
-  if (range === 'custom' && customRange?.from) {
-    return { since: localDateStr(customRange.from), until: localDateStr(customRange.to || customRange.from) };
-  }
-  const today = todayString();
-  if (range === 'today') return { since: today, until: today };
-  const now = new Date();
-  const days = range === '7d' ? 7 : range === '30d' ? 30 : 90;
-  const from = new Date(now); from.setDate(from.getDate() - days);
-  return { since: localDateStr(from), until: today };
-}
 
 function dateLabel(range, customRange) {
   if (range === 'all' || !range) return null;
@@ -59,8 +46,6 @@ function passesDate(contact, range, customRange, todayStr) {
   const d = new Date(contact.updated_at);
   const now = Date.now();
   if (range === 'today') {
-    const todayParts = todayStr.split('-').map(Number);
-    // compare local date
     const cd = localDateStr(d);
     return cd === todayStr;
   }

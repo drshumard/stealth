@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Request, BackgroundTasks
+from fastapi import FastAPI, APIRouter, HTTPException, Request, BackgroundTasks, Query
 from fastapi.responses import PlainTextResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -337,8 +337,7 @@ def fix_visit_doc(v: dict) -> dict:
 
 
 def strip_nulls(d: dict) -> dict:
-    """Recursively remove None values so MongoDB never stores null sub-fields
-    that would block future dot-path $set operations."""
+    """Recursively remove None values so MongoDB never stores null sub-fields."""
     result = {}
     for k, v in d.items():
         if v is None:
@@ -350,6 +349,28 @@ def strip_nulls(d: dict) -> dict:
         else:
             result[k] = v
     return result
+
+
+def _tz_day_start(date_str: str, tz_name: Optional[str]) -> str:
+    """UTC ISO string for 00:00:00 of date_str in tz_name. Falls back to treating date as UTC."""
+    try:
+        from zoneinfo import ZoneInfo
+        z = ZoneInfo(tz_name) if tz_name else timezone.utc
+        d = datetime.strptime(date_str, "%Y-%m-%d")
+        return dt_to_str(datetime(d.year, d.month, d.day, 0, 0, 0, tzinfo=z).astimezone(timezone.utc))
+    except Exception:
+        return date_str
+
+
+def _tz_day_end(date_str: str, tz_name: Optional[str]) -> str:
+    """UTC ISO string for 23:59:59.999999 of date_str in tz_name. Falls back to treating date as UTC."""
+    try:
+        from zoneinfo import ZoneInfo
+        z = ZoneInfo(tz_name) if tz_name else timezone.utc
+        d = datetime.strptime(date_str, "%Y-%m-%d")
+        return dt_to_str(datetime(d.year, d.month, d.day, 23, 59, 59, 999999, tzinfo=z).astimezone(timezone.utc))
+    except Exception:
+        return date_str.split("T")[0] + "T23:59:59.999999+00:00"
 
 
 async def _resolve_contact_id(contact_id: str) -> str:
@@ -1661,6 +1682,7 @@ async def export_contacts(
     until: Optional[str] = None,
     tz: Optional[str] = None,
     search: Optional[str] = None,
+    ids: Optional[List[str]] = Query(default=None),   # explicit contact IDs — used by PDF export
     limit: int = 5000,
 ):
     """
@@ -1669,24 +1691,6 @@ async def export_contacts(
     Date filters use the same timezone-aware day-bound logic as /automations/runs.
     """
     from collections import defaultdict
-
-    def _day_start(ds: str, tz_name: Optional[str]) -> str:
-        try:
-            from zoneinfo import ZoneInfo
-            z = ZoneInfo(tz_name) if tz_name else timezone.utc
-            d = datetime.strptime(ds, "%Y-%m-%d")
-            return dt_to_str(datetime(d.year, d.month, d.day, 0, 0, 0, tzinfo=z).astimezone(timezone.utc))
-        except Exception:
-            return ds
-
-    def _day_end(ds: str, tz_name: Optional[str]) -> str:
-        try:
-            from zoneinfo import ZoneInfo
-            z = ZoneInfo(tz_name) if tz_name else timezone.utc
-            d = datetime.strptime(ds, "%Y-%m-%d")
-            return dt_to_str(datetime(d.year, d.month, d.day, 23, 59, 59, 999999, tzinfo=z).astimezone(timezone.utc))
-        except Exception:
-            return ds.split("T")[0] + "T23:59:59.999999+00:00"
 
     query: dict = {
         "merged_into": None,
@@ -1697,13 +1701,18 @@ async def export_contacts(
         ],
     }
 
+    # If specific IDs provided (PDF export path), skip other filters for efficiency
+    if ids:
+        query = {"contact_id": {"$in": ids}, "merged_into": None}
+
+
     # Date filter on updated_at (when the lead was last identified)
     if since or until:
         ts_filter: dict = {}
         if since:
-            ts_filter["$gte"] = _day_start(since, tz)
+            ts_filter["$gte"] = _tz_day_start(since, tz)
         if until:
-            ts_filter["$lte"] = _day_end(until, tz)
+            ts_filter["$lte"] = _tz_day_end(until, tz)
         query["updated_at"] = ts_filter
 
     # Optional text search (email / name / phone)
@@ -1996,33 +2005,13 @@ async def get_automation_runs(
     if not auto:
         raise HTTPException(status_code=404, detail="Automation not found")
 
-    def _day_start_utc(date_str: str, tz_name: Optional[str]) -> str:
-        """ISO UTC string for 00:00:00 of date_str in tz_name."""
-        try:
-            from zoneinfo import ZoneInfo
-            z = ZoneInfo(tz_name) if tz_name else timezone.utc
-            d = datetime.strptime(date_str, "%Y-%m-%d")
-            return dt_to_str(datetime(d.year, d.month, d.day, 0, 0, 0, tzinfo=z).astimezone(timezone.utc))
-        except Exception:
-            return date_str  # fallback: treat as UTC day start
-
-    def _day_end_utc(date_str: str, tz_name: Optional[str]) -> str:
-        """ISO UTC string for 23:59:59.999999 of date_str in tz_name."""
-        try:
-            from zoneinfo import ZoneInfo
-            z = ZoneInfo(tz_name) if tz_name else timezone.utc
-            d = datetime.strptime(date_str, "%Y-%m-%d")
-            return dt_to_str(datetime(d.year, d.month, d.day, 23, 59, 59, 999999, tzinfo=z).astimezone(timezone.utc))
-        except Exception:
-            return date_str.split("T")[0] + "T23:59:59.999999+00:00"
-
     match: dict = {"automation_id": auto_id}
     if since or until:
         ts_filter: dict = {}
         if since:
-            ts_filter["$gte"] = _day_start_utc(since, tz)
+            ts_filter["$gte"] = _tz_day_start(since, tz)
         if until:
-            ts_filter["$lte"] = _day_end_utc(until, tz)
+            ts_filter["$lte"] = _tz_day_end(until, tz)
         match["triggered_at"] = ts_filter
     if run_type in ("live", "test"):
         match["run_type"] = run_type
@@ -2059,6 +2048,8 @@ async def retry_automation_run(auto_id: str, run_id: str):
 
     payload = original.get("payload") or {}
     url     = auto.get("webhook_url") or original.get("webhook_url", "")
+    if not url:
+        raise HTTPException(status_code=400, detail="Automation has no webhook URL configured")
     hdrs    = {"Content-Type": "application/json"}
     if auto.get("custom_headers"):
         hdrs.update(auto["custom_headers"])

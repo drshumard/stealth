@@ -176,12 +176,20 @@ function RunCard({ run, automationId, onRetried }) {
   catch { /* keep */ }
 
   return (
-    <div className="rounded-2xl border overflow-hidden transition-all"
+    <div
+      className="rounded-2xl border overflow-hidden transition-all"
       style={{
-        borderColor:     ok ? (run.run_type === 'test' ? '#fecdc7' : '#c0c9e8') : '#fecaca',
-        backgroundColor: ok ? (run.run_type === 'test' ? 'rgba(163,24,0,0.02)' : 'rgba(3,3,82,0.015)') : '#fff8f8',
+        borderColor:     ok ? (run.run_type === 'test' ? '#fecdc7' : run.run_type === 'retry' ? '#fde68a' : '#c0c9e8') : '#fecaca',
+        backgroundColor: ok ? (run.run_type === 'test' ? 'rgba(163,24,0,0.02)' : run.run_type === 'retry' ? 'rgba(217,119,6,0.02)' : 'rgba(3,3,82,0.015)') : '#fff8f8',
       }}>
-      <button className="w-full flex items-center gap-4 px-5 py-4 text-left" onClick={() => setOpen(v => !v)}>
+      {/* Row — div not button so the retry <button> isn't a nested interactive */}
+      <div
+        className="flex items-center gap-4 px-5 py-4 cursor-pointer select-none"
+        role="button"
+        tabIndex={0}
+        onClick={() => setOpen(v => !v)}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(v => !v); } }}
+      >
         <div className="w-2.5 h-2.5 rounded-full shrink-0"
           style={{ backgroundColor: ok ? (run.run_type === 'test' ? '#A31800' : '#030352') : '#ef4444' }} />
         <div className="flex-1 min-w-0">
@@ -232,7 +240,7 @@ function RunCard({ run, automationId, onRetried }) {
             ? <ChevronUp  size={14} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
             : <ChevronDown size={14} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />}
         </div>
-      </button>
+      </div>
 
       {open && (
         <div className="border-t px-5 pb-5 pt-4 space-y-4" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>

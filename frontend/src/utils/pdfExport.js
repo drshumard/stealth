@@ -16,14 +16,17 @@ function localDateStr(d) {
 export async function exportLeadsToPdf(contactsToExport, filterLabel, timezone) {
   if (!contactsToExport.length) throw new Error('No leads to export');
 
-  // Fetch full data (contact info + all visits) for the exact contacts in scope
-  const res = await fetch(`${BACKEND_URL}/api/leads/export?limit=5000`);
+  // Send only the IDs we need — avoids fetching thousands of unused contacts
+  const ids    = contactsToExport.map(c => c.contact_id);
+  const params = new URLSearchParams({ limit: String(ids.length + 10) });
+  ids.forEach(id => params.append('ids', id));
+  const res = await fetch(`${BACKEND_URL}/api/leads/export?${params}`);
   if (!res.ok) throw new Error(`Export API returned ${res.status}: ${await res.text()}`);
   const allData = await res.json();
   if (!Array.isArray(allData)) throw new Error(`Unexpected API response: ${JSON.stringify(allData).slice(0, 200)}`);
 
-  const ids  = new Set(contactsToExport.map(c => c.contact_id));
-  const data = allData.filter(c => ids.has(c.contact_id));
+  // allData already contains only the requested IDs — no client-side filter needed
+  const data = allData;
   if (!data.length) throw new Error('None of the selected leads were found in the export');
 
   const NAVY  = [3, 3, 82];
