@@ -1,32 +1,61 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, XCircle, Clock, RefreshCw, Zap, FlaskConical, Activity, Timer, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  CheckCircle2, XCircle, Clock, RefreshCw, Zap, FlaskConical,
+  Activity, Timer, ChevronDown, ChevronUp, Filter, X,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
 const API = `${BACKEND_URL}/api`;
 
+// ── date range helpers ────────────────────────────────────────────────────────
+const DATE_OPTIONS = [
+  { value: 'all',   label: 'All time' },
+  { value: 'today', label: 'Today' },
+  { value: '7d',    label: 'Last 7 days' },
+  { value: '30d',   label: 'Last 30 days' },
+  { value: '90d',   label: 'Last 90 days' },
+];
+
+function dateRangeToParams(range) {
+  if (range === 'all') return {};
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const fmt = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const until = fmt(now);
+  if (range === 'today')  return { since: until, until };
+  const days = range === '7d' ? 7 : range === '30d' ? 30 : 90;
+  const from = new Date(now); from.setDate(from.getDate() - days);
+  return { since: fmt(from), until };
+}
+
 function timeAgo(ts) {
   if (!ts) return '—';
   const s = Math.floor((Date.now() - new Date(ts)) / 1000);
-  if (s < 5)  return 'just now';
-  if (s < 60) return `${s}s ago`;
+  if (s < 5)    return 'just now';
+  if (s < 60)   return `${s}s ago`;
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return new Date(ts).toLocaleString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
 }
 
+// ── sub-components ────────────────────────────────────────────────────────────
 function StatusBadge({ success, httpStatus }) {
-  if (httpStatus == null) {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full"
-        style={{ backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #fcd34d' }}>
-        <Timer size={11} /> No response
-      </span>
-    );
-  }
+  if (httpStatus == null) return (
+    <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full"
+      style={{ backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #fcd34d' }}>
+      <Timer size={11} /> No response
+    </span>
+  );
   const ok = success || (httpStatus >= 200 && httpStatus < 300);
   return (
     <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full"
@@ -59,16 +88,14 @@ function RunTypeBadge({ type }) {
 function RunCard({ run }) {
   const [open, setOpen] = useState(false);
   const ok = run.success || (run.http_status >= 200 && run.http_status < 300);
-
   let prettyResponse = run.response_body;
-  try {
-    if (run.response_body) prettyResponse = JSON.stringify(JSON.parse(run.response_body), null, 2);
-  } catch { /* keep as-is */ }
+  try { if (run.response_body) prettyResponse = JSON.stringify(JSON.parse(run.response_body), null, 2); }
+  catch { /* keep as-is */ }
 
   return (
     <div className="rounded-2xl border overflow-hidden transition-all"
       style={{
-        borderColor: ok ? (run.run_type === 'test' ? '#fecdc7' : '#c0c9e8') : '#fecaca',
+        borderColor:     ok ? (run.run_type === 'test' ? '#fecdc7' : '#c0c9e8') : '#fecaca',
         backgroundColor: ok ? (run.run_type === 'test' ? 'rgba(163,24,0,0.02)' : 'rgba(3,3,82,0.015)') : '#fff8f8',
       }}>
       <button className="w-full flex items-center gap-4 px-5 py-4 text-left" onClick={() => setOpen(v => !v)}>
@@ -92,13 +119,18 @@ function RunCard({ run }) {
           </div>
         </div>
         <div className="text-right shrink-0">
-          <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{timeAgo(run.triggered_at)}</div>
+          <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+            {timeAgo(run.triggered_at)}
+          </div>
           <div className="text-xs" style={{ color: 'var(--text-dim)', fontFamily: 'IBM Plex Mono, monospace' }}>
-            {new Date(run.triggered_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            {new Date(run.triggered_at).toLocaleTimeString('en-US', {
+              hour: '2-digit', minute: '2-digit', second: '2-digit',
+            })}
           </div>
         </div>
-        {open ? <ChevronUp size={14} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
-              : <ChevronDown size={14} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />}
+        {open
+          ? <ChevronUp  size={14} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
+          : <ChevronDown size={14} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />}
       </button>
 
       {open && (
@@ -111,11 +143,12 @@ function RunCard({ run }) {
           )}
           {!run.success && run.response_body && (() => {
             try {
-              const parsed = JSON.parse(run.response_body);
-              const hint = parsed.hint || parsed.message;
+              const p = JSON.parse(run.response_body);
+              const hint = p.hint || p.message;
               if (!hint) return null;
               return (
-                <div className="rounded-xl p-3 flex items-start gap-2" style={{ backgroundColor: '#fffbeb', border: '1px solid #fcd34d' }}>
+                <div className="rounded-xl p-3 flex items-start gap-2"
+                  style={{ backgroundColor: '#fffbeb', border: '1px solid #fcd34d' }}>
                   <span className="text-xs font-bold shrink-0" style={{ color: '#92400e' }}>Hint:</span>
                   <p className="text-xs" style={{ color: '#78350f' }}>{hint}</p>
                 </div>
@@ -124,22 +157,27 @@ function RunCard({ run }) {
           })()}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: '#030352', opacity: 0.65 }}>Payload Sent</p>
+              <p className="text-xs font-bold uppercase tracking-wide mb-2"
+                style={{ color: '#030352', opacity: 0.65 }}>Payload Sent</p>
               <pre className="text-xs rounded-xl p-3 overflow-auto max-h-56"
-                style={{ backgroundColor: '#f2f3f9', border: '1px solid #d2d8ef', fontFamily: 'IBM Plex Mono, monospace', color: '#030352', lineHeight: 1.6 }}>
+                style={{ backgroundColor: '#f2f3f9', border: '1px solid #d2d8ef',
+                  fontFamily: 'IBM Plex Mono, monospace', color: '#030352', lineHeight: 1.6 }}>
                 {JSON.stringify(run.payload, null, 2)}
               </pre>
             </div>
             <div>
-              <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: ok ? '#065f46' : '#991b1b', opacity: 0.75 }}>Response Body</p>
+              <p className="text-xs font-bold uppercase tracking-wide mb-2"
+                style={{ color: ok ? '#065f46' : '#991b1b', opacity: 0.75 }}>Response Body</p>
               {prettyResponse ? (
                 <pre className="text-xs rounded-xl p-3 overflow-auto max-h-56"
-                  style={{ backgroundColor: ok ? '#ecfdf5' : '#fef2f2', border: `1px solid ${ok ? '#a7f3d0' : '#fecaca'}`, fontFamily: 'IBM Plex Mono, monospace', color: ok ? '#065f46' : '#991b1b', lineHeight: 1.6 }}>
+                  style={{ backgroundColor: ok ? '#ecfdf5' : '#fef2f2',
+                    border: `1px solid ${ok ? '#a7f3d0' : '#fecaca'}`,
+                    fontFamily: 'IBM Plex Mono, monospace', color: ok ? '#065f46' : '#991b1b', lineHeight: 1.6 }}>
                   {prettyResponse}
                 </pre>
               ) : ok ? (
                 <div className="rounded-xl p-3 text-xs" style={{ backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46' }}>
-                  <p className="font-bold mb-1">Webhook acknowledged ✔</p>
+                  <p className="font-bold mb-1">Webhook acknowledged ✓</p>
                   <p style={{ opacity: 0.8 }}>No response body — normal for n8n and most webhook services.</p>
                 </div>
               ) : (
@@ -170,18 +208,31 @@ function RunCard({ run }) {
   );
 }
 
+// ── main export ───────────────────────────────────────────────────────────────
 export function AutomationRuns({ open, automation, onClose }) {
   const qc = useQueryClient();
+  const [dateRange,  setDateRange]  = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
 
-  const { data: runs = [], isLoading: loading } = useQuery({
-    queryKey: ['automation-runs', automation?.id],
-    queryFn: () => fetch(`${API}/automations/${automation.id}/runs?limit=50`)
+  // Build query params from filter state
+  const dateParams = dateRangeToParams(dateRange);
+  const queryParams = new URLSearchParams({ limit: '2000' });
+  if (dateParams.since) queryParams.set('since', dateParams.since);
+  if (dateParams.until) queryParams.set('until', dateParams.until);
+  if (typeFilter !== 'all') queryParams.set('run_type', typeFilter);
+
+  const queryKey = ['automation-runs', automation?.id, dateRange, typeFilter];
+
+  const { data: runs = [], isLoading } = useQuery({
+    queryKey,
+    queryFn: () => fetch(`${API}/automations/${automation.id}/runs?${queryParams}`)
       .then(r => { if (!r.ok) throw new Error(); return r.json(); }),
     enabled: open && !!automation?.id,
     refetchOnMount: true,
   });
 
-  const handleRefresh = () => qc.invalidateQueries({ queryKey: ['automation-runs', automation?.id] });
+  const handleRefresh = () => qc.invalidateQueries({ queryKey });
+  const activeFilters = (dateRange !== 'all' ? 1 : 0) + (typeFilter !== 'all' ? 1 : 0);
 
   const successCount = runs.filter(r => r.success).length;
   const failCount    = runs.filter(r => !r.success).length;
@@ -194,34 +245,43 @@ export function AutomationRuns({ open, automation, onClose }) {
         className="w-full sm:w-[660px] lg:w-[720px] p-0 flex flex-col"
         style={{ backgroundColor: '#f9f8f5', borderColor: 'var(--stroke)', maxWidth: '720px' }}>
 
+        {/* Header */}
         <div className="px-7 pt-6 pb-5 border-b shrink-0"
           style={{ background: 'linear-gradient(135deg, #e8ebf5 0%, #f2f3f9 60%, #f9f8f5 100%)', borderColor: '#d2d8ef' }}>
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
-              <div className="w-11 h-11 rounded-2xl flex items-center justify-center mt-0.5" style={{ backgroundColor: 'rgba(3,3,82,0.12)' }}>
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center mt-0.5"
+                style={{ backgroundColor: 'rgba(3,3,82,0.12)' }}>
                 <Activity size={20} style={{ color: '#030352' }} />
               </div>
               <div>
-                <h2 className="text-xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--brand-navy)', letterSpacing: '-0.02em' }}>Run History</h2>
-                <p className="text-xs font-semibold mt-0.5" style={{ color: 'var(--brand-navy)', opacity: 0.55 }}>{automation?.name}</p>
+                <h2 className="text-xl font-bold"
+                  style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--brand-navy)', letterSpacing: '-0.02em' }}>
+                  Run History
+                </h2>
+                <p className="text-xs font-semibold mt-0.5" style={{ color: 'var(--brand-navy)', opacity: 0.55 }}>
+                  {automation?.name}
+                </p>
               </div>
             </div>
-            <Button variant="ghost" size="sm" onClick={handleRefresh} className="h-9 w-9 p-0 rounded-lg mt-1" style={{ color: 'var(--text-dim)' }}>
+            <Button variant="ghost" size="sm" onClick={handleRefresh}
+              className="h-9 w-9 p-0 rounded-lg mt-1" style={{ color: 'var(--text-dim)' }}>
               <RefreshCw size={14} />
             </Button>
           </div>
 
-          {!loading && runs.length > 0 && (
-            <div className="flex items-center gap-4 mt-4 flex-wrap">
+          {/* Summary stats */}
+          {!isLoading && runs.length > 0 && (
+            <div className="flex items-center gap-3 mt-4 flex-wrap">
               {[
-                { label: 'Total',   value: runs.length,    color: '#030352', bg: 'rgba(3,3,82,0.08)' },
-                { label: 'Live',    value: liveCount,      color: '#030352', bg: 'rgba(3,3,82,0.06)' },
-                { label: 'Test',    value: testCount,      color: '#A31800', bg: 'rgba(163,24,0,0.06)' },
-                { label: 'Success', value: successCount,   color: '#065f46', bg: '#ecfdf5' },
-                { label: 'Failed',  value: failCount,      color: failCount > 0 ? '#991b1b' : 'var(--text-dim)', bg: failCount > 0 ? '#fef2f2' : '#f8f7f4' },
+                { label: 'Total',   value: runs.length,  color: '#030352', bg: 'rgba(3,3,82,0.08)' },
+                { label: 'Live',    value: liveCount,    color: '#030352', bg: 'rgba(3,3,82,0.06)' },
+                { label: 'Test',    value: testCount,    color: '#A31800', bg: 'rgba(163,24,0,0.06)' },
+                { label: 'Success', value: successCount, color: '#065f46', bg: '#ecfdf5' },
+                { label: 'Failed',  value: failCount,    color: failCount > 0 ? '#991b1b' : 'var(--text-dim)', bg: failCount > 0 ? '#fef2f2' : '#f8f7f4' },
               ].map(s => (
-                <div key={s.label} className="text-center px-4 py-2 rounded-xl" style={{ backgroundColor: s.bg }}>
-                  <div className="text-lg font-bold tabular-nums" style={{ color: s.color, fontFamily: 'Space Grotesk, sans-serif' }}>{s.value}</div>
+                <div key={s.label} className="text-center px-3 py-2 rounded-xl" style={{ backgroundColor: s.bg }}>
+                  <div className="text-base font-bold tabular-nums" style={{ color: s.color, fontFamily: 'Space Grotesk, sans-serif' }}>{s.value}</div>
                   <div className="text-xs font-medium" style={{ color: s.color, opacity: 0.7 }}>{s.label}</div>
                 </div>
               ))}
@@ -229,19 +289,81 @@ export function AutomationRuns({ open, automation, onClose }) {
           )}
         </div>
 
+        {/* Filter bar */}
+        <div className="flex items-center gap-3 px-6 py-3 border-b shrink-0 flex-wrap"
+          style={{ borderColor: 'var(--stroke)', backgroundColor: '#faf9f6' }}>
+          <div className="flex items-center gap-1.5 shrink-0" style={{ color: 'var(--text-dim)' }}>
+            <Filter size={13} />
+            <span className="text-xs font-semibold">Filter</span>
+            {activeFilters > 0 && (
+              <span className="inline-flex items-center justify-center w-4 h-4 text-xs font-bold rounded-full"
+                style={{ backgroundColor: 'rgba(3,3,82,0.12)', color: '#030352' }}>
+                {activeFilters}
+              </span>
+            )}
+          </div>
+
+          {/* Date range */}
+          <Select value={dateRange} onValueChange={setDateRange}>
+            <SelectTrigger className="h-8 text-xs w-36" style={{ borderColor: 'var(--stroke)' }}>
+              <SelectValue placeholder="All time" />
+            </SelectTrigger>
+            <SelectContent>
+              {DATE_OPTIONS.map(o => (
+                <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Run type */}
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="h-8 text-xs w-28" style={{ borderColor: 'var(--stroke)' }}>
+              <SelectValue placeholder="All types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all"  className="text-xs">All types</SelectItem>
+              <SelectItem value="live" className="text-xs">Live only</SelectItem>
+              <SelectItem value="test" className="text-xs">Test only</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {activeFilters > 0 && (
+            <button
+              onClick={() => { setDateRange('all'); setTypeFilter('all'); }}
+              className="flex items-center gap-1 text-xs font-medium px-2 py-1.5 rounded-lg border transition-colors"
+              style={{ color: 'var(--text-muted)', borderColor: 'var(--stroke)' }}>
+              <X size={11} /> Clear
+            </button>
+          )}
+
+          <span className="ml-auto text-xs font-semibold tabular-nums"
+            style={{ color: 'var(--brand-navy)' }}>
+            {runs.length} run{runs.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+
+        {/* Runs list */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
-          {loading ? (
+          {isLoading ? (
             <div className="space-y-3">
               {[1,2,3,4].map(i => <Skeleton key={i} className="h-20 rounded-2xl" style={{ backgroundColor: '#f0ede8' }} />)}
             </div>
           ) : runs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #e8ebf5, #f2f3f9)' }}>
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
+                style={{ background: 'linear-gradient(135deg, #e8ebf5, #f2f3f9)' }}>
                 <Zap size={28} style={{ color: '#030352' }} />
               </div>
               <div className="text-center">
-                <p className="text-base font-bold mb-1" style={{ color: 'var(--brand-navy)', fontFamily: 'Space Grotesk, sans-serif' }}>No runs yet</p>
-                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Run history will appear here once this automation fires.</p>
+                <p className="text-base font-bold mb-1"
+                  style={{ color: 'var(--brand-navy)', fontFamily: 'Space Grotesk, sans-serif' }}>
+                  No runs {activeFilters > 0 ? 'match your filters' : 'yet'}
+                </p>
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                  {activeFilters > 0
+                    ? 'Try a wider date range or clear the filters.'
+                    : 'Run history will appear here once this automation fires.'}
+                </p>
               </div>
             </div>
           ) : (

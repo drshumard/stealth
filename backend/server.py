@@ -1879,14 +1879,36 @@ async def test_automation(auto_id: str):
 
 
 @api_router.get("/automations/{auto_id}/runs", response_model=List[AutomationRunOut])
-async def get_automation_runs(auto_id: str, limit: int = 50):
-    """Return execution history for a specific automation, newest first."""
+async def get_automation_runs(
+    auto_id: str,
+    limit: int = 2000,        # generous default — front-end does date filtering
+    since: Optional[str] = None,   # ISO date string  e.g. 2026-01-01
+    until: Optional[str] = None,   # ISO date string  e.g. 2026-12-31
+    run_type: Optional[str] = None, # 'live' | 'test' | None (all)
+):
+    """Return execution history for a specific automation, newest first.
+    Optional filters: since, until (ISO date strings), run_type."""
     auto = await db.automations.find_one({"id": auto_id}, {"_id": 0, "id": 1})
     if not auto:
         raise HTTPException(status_code=404, detail="Automation not found")
-    runs = await db.automation_runs.find(
-        {"automation_id": auto_id}, {"_id": 0}
-    ).sort("triggered_at", -1).limit(limit).to_list(limit)
+
+    match: dict = {"automation_id": auto_id}
+    if since or until:
+        ts_filter: dict = {}
+        if since:
+            ts_filter["$gte"] = since
+        if until:
+            # include the full until day by appending end-of-day
+            ts_filter["$lte"] = until.split("T")[0] + "T23:59:59Z"
+        match["triggered_at"] = ts_filter
+    if run_type in ("live", "test"):
+        match["run_type"] = run_type
+
+    runs = await db.automation_runs.find(match, {"_id": 0}) \
+        .sort("triggered_at", -1) \
+        .limit(limit) \
+        .to_list(limit)
+
     result = []
     for r in runs:
         r["triggered_at"] = str_to_dt(r.get("triggered_at"))
