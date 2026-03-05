@@ -63,6 +63,7 @@ export const ContactsTable = ({
   onCopyScript,
   onBulkDelete,
   hideSearch,
+  onSelectionChange,   // optional: (selectedIds: Set<string>) => void
 }) => {
   const [search,   setSearch]   = useState('');
   const [selected, setSelected] = useState(new Set());
@@ -71,6 +72,11 @@ export const ContactsTable = ({
   const [pageSize, setPageSize] = useState(8);
 
   useEffect(() => { setSelected(new Set()); }, [contacts]);
+
+  // Notify parent whenever selection changes
+  useEffect(() => {
+    if (onSelectionChange) onSelectionChange(selected);
+  }, [selected, onSelectionChange]);
   useEffect(() => { setPage(1); }, [search, contacts]);
 
   /* ── Filter ── */

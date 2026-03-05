@@ -1655,7 +1655,7 @@ async def get_stats():
 
 @api_router.get("/logs")
 
-@api_router.get("/contacts/export")
+@api_router.get("/leads/export")
 async def export_contacts(
     since: Optional[str] = None,
     until: Optional[str] = None,

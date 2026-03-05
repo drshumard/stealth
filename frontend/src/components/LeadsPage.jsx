@@ -1,5 +1,5 @@
-import { useState, useMemo, useCallback } from 'react';
-import { RefreshCw, Copy, Filter, X, Download, FileText, CalendarDays, Loader2 } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { RefreshCw, Copy, Filter, X, CalendarDays, Loader2, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { toast } from 'sonner';
 import { ContactsTable } from '@/components/ContactsTable';
 import { useTimezone } from '@/components/TimezoneContext';
+import { exportLeadsToPdf } from '@/utils/pdfExport';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -78,183 +79,6 @@ function passesDate(contact, range, customRange, todayStr) {
   return true;
 }
 
-// ── PDF export ────────────────────────────────────────────────────────────────
-async function exportToPdf(filteredContacts, filterLabel, timezone, formatDateTime) {
-  if (filteredContacts.length === 0) {
-    toast.error('No leads to export');
-    return;
-  }
-
-  const { default: jsPDF } = await import('jspdf');
-  const { default: autoTable } = await import('jspdf-autotable');
-
-  // Fetch full contact data (with visits) from the export endpoint
-  const params = new URLSearchParams({ limit: '5000' });
-  if (filterLabel) params.set('search', ''); // just to show intent; date params handled below
-  // We pass the already-filtered contacts' IDs isn't available via the export endpoint
-  // so we'll use the contact detail endpoint for each — but batch using the export endpoint
-  // with no date filter and then filter client-side from the already-filtered list
-  // Actually: fetch all via /contacts/export and filter by the IDs we already have
-  const res  = await fetch(`${BACKEND_URL}/api/contacts/export?${params}`);
-  const all  = await res.json();
-
-  // Keep only the contacts in the current filtered view
-  const ids  = new Set(filteredContacts.map(c => c.contact_id));
-  const data = all.filter(c => ids.has(c.contact_id));
-
-  const NAVY = [3, 3, 82];
-  const RED  = [163, 24, 0];
-  const GRAY = [100, 100, 110];
-
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const PW = 170; // printable width (A4 210 - 20 margin each side)
-
-  // ── Cover header ──
-  doc.setFontSize(22);
-  doc.setTextColor(...NAVY);
-  doc.setFont('helvetica', 'bold');
-  doc.text('TETHER', 20, 22);
-  doc.setFontSize(12);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...GRAY);
-  doc.text('Lead Export', 20, 29);
-
-  doc.setFontSize(9);
-  doc.setTextColor(...GRAY);
-  const now = new Date().toLocaleString('en-US', {
-    timeZone: timezone, month: 'short', day: 'numeric', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
-  doc.text(`Generated: ${now}  ·  Timezone: ${timezone}`, 20, 36);
-  if (filterLabel) doc.text(`Date filter: ${filterLabel}`, 20, 41);
-  doc.text(`${data.length} lead${data.length !== 1 ? 's' : ''}`, 20, filterLabel ? 46 : 41);
-
-  // Divider
-  doc.setDrawColor(...NAVY);
-  doc.setLineWidth(0.5);
-  doc.line(20, filterLabel ? 50 : 45, 190, filterLabel ? 50 : 45);
-
-  let y = filterLabel ? 56 : 51;
-
-  for (let idx = 0; idx < data.length; idx++) {
-    const c = data[idx];
-
-    // Page break if needed (keep at least 60mm for one section)
-    if (y > 240) { doc.addPage(); y = 20; }
-
-    // ── Lead header ──
-    doc.setFontSize(11);
-    doc.setTextColor(...NAVY);
-    doc.setFont('helvetica', 'bold');
-    const headerName = c.name || c.email || c.phone || 'Anonymous';
-    const headerSub  = c.name && c.email ? `  <${c.email}>` : '';
-    doc.text(`${idx + 1}. ${headerName}${headerSub}`, 20, y);
-    y += 5;
-
-    // ── Contact info ──
-    const infoRows = [
-      ['Name',       c.name       || '—'],
-      ['Email',      c.email      || '—'],
-      ['Phone',      c.phone      || '—'],
-      ['Contact ID', c.contact_id || '—'],
-      ['IP Address', c.client_ip  || '—'],
-      ['First Seen', c.created_at ? new Date(c.created_at).toLocaleString('en-US', { timeZone: timezone, month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'],
-      ['Last Active', c.updated_at ? new Date(c.updated_at).toLocaleString('en-US', { timeZone: timezone, month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'],
-    ];
-    if (c.tags?.length > 0) infoRows.push(['Tags', c.tags.join(', ')]);
-
-    autoTable(doc, {
-      startY:   y,
-      head:     [['Contact Information', '']],
-      body:     infoRows,
-      theme:    'grid',
-      headStyles:   { fillColor: NAVY, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, cellPadding: 2 },
-      bodyStyles:   { fontSize: 8, cellPadding: 2, textColor: [30, 30, 40] },
-      alternateRowStyles: { fillColor: [246, 247, 252] },
-      columnStyles: { 0: { cellWidth: 32, fontStyle: 'bold', textColor: GRAY }, 1: { cellWidth: PW - 32 } },
-      margin:   { left: 20, right: 20 },
-    });
-    y = doc.lastAutoTable.finalY + 4;
-
-    // ── Stitch information ──
-    if (c.merged_children?.length > 0) {
-      if (y > 250) { doc.addPage(); y = 20; }
-      autoTable(doc, {
-        startY:   y,
-        head:     [['Stitched Identities (merged contacts)', '']],
-        body:     c.merged_children.map((cid, i) => [`${i + 1}`, cid]),
-        theme:    'grid',
-        headStyles:   { fillColor: [5, 150, 105], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, cellPadding: 2 },
-        bodyStyles:   { fontSize: 7.5, cellPadding: 2, fontFamily: 'courier', textColor: [30, 30, 40] },
-        columnStyles: { 0: { cellWidth: 8 }, 1: { cellWidth: PW - 8 } },
-        margin:   { left: 20, right: 20 },
-      });
-      y = doc.lastAutoTable.finalY + 4;
-    }
-
-    // ── URL history ──
-    if (c.visits?.length > 0) {
-      if (y > 250) { doc.addPage(); y = 20; }
-      const urlRows = c.visits.map((v, i) => [
-        i + 1,
-        v.timestamp ? new Date(v.timestamp).toLocaleString('en-US', {
-          timeZone: timezone, month: 'short', day: 'numeric', year: 'numeric',
-          hour: '2-digit', minute: '2-digit', second: '2-digit',
-        }) : '—',
-        v.url || '—',
-      ]);
-      autoTable(doc, {
-        startY:   y,
-        head:     [['#', 'Date / Time', 'URL Visited']],
-        body:     urlRows,
-        theme:    'grid',
-        headStyles:   { fillColor: RED, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, cellPadding: 2 },
-        bodyStyles:   { fontSize: 7.5, cellPadding: 2, textColor: [30, 30, 40] },
-        alternateRowStyles: { fillColor: [255, 248, 247] },
-        columnStyles: { 0: { cellWidth: 8 }, 1: { cellWidth: 42 }, 2: { cellWidth: PW - 50 } },
-        margin:   { left: 20, right: 20 },
-        didDrawCell: (data) => {
-          // Word-wrap URLs in the URL column
-          if (data.column.index === 2 && data.cell.raw) {
-            // jsPDF-autotable handles wrapping automatically
-          }
-        },
-      });
-      y = doc.lastAutoTable.finalY + 4;
-    } else {
-      doc.setFontSize(8);
-      doc.setTextColor(...GRAY);
-      doc.setFont('helvetica', 'italic');
-      doc.text('No URL visits recorded.', 22, y + 3);
-      y += 8;
-    }
-
-    // Separator between leads
-    if (idx < data.length - 1) {
-      if (y > 255) { doc.addPage(); y = 20; }
-      doc.setDrawColor(220, 220, 228);
-      doc.setLineWidth(0.3);
-      doc.line(20, y + 2, 190, y + 2);
-      y += 10;
-    }
-  }
-
-  // Page numbers
-  const totalPages = doc.internal.getNumberOfPages();
-  for (let i = 1; i <= totalPages; i++) {
-    doc.setPage(i);
-    doc.setFontSize(7);
-    doc.setTextColor(180);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Tether Lead Export  ·  Page ${i} of ${totalPages}`, 105, 292, { align: 'center' });
-  }
-
-  const fname = `tether-leads-${localDateStr(new Date())}.pdf`;
-  doc.save(fname);
-  toast.success(`PDF saved as ${fname}`);
-}
-
-// ── component ─────────────────────────────────────────────────────────────────
 export default function LeadsPage({ contacts, loading, initialLoad, stats, onRefresh, onSelectContact, onDeleteContact, onBulkDelete }) {
   const { timezone, todayString } = useTimezone();
   const [search,       setSearch]       = useState('');
@@ -263,6 +87,7 @@ export default function LeadsPage({ contacts, loading, initialLoad, stats, onRef
   const [customRange,  setCustomRange]  = useState(null);
   const [calOpen,      setCalOpen]      = useState(false);
   const [exporting,    setExporting]    = useState(false);
+  const [selectedIds,  setSelectedIds]  = useState(new Set()); // track checkbox selection from table
 
   const handleCopyScript = () =>
     navigator.clipboard.writeText(`<script src="${BACKEND_URL}/api/shumard.js"></script>`)
@@ -295,12 +120,16 @@ export default function LeadsPage({ contacts, loading, initialLoad, stats, onRef
   const activeFilters = (srcFilter !== 'all' ? 1 : 0) + (dateRange !== 'all' ? 1 : 0);
 
   const handleExportPdf = async () => {
+    const toExport = selectedIds.size > 0
+      ? filtered.filter(c => selectedIds.has(c.contact_id))
+      : filtered;
     setExporting(true);
     try {
-      await exportToPdf(filtered, dateLabel(dateRange, customRange), timezone, () => {});
+      const { fname, count } = await exportLeadsToPdf(toExport, dateLabel(dateRange, customRange), timezone);
+      toast.success(`Saved ${fname}  (${count} lead${count !== 1 ? 's' : ''})`);
     } catch (e) {
-      console.error(e);
-      toast.error('PDF export failed');
+      console.error('PDF export error:', e);
+      toast.error(`Export failed: ${e.message}`);
     } finally {
       setExporting(false);
     }
@@ -330,10 +159,11 @@ export default function LeadsPage({ contacts, loading, initialLoad, stats, onRef
             >
               {exporting ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
               Export PDF
-              {filtered.length > 0 && (
+              {(selectedIds.size > 0 ? selectedIds.size : filtered.length) > 0 && (
                 <span className="text-xs font-bold px-1.5 py-0.5 rounded-full ml-0.5"
                   style={{ backgroundColor: 'rgba(3,3,82,0.10)', color: '#030352' }}>
-                  {filtered.length}
+                  {selectedIds.size > 0 ? selectedIds.size : filtered.length}
+                  {selectedIds.size > 0 ? ' selected' : ''}
                 </span>
               )}
             </Button>
@@ -477,6 +307,7 @@ export default function LeadsPage({ contacts, loading, initialLoad, stats, onRef
             onCopyScript={handleCopyScript}
             onBulkDelete={onBulkDelete}
             hideSearch
+            onSelectionChange={setSelectedIds}
           />
         </div>
       </div>
