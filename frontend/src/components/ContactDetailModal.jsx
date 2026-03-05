@@ -146,7 +146,7 @@ const UrlVisitItem = ({ visit, index }) => {
         <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
           <div className="flex items-center gap-1.5 shrink-0">
             <Clock size={11} style={{ color: 'var(--text-dim)' }} />
-            <span className="text-xs" style={{ color: 'var(--text-dim)' }}>{fmt(visit.timestamp)}</span>
+            <span className="text-xs" style={{ color: 'var(--text-dim)' }}>{formatDateTime(visit.timestamp)}</span>
           </div>
           {visit.page_title && (
             <Badge variant="secondary" className="text-xs px-2 py-0 max-w-[160px] truncate shrink-0"
