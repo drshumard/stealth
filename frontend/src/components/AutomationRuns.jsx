@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   CheckCircle2, XCircle, Clock, RefreshCw, Zap, FlaskConical,
   Activity, Timer, ChevronDown, ChevronUp, Filter, X,
+  Download, ArrowLeft,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -29,7 +30,7 @@ function dateRangeToParams(range) {
   const pad = n => String(n).padStart(2, '0');
   const fmt = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
   const until = fmt(now);
-  if (range === 'today')  return { since: until, until };
+  if (range === 'today') return { since: until, until };
   const days = range === '7d' ? 7 : range === '30d' ? 30 : 90;
   const from = new Date(now); from.setDate(from.getDate() - days);
   return { since: fmt(from), until };
@@ -46,6 +47,36 @@ function timeAgo(ts) {
     month: 'short', day: 'numeric', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
+}
+
+// ── CSV export ────────────────────────────────────────────────────────────────
+function exportCsv(runs, automationName) {
+  const headers = [
+    'Date', 'Contact Email', 'Contact Name', 'Run Type',
+    'HTTP Status', 'Success', 'Duration (ms)', 'Contact ID',
+  ];
+  const rows = runs.map(r => [
+    new Date(r.triggered_at).toISOString(),
+    r.contact_email  || '',
+    r.contact_name   || '',
+    r.run_type,
+    r.http_status    ?? '',
+    r.success ? 'Yes' : 'No',
+    r.duration_ms    ?? '',
+    r.contact_id     || '',
+  ]);
+  const csv = [headers, ...rows]
+    .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `${(automationName || 'automation').replace(/\s+/g, '-').toLowerCase()}-runs-${new Date().toISOString().split('T')[0]}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // ── sub-components ────────────────────────────────────────────────────────────
@@ -90,7 +121,7 @@ function RunCard({ run }) {
   const ok = run.success || (run.http_status >= 200 && run.http_status < 300);
   let prettyResponse = run.response_body;
   try { if (run.response_body) prettyResponse = JSON.stringify(JSON.parse(run.response_body), null, 2); }
-  catch { /* keep as-is */ }
+  catch { /* keep */ }
 
   return (
     <div className="rounded-2xl border overflow-hidden transition-all"
@@ -119,13 +150,9 @@ function RunCard({ run }) {
           </div>
         </div>
         <div className="text-right shrink-0">
-          <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-            {timeAgo(run.triggered_at)}
-          </div>
+          <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{timeAgo(run.triggered_at)}</div>
           <div className="text-xs" style={{ color: 'var(--text-dim)', fontFamily: 'IBM Plex Mono, monospace' }}>
-            {new Date(run.triggered_at).toLocaleTimeString('en-US', {
-              hour: '2-digit', minute: '2-digit', second: '2-digit',
-            })}
+            {new Date(run.triggered_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </div>
         </div>
         {open
@@ -157,22 +184,17 @@ function RunCard({ run }) {
           })()}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wide mb-2"
-                style={{ color: '#030352', opacity: 0.65 }}>Payload Sent</p>
+              <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: '#030352', opacity: 0.65 }}>Payload Sent</p>
               <pre className="text-xs rounded-xl p-3 overflow-auto max-h-56"
-                style={{ backgroundColor: '#f2f3f9', border: '1px solid #d2d8ef',
-                  fontFamily: 'IBM Plex Mono, monospace', color: '#030352', lineHeight: 1.6 }}>
+                style={{ backgroundColor: '#f2f3f9', border: '1px solid #d2d8ef', fontFamily: 'IBM Plex Mono, monospace', color: '#030352', lineHeight: 1.6 }}>
                 {JSON.stringify(run.payload, null, 2)}
               </pre>
             </div>
             <div>
-              <p className="text-xs font-bold uppercase tracking-wide mb-2"
-                style={{ color: ok ? '#065f46' : '#991b1b', opacity: 0.75 }}>Response Body</p>
+              <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: ok ? '#065f46' : '#991b1b', opacity: 0.75 }}>Response Body</p>
               {prettyResponse ? (
                 <pre className="text-xs rounded-xl p-3 overflow-auto max-h-56"
-                  style={{ backgroundColor: ok ? '#ecfdf5' : '#fef2f2',
-                    border: `1px solid ${ok ? '#a7f3d0' : '#fecaca'}`,
-                    fontFamily: 'IBM Plex Mono, monospace', color: ok ? '#065f46' : '#991b1b', lineHeight: 1.6 }}>
+                  style={{ backgroundColor: ok ? '#ecfdf5' : '#fef2f2', border: `1px solid ${ok ? '#a7f3d0' : '#fecaca'}`, fontFamily: 'IBM Plex Mono, monospace', color: ok ? '#065f46' : '#991b1b', lineHeight: 1.6 }}>
                   {prettyResponse}
                 </pre>
               ) : ok ? (
@@ -181,9 +203,7 @@ function RunCard({ run }) {
                   <p style={{ opacity: 0.8 }}>No response body — normal for n8n and most webhook services.</p>
                 </div>
               ) : (
-                <div className="rounded-xl p-3 text-xs font-medium" style={{ backgroundColor: '#f8f7f4', border: '1px solid var(--stroke)', color: 'var(--text-dim)' }}>
-                  No response body
-                </div>
+                <div className="rounded-xl p-3 text-xs font-medium" style={{ backgroundColor: '#f8f7f4', border: '1px solid var(--stroke)', color: 'var(--text-dim)' }}>No response body</div>
               )}
             </div>
           </div>
@@ -214,8 +234,7 @@ export function AutomationRuns({ open, automation, onClose }) {
   const [dateRange,  setDateRange]  = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
 
-  // Build query params from filter state
-  const dateParams = dateRangeToParams(dateRange);
+  const dateParams  = dateRangeToParams(dateRange);
   const queryParams = new URLSearchParams({ limit: '2000' });
   if (dateParams.since) queryParams.set('since', dateParams.since);
   if (dateParams.until) queryParams.set('until', dateParams.until);
@@ -240,139 +259,186 @@ export function AutomationRuns({ open, automation, onClose }) {
   const liveCount    = runs.filter(r => r.run_type === 'live').length;
 
   return (
-    <Sheet open={open} onOpenChange={v => { if (!v) onClose(); }}>
-      <SheetContent side="right"
-        className="w-full sm:w-[660px] lg:w-[720px] p-0 flex flex-col"
-        style={{ backgroundColor: '#f9f8f5', borderColor: 'var(--stroke)', maxWidth: '720px' }}>
+    <AnimatePresence>
+      {open && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            key="backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="fixed inset-0 z-40 bg-black/40"
+            onClick={onClose}
+          />
 
-        {/* Header */}
-        <div className="px-7 pt-6 pb-5 border-b shrink-0"
-          style={{ background: 'linear-gradient(135deg, #e8ebf5 0%, #f2f3f9 60%, #f9f8f5 100%)', borderColor: '#d2d8ef' }}>
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <div className="w-11 h-11 rounded-2xl flex items-center justify-center mt-0.5"
-                style={{ backgroundColor: 'rgba(3,3,82,0.12)' }}>
-                <Activity size={20} style={{ color: '#030352' }} />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold"
-                  style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--brand-navy)', letterSpacing: '-0.02em' }}>
-                  Run History
-                </h2>
-                <p className="text-xs font-semibold mt-0.5" style={{ color: 'var(--brand-navy)', opacity: 0.55 }}>
-                  {automation?.name}
-                </p>
-              </div>
-            </div>
-            <Button variant="ghost" size="sm" onClick={handleRefresh}
-              className="h-9 w-9 p-0 rounded-lg mt-1" style={{ color: 'var(--text-dim)' }}>
-              <RefreshCw size={14} />
-            </Button>
-          </div>
-
-          {/* Summary stats */}
-          {!isLoading && runs.length > 0 && (
-            <div className="flex items-center gap-3 mt-4 flex-wrap">
-              {[
-                { label: 'Total',   value: runs.length,  color: '#030352', bg: 'rgba(3,3,82,0.08)' },
-                { label: 'Live',    value: liveCount,    color: '#030352', bg: 'rgba(3,3,82,0.06)' },
-                { label: 'Test',    value: testCount,    color: '#A31800', bg: 'rgba(163,24,0,0.06)' },
-                { label: 'Success', value: successCount, color: '#065f46', bg: '#ecfdf5' },
-                { label: 'Failed',  value: failCount,    color: failCount > 0 ? '#991b1b' : 'var(--text-dim)', bg: failCount > 0 ? '#fef2f2' : '#f8f7f4' },
-              ].map(s => (
-                <div key={s.label} className="text-center px-3 py-2 rounded-xl" style={{ backgroundColor: s.bg }}>
-                  <div className="text-base font-bold tabular-nums" style={{ color: s.color, fontFamily: 'Space Grotesk, sans-serif' }}>{s.value}</div>
-                  <div className="text-xs font-medium" style={{ color: s.color, opacity: 0.7 }}>{s.label}</div>
+          {/* Full-page panel */}
+          <motion.div
+            key="panel"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            className="fixed inset-4 z-50 flex flex-col rounded-2xl overflow-hidden"
+            style={{ backgroundColor: '#f9f8f5', boxShadow: '0 24px 60px rgba(3,3,82,0.18)', border: '1px solid var(--stroke)' }}
+          >
+            {/* ── Header ── */}
+            <div className="px-8 pt-6 pb-5 border-b shrink-0"
+              style={{ background: 'linear-gradient(135deg, #e8ebf5 0%, #f2f3f9 60%, #f9f8f5 100%)', borderColor: '#d2d8ef' }}>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <button onClick={onClose}
+                    className="w-9 h-9 rounded-xl flex items-center justify-center mt-0.5 transition-colors hover:bg-white/40"
+                    style={{ color: '#030352' }}>
+                    <ArrowLeft size={18} />
+                  </button>
+                  <div className="w-11 h-11 rounded-2xl flex items-center justify-center mt-0.5"
+                    style={{ backgroundColor: 'rgba(3,3,82,0.12)' }}>
+                    <Activity size={20} style={{ color: '#030352' }} />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold"
+                      style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--brand-navy)', letterSpacing: '-0.02em' }}>
+                      Run History
+                    </h2>
+                    <p className="text-sm font-semibold mt-0.5" style={{ color: 'var(--brand-navy)', opacity: 0.55 }}>
+                      {automation?.name}
+                    </p>
+                  </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
 
-        {/* Filter bar */}
-        <div className="flex items-center gap-3 px-6 py-3 border-b shrink-0 flex-wrap"
-          style={{ borderColor: 'var(--stroke)', backgroundColor: '#faf9f6' }}>
-          <div className="flex items-center gap-1.5 shrink-0" style={{ color: 'var(--text-dim)' }}>
-            <Filter size={13} />
-            <span className="text-xs font-semibold">Filter</span>
-            {activeFilters > 0 && (
-              <span className="inline-flex items-center justify-center w-4 h-4 text-xs font-bold rounded-full"
-                style={{ backgroundColor: 'rgba(3,3,82,0.12)', color: '#030352' }}>
-                {activeFilters}
+                <div className="flex items-center gap-2 mt-1">
+                  <Button
+                    variant="outline" size="sm"
+                    onClick={() => exportCsv(runs, automation?.name)}
+                    disabled={runs.length === 0}
+                    className="gap-2 h-9 px-4 text-sm font-semibold"
+                    style={{ borderColor: 'var(--brand-navy)', color: 'var(--brand-navy)', backgroundColor: 'rgba(255,255,255,0.7)' }}
+                  >
+                    <Download size={14} />
+                    Export CSV
+                    {runs.length > 0 && (
+                      <span className="text-xs font-bold px-1.5 py-0.5 rounded-full ml-0.5"
+                        style={{ backgroundColor: 'rgba(3,3,82,0.10)', color: '#030352' }}>
+                        {runs.length}
+                      </span>
+                    )}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={handleRefresh}
+                    className="h-9 w-9 p-0 rounded-lg" style={{ color: 'var(--text-dim)' }}>
+                    <RefreshCw size={14} />
+                  </Button>
+                  <button onClick={onClose}
+                    className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors hover:bg-white/40"
+                    style={{ color: 'var(--text-dim)' }}>
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Summary stats */}
+              {!isLoading && runs.length > 0 && (
+                <div className="flex items-center gap-3 mt-5 flex-wrap">
+                  {[
+                    { label: 'Total',   value: runs.length,  color: '#030352', bg: 'rgba(3,3,82,0.08)' },
+                    { label: 'Live',    value: liveCount,    color: '#030352', bg: 'rgba(3,3,82,0.06)' },
+                    { label: 'Test',    value: testCount,    color: '#A31800', bg: 'rgba(163,24,0,0.06)' },
+                    { label: 'Success', value: successCount, color: '#065f46', bg: '#ecfdf5' },
+                    { label: 'Failed',  value: failCount,    color: failCount > 0 ? '#991b1b' : 'var(--text-dim)', bg: failCount > 0 ? '#fef2f2' : '#f8f7f4' },
+                  ].map(s => (
+                    <div key={s.label} className="text-center px-4 py-2 rounded-xl" style={{ backgroundColor: s.bg }}>
+                      <div className="text-lg font-bold tabular-nums" style={{ color: s.color, fontFamily: 'Space Grotesk, sans-serif' }}>{s.value}</div>
+                      <div className="text-xs font-medium" style={{ color: s.color, opacity: 0.7 }}>{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ── Filter bar ── */}
+            <div className="flex items-center gap-3 px-8 py-4 border-b shrink-0 flex-wrap"
+              style={{ borderColor: 'var(--stroke)', backgroundColor: '#faf9f6' }}>
+              <div className="flex items-center gap-1.5 shrink-0" style={{ color: 'var(--text-dim)' }}>
+                <Filter size={13} />
+                <span className="text-xs font-semibold">Filter</span>
+                {activeFilters > 0 && (
+                  <span className="inline-flex items-center justify-center w-4 h-4 text-xs font-bold rounded-full"
+                    style={{ backgroundColor: 'rgba(3,3,82,0.12)', color: '#030352' }}>
+                    {activeFilters}
+                  </span>
+                )}
+              </div>
+
+              <Select value={dateRange} onValueChange={setDateRange}>
+                <SelectTrigger className="h-9 text-sm w-40" style={{ borderColor: 'var(--stroke)' }}>
+                  <SelectValue placeholder="All time" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DATE_OPTIONS.map(o => (
+                    <SelectItem key={o.value} value={o.value} className="text-sm">{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="h-9 text-sm w-32" style={{ borderColor: 'var(--stroke)' }}>
+                  <SelectValue placeholder="All types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all"  className="text-sm">All types</SelectItem>
+                  <SelectItem value="live" className="text-sm">Live only</SelectItem>
+                  <SelectItem value="test" className="text-sm">Test only</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {activeFilters > 0 && (
+                <button
+                  onClick={() => { setDateRange('all'); setTypeFilter('all'); }}
+                  className="flex items-center gap-1 text-sm font-medium px-3 py-2 rounded-lg border transition-colors"
+                  style={{ color: 'var(--text-muted)', borderColor: 'var(--stroke)' }}>
+                  <X size={12} /> Clear
+                </button>
+              )}
+
+              <span className="ml-auto text-sm font-bold tabular-nums" style={{ color: 'var(--brand-navy)' }}>
+                {runs.length} run{runs.length !== 1 ? 's' : ''}
               </span>
-            )}
-          </div>
-
-          {/* Date range */}
-          <Select value={dateRange} onValueChange={setDateRange}>
-            <SelectTrigger className="h-8 text-xs w-36" style={{ borderColor: 'var(--stroke)' }}>
-              <SelectValue placeholder="All time" />
-            </SelectTrigger>
-            <SelectContent>
-              {DATE_OPTIONS.map(o => (
-                <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Run type */}
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="h-8 text-xs w-28" style={{ borderColor: 'var(--stroke)' }}>
-              <SelectValue placeholder="All types" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all"  className="text-xs">All types</SelectItem>
-              <SelectItem value="live" className="text-xs">Live only</SelectItem>
-              <SelectItem value="test" className="text-xs">Test only</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {activeFilters > 0 && (
-            <button
-              onClick={() => { setDateRange('all'); setTypeFilter('all'); }}
-              className="flex items-center gap-1 text-xs font-medium px-2 py-1.5 rounded-lg border transition-colors"
-              style={{ color: 'var(--text-muted)', borderColor: 'var(--stroke)' }}>
-              <X size={11} /> Clear
-            </button>
-          )}
-
-          <span className="ml-auto text-xs font-semibold tabular-nums"
-            style={{ color: 'var(--brand-navy)' }}>
-            {runs.length} run{runs.length !== 1 ? 's' : ''}
-          </span>
-        </div>
-
-        {/* Runs list */}
-        <div className="flex-1 overflow-y-auto px-6 py-5">
-          {isLoading ? (
-            <div className="space-y-3">
-              {[1,2,3,4].map(i => <Skeleton key={i} className="h-20 rounded-2xl" style={{ backgroundColor: '#f0ede8' }} />)}
             </div>
-          ) : runs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-4">
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
-                style={{ background: 'linear-gradient(135deg, #e8ebf5, #f2f3f9)' }}>
-                <Zap size={28} style={{ color: '#030352' }} />
-              </div>
-              <div className="text-center">
-                <p className="text-base font-bold mb-1"
-                  style={{ color: 'var(--brand-navy)', fontFamily: 'Space Grotesk, sans-serif' }}>
-                  No runs {activeFilters > 0 ? 'match your filters' : 'yet'}
-                </p>
-                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                  {activeFilters > 0
-                    ? 'Try a wider date range or clear the filters.'
-                    : 'Run history will appear here once this automation fires.'}
-                </p>
-              </div>
+
+            {/* ── Runs list ── */}
+            <div className="flex-1 overflow-y-auto px-8 py-6">
+              {isLoading ? (
+                <div className="space-y-3 max-w-4xl mx-auto">
+                  {[1,2,3,4,5,6].map(i => <Skeleton key={i} className="h-20 rounded-2xl" style={{ backgroundColor: '#f0ede8' }} />)}
+                </div>
+              ) : runs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full gap-4">
+                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
+                    style={{ background: 'linear-gradient(135deg, #e8ebf5, #f2f3f9)' }}>
+                    <Zap size={28} style={{ color: '#030352' }} />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-base font-bold mb-1"
+                      style={{ color: 'var(--brand-navy)', fontFamily: 'Space Grotesk, sans-serif' }}>
+                      No runs {activeFilters > 0 ? 'match your filters' : 'yet'}
+                    </p>
+                    <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                      {activeFilters > 0
+                        ? 'Try a wider date range or clear the filters.'
+                        : 'Run history will appear here once this automation fires.'}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3 max-w-4xl mx-auto">
+                  {runs.map(run => <RunCard key={run.id} run={run} />)}
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="space-y-3">
-              {runs.map(run => <RunCard key={run.id} run={run} />)}
-            </div>
-          )}
-        </div>
-      </SheetContent>
-    </Sheet>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
   );
 }
