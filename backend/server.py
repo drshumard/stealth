@@ -2039,6 +2039,89 @@ async def get_automation_runs(
     return result
 
 
+@api_router.post("/automations/{auto_id}/runs/{run_id}/retry")
+async def retry_automation_run(auto_id: str, run_id: str):
+    """
+    Re-fire a specific run using its original payload and webhook URL.
+    Creates a new run record so history is preserved; marks the run_type as 'retry'.
+    """
+    # Fetch the original run
+    original = await db.automation_runs.find_one(
+        {"id": run_id, "automation_id": auto_id}, {"_id": 0}
+    )
+    if not original:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    # Fetch the automation to get current webhook URL / headers
+    auto = await db.automations.find_one({"id": auto_id}, {"_id": 0})
+    if not auto:
+        raise HTTPException(status_code=404, detail="Automation not found")
+
+    payload = original.get("payload") or {}
+    url     = auto.get("webhook_url") or original.get("webhook_url", "")
+    hdrs    = {"Content-Type": "application/json"}
+    if auto.get("custom_headers"):
+        hdrs.update(auto["custom_headers"])
+
+    # Fire synchronously so we can return the result immediately
+    import time
+    start         = time.monotonic()
+    http_status   = None
+    response_body = None
+    success       = False
+    error_msg     = None
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            resp = await client.post(url, json=payload, headers=hdrs)
+            http_status   = resp.status_code
+            raw_text      = resp.text.strip() if resp.text else ''
+            response_body = raw_text[:2000] if raw_text else None
+            success       = 200 <= resp.status_code < 300
+    except httpx.TimeoutException:
+        error_msg = "Request timed out after 30 seconds."
+    except Exception as e:
+        error_msg = str(e)
+
+    duration_ms = round((time.monotonic() - start) * 1000)
+    now         = datetime.now(timezone.utc)
+
+    # Store as a new run (type = "retry") so history is preserved
+    run_doc = {
+        "id":            str(uuid.uuid4()),
+        "automation_id": auto_id,
+        "run_type":      "retry",
+        "contact_id":    original.get("contact_id"),
+        "contact_email": original.get("contact_email"),
+        "contact_name":  original.get("contact_name"),
+        "fbclid":        original.get("fbclid"),
+        "payload":       payload,
+        "webhook_url":   url,
+        "http_status":   http_status,
+        "response_body": response_body,
+        "success":       success,
+        "error":         error_msg,
+        "duration_ms":   duration_ms,
+        "triggered_at":  dt_to_str(now),
+    }
+    await db.automation_runs.insert_one(run_doc)
+    await db.automations.update_one(
+        {"id": auto_id},
+        {"$set": {"last_triggered_at": dt_to_str(now)}}
+    )
+
+    return {
+        "status":        "ok" if success else "error",
+        "run_id":        run_doc["id"],
+        "http_status":   http_status,
+        "response_body": response_body,
+        "duration_ms":   duration_ms,
+        "success":       success,
+        "error":         error_msg,
+    }
+
+
+
 
 # ─────────────────────────── Sales ───────────────────────────
 

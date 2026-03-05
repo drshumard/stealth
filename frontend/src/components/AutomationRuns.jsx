@@ -4,10 +4,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   CheckCircle2, XCircle, Clock, RefreshCw, Zap, FlaskConical,
   Activity, Timer, ChevronDown, ChevronUp, Filter, X,
-  Download, ArrowLeft, CalendarDays,
+  Download, ArrowLeft, CalendarDays, RotateCcw, Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from 'sonner';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -131,24 +132,45 @@ function StatusBadge({ success, httpStatus }) {
 }
 
 function RunTypeBadge({ type }) {
-  const isTest = type === 'test';
+  const isTest  = type === 'test';
+  const isRetry = type === 'retry';
+  const color   = isTest ? '#A31800' : isRetry ? '#d97706' : '#030352';
+  const bg      = isTest ? 'rgba(163,24,0,0.08)' : isRetry ? 'rgba(217,119,6,0.08)' : 'rgba(3,3,82,0.08)';
+  const border  = isTest ? 'rgba(163,24,0,0.18)' : isRetry ? 'rgba(217,119,6,0.20)' : 'rgba(3,3,82,0.15)';
+  const icon    = isTest ? <FlaskConical size={10} /> : isRetry ? <RotateCcw size={10} /> : <Activity size={10} />;
+  const label   = isTest ? 'Test' : isRetry ? 'Retry' : 'Live';
   return (
     <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
-      style={{
-        backgroundColor: isTest ? 'rgba(163,24,0,0.08)' : 'rgba(3,3,82,0.08)',
-        color:           isTest ? '#A31800' : '#030352',
-        border:          `1px solid ${isTest ? 'rgba(163,24,0,0.18)' : 'rgba(3,3,82,0.15)'}`,
-      }}>
-      {isTest ? <FlaskConical size={10} /> : <Activity size={10} />}
-      {isTest ? 'Test' : 'Live'}
+      style={{ backgroundColor: bg, color, border: `1px solid ${border}` }}>
+      {icon}{label}
     </span>
   );
 }
 
-function RunCard({ run }) {
-  const [open, setOpen] = useState(false);
+function RunCard({ run, automationId, onRetried }) {
+  const [open,     setOpen]     = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const { formatDateTime, formatTime } = useTimezone();
   const ok = run.success || (run.http_status >= 200 && run.http_status < 300);
+
+  const handleRetry = async (e) => {
+    e.stopPropagation();
+    setRetrying(true);
+    try {
+      const res  = await fetch(`${API}/automations/${automationId}/runs/${run.id}/retry`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Retry succeeded → HTTP ${data.http_status} (${data.duration_ms}ms)`);
+      } else {
+        toast.error(`Retry failed: ${data.error || `HTTP ${data.http_status}`}`);
+      }
+      if (onRetried) onRetried();
+    } catch (err) {
+      toast.error(`Retry error: ${err.message}`);
+    } finally {
+      setRetrying(false);
+    }
+  };
   let prettyResponse = run.response_body;
   try { if (run.response_body) prettyResponse = JSON.stringify(JSON.parse(run.response_body), null, 2); }
   catch { /* keep */ }
@@ -179,15 +201,37 @@ function RunCard({ run }) {
             )}
           </div>
         </div>
-        <div className="text-right shrink-0">
-          <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{timeAgo(run.triggered_at, formatDateTime)}</div>
-          <div className="text-xs" style={{ color: 'var(--text-dim)', fontFamily: 'IBM Plex Mono, monospace' }}>
-            {formatTime(run.triggered_at)}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Retry button — only on failed runs */}
+          {!ok && (
+            <button
+              onClick={handleRetry}
+              disabled={retrying}
+              className="flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded-lg border transition-all duration-150"
+              style={{
+                backgroundColor: retrying ? '#fff7ed' : '#fff0e6',
+                borderColor: '#fed7aa',
+                color: retrying ? '#c2410c' : '#ea580c',
+                opacity: retrying ? 0.8 : 1,
+              }}
+              title="Retry this run"
+            >
+              {retrying
+                ? <Loader2 size={11} className="animate-spin" />
+                : <RotateCcw size={11} />}
+              {retrying ? 'Retrying…' : 'Retry'}
+            </button>
+          )}
+          <div className="text-right">
+            <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{timeAgo(run.triggered_at, formatDateTime)}</div>
+            <div className="text-xs" style={{ color: 'var(--text-dim)', fontFamily: 'IBM Plex Mono, monospace' }}>
+              {formatTime(run.triggered_at)}
+            </div>
           </div>
+          {open
+            ? <ChevronUp  size={14} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
+            : <ChevronDown size={14} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />}
         </div>
-        {open
-          ? <ChevronUp  size={14} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
-          : <ChevronDown size={14} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />}
       </button>
 
       {open && (
@@ -535,7 +579,14 @@ export function AutomationRuns({ open, automation, onClose }) {
                 </div>
               ) : (
                 <div className="space-y-3 max-w-4xl mx-auto">
-                  {runs.map(run => <RunCard key={run.id} run={run} />)}
+                  {runs.map(run => (
+                    <RunCard
+                      key={run.id}
+                      run={run}
+                      automationId={automation?.id}
+                      onRetried={handleRefresh}
+                    />
+                  ))}
                 </div>
               )}
             </div>
