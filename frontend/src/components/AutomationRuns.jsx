@@ -55,12 +55,16 @@ function dateRangeToParams(range, customRange, todayString) {
   return { since: localDateStr(from), until: today };
 }
 
-function fmtRangeLabel(customRange, formatDate) {
+function fmtRangeLabel(customRange) {
   if (!customRange?.from) return 'Custom range…';
-  const from = formatDate(customRange.from, { month: 'short', day: 'numeric' });
+  // Use the browser's local timezone for display — same as the calendar renders.
+  // Using the app's timezone context here would show the wrong day for UTC+ users
+  // because the calendar creates Date objects at midnight local browser time.
+  const opts  = { month: 'short', day: 'numeric', year: 'numeric' };
+  const from  = customRange.from.toLocaleDateString('en-US', opts);
   if (!customRange.to || customRange.from.toDateString() === customRange.to.toDateString())
     return from;
-  const to = formatDate(customRange.to, { month: 'short', day: 'numeric' });
+  const to = customRange.to.toLocaleDateString('en-US', opts);
   return `${from} – ${to}`;
 }
 
@@ -414,7 +418,7 @@ export function AutomationRuns({ open, automation, onClose }) {
                 <SelectTrigger className="h-9 text-sm w-44" style={{ borderColor: 'var(--stroke)' }}>
                   <SelectValue>
                     {dateRange === 'custom'
-                      ? fmtRangeLabel(customRange, formatDate)
+                      ? fmtRangeLabel(customRange)
                       : DATE_OPTIONS.find(o => o.value === dateRange)?.label || 'All time'}
                   </SelectValue>
                 </SelectTrigger>
@@ -437,7 +441,7 @@ export function AutomationRuns({ open, automation, onClose }) {
                   >
                     <CalendarDays size={14} />
                     {dateRange === 'custom' && customRange
-                      ? fmtRangeLabel(customRange, formatDate)
+                      ? fmtRangeLabel(customRange)
                       : 'Pick dates'}
                   </button>
                 </PopoverTrigger>
@@ -459,7 +463,7 @@ export function AutomationRuns({ open, automation, onClose }) {
                   <div className="px-4 pb-3 flex items-center justify-between">
                     <span className="text-xs" style={{ color: 'var(--text-dim)' }}>
                       {customRange?.from
-                        ? `${formatDate(customRange.from)}${customRange.to ? ' → ' + formatDate(customRange.to) : ' → pick end'}`
+                        ? `${customRange.from.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}${customRange.to ? ' → ' + customRange.to.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ' → pick end'}`
                         : 'Select start date'}
                     </span>
                     {customRange && (
