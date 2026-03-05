@@ -1654,6 +1654,108 @@ async def get_stats():
 
 
 @api_router.get("/logs")
+
+@api_router.get("/contacts/export")
+async def export_contacts(
+    since: Optional[str] = None,
+    until: Optional[str] = None,
+    tz: Optional[str] = None,
+    search: Optional[str] = None,
+    limit: int = 5000,
+):
+    """
+    Returns identified contacts (with email/phone/name) including their full
+    page-visit history. Used by the PDF export on the Leads page.
+    Date filters use the same timezone-aware day-bound logic as /automations/runs.
+    """
+    from collections import defaultdict
+
+    def _day_start(ds: str, tz_name: Optional[str]) -> str:
+        try:
+            from zoneinfo import ZoneInfo
+            z = ZoneInfo(tz_name) if tz_name else timezone.utc
+            d = datetime.strptime(ds, "%Y-%m-%d")
+            return dt_to_str(datetime(d.year, d.month, d.day, 0, 0, 0, tzinfo=z).astimezone(timezone.utc))
+        except Exception:
+            return ds
+
+    def _day_end(ds: str, tz_name: Optional[str]) -> str:
+        try:
+            from zoneinfo import ZoneInfo
+            z = ZoneInfo(tz_name) if tz_name else timezone.utc
+            d = datetime.strptime(ds, "%Y-%m-%d")
+            return dt_to_str(datetime(d.year, d.month, d.day, 23, 59, 59, 999999, tzinfo=z).astimezone(timezone.utc))
+        except Exception:
+            return ds.split("T")[0] + "T23:59:59.999999+00:00"
+
+    query: dict = {
+        "merged_into": None,
+        "$or": [
+            {"email": {"$ne": None}},
+            {"phone": {"$ne": None}},
+            {"name":  {"$ne": None}},
+        ],
+    }
+
+    # Date filter on updated_at (when the lead was last identified)
+    if since or until:
+        ts_filter: dict = {}
+        if since:
+            ts_filter["$gte"] = _day_start(since, tz)
+        if until:
+            ts_filter["$lte"] = _day_end(until, tz)
+        query["updated_at"] = ts_filter
+
+    # Optional text search (email / name / phone)
+    if search:
+        sq = {"$regex": search, "$options": "i"}
+        query["$and"] = [{"$or": [{"email": sq}, {"name": sq}, {"phone": sq}]}]
+
+    try:
+        contacts_raw = await db.contacts.find(query, {"_id": 0}) \
+            .sort("updated_at", -1).limit(limit).to_list(limit)
+
+        if not contacts_raw:
+            return []
+
+        # Batch fetch ALL page visits for these contacts in one query
+        cids = [c["contact_id"] for c in contacts_raw]
+        visits_raw = await db.page_visits.find(
+            {"contact_id": {"$in": cids}},
+            {"_id": 0, "contact_id": 1, "current_url": 1, "timestamp": 1, "page_title": 1}
+        ).sort("timestamp", 1).to_list(200_000)
+
+        visits_map: dict = defaultdict(list)
+        for v in visits_raw:
+            visits_map[v["contact_id"]].append({
+                "url":       v.get("current_url", ""),
+                "timestamp": v.get("timestamp", ""),
+                "title":     v.get("page_title", ""),
+            })
+
+        result = []
+        for c in contacts_raw:
+            fix_contact_doc(c)
+            result.append({
+                "contact_id":      c.get("contact_id"),
+                "name":            c.get("name"),
+                "email":           c.get("email"),
+                "phone":           c.get("phone"),
+                "client_ip":       c.get("client_ip"),
+                "session_id":      c.get("session_id"),
+                "tags":            c.get("tags"),
+                "merged_children": c.get("merged_children"),
+                "merged_into":     c.get("merged_into"),
+                "created_at":      dt_to_str(c.get("created_at")) if c.get("created_at") else None,
+                "updated_at":      dt_to_str(c.get("updated_at")) if c.get("updated_at") else None,
+                "visits":          visits_map.get(c.get("contact_id"), []),
+            })
+        return result
+    except Exception as e:
+        logger.error(f"Export error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 async def get_logs(limit: int = 200):
     """Recent activity feed: page visits enriched with contact identity."""
     try:
