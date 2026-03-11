@@ -10,7 +10,6 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { AutomationBuilder } from '@/components/AutomationBuilder';
 import { AutomationRuns } from '@/components/AutomationRuns';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
