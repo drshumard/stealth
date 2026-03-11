@@ -82,11 +82,14 @@ function timeAgo(ts, formatDateTime) {
 // ── CSV export ────────────────────────────────────────────────────────────────
 function exportCsv(runs, automationName) {
   const headers = [
-    'Date', 'Contact Email', 'Contact Name', 'Contact Phone', 'Run Type',
+    'Date', 'Action Name', 'Webhook URL',
+    'Contact Email', 'Contact Name', 'Contact Phone', 'Run Type',
     'HTTP Status', 'Success', 'Duration (ms)', 'Contact ID', 'Payload',
   ];
   const rows = runs.map(r => [
     new Date(r.triggered_at).toISOString(),
+    r.action_name    || '',
+    r.webhook_url    || '',
     r.contact_email  || '',
     r.contact_name   || '',
     r.payload?.phone || '',
@@ -155,6 +158,21 @@ function RunCard({ run, automationId, onRetried }) {
   const { formatDateTime, formatTime } = useTimezone();
   const ok = run.success || (run.http_status >= 200 && run.http_status < 300);
 
+  // Derive a short, readable destination label for the collapsed row.
+  // Priority: explicit action name → webhook URL hostname → nothing.
+  const webhookLabel = (() => {
+    if (run.action_name) return run.action_name;
+    if (run.webhook_url) {
+      try {
+        const host = new URL(run.webhook_url).hostname.replace(/^www\./, '');
+        // Keep just the first meaningful segment, e.g. "hooks.zapier.com" → "zapier.com"
+        const parts = host.split('.');
+        return parts.length > 2 ? parts.slice(-2).join('.') : host;
+      } catch { return null; }
+    }
+    return null;
+  })();
+
   const handleRetry = async (e) => {
     e.stopPropagation();
     setRetrying(true);
@@ -203,13 +221,22 @@ function RunCard({ run, automationId, onRetried }) {
               <span className="text-xs" style={{ color: 'var(--text-dim)' }}>{run.contact_email}</span>
             )}
           </div>
-          <div className="flex items-center gap-2 mt-0.5">
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
             <RunTypeBadge type={run.run_type} />
             <StatusBadge success={run.success} httpStatus={run.http_status} />
-            {run.action_name && (
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                style={{ backgroundColor: 'rgba(5,150,105,0.10)', color: '#059669', border: '1px solid rgba(5,150,105,0.20)' }}>
-                {run.action_name}
+            {/* Webhook destination — always shown so multi-step runs are never ambiguous */}
+            {webhookLabel && (
+              <span
+                className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
+                style={{
+                  backgroundColor: 'rgba(3,3,82,0.07)',
+                  color: '#030352',
+                  border: '1px solid rgba(3,3,82,0.15)',
+                  fontFamily: 'IBM Plex Mono, monospace',
+                }}
+                title={run.webhook_url}
+              >
+                → {webhookLabel}
               </span>
             )}
             {run.duration_ms != null && (
