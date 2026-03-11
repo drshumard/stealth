@@ -1,14 +1,30 @@
 [
   {
-    "content": "Backend: POST /api/stealth/webhook + GET /api/stealth endpoint + stealth_registrations collection",
+    "content": "Add routes /automations/new and /automations/builder/:id in App.js",
     "status": "in_progress"
   },
   {
-    "content": "Frontend: StealthPage.jsx - table with fbclid YES/NO badge",
+    "content": "Create AutomationBuilderPage.jsx with header, steps list, and add-step controls",
     "status": "pending"
   },
   {
-    "content": "Frontend: Add /stealth to TopNav and App.js",
+    "content": "Implement step type editors (WaitFor, Filter, Delay, Webhook)",
+    "status": "pending"
+  },
+  {
+    "content": "Wire TanStack Query for fetch and save with cache invalidation",
+    "status": "pending"
+  },
+  {
+    "content": "Implement Up/Down reordering with optimistic UI",
+    "status": "pending"
+  },
+  {
+    "content": "Update AutomationsPage to link to new builder routes",
+    "status": "pending"
+  },
+  {
+    "content": "Test the complete flow with testing agent",
     "status": "pending"
   }
 ]
