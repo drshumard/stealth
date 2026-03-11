@@ -1,279 +1,99 @@
-# StealthTrack (Hyros-like) — Development Plan (MVP → V1) **(Updated v3: Shumard Script + Deletion UI + No-Flash Loading + Always-on Logs)**
+# Tether – Zapier-style Automation Builder Plan
 
 ## 1) Objectives
-- Capture **page visits + referrer attribution** and **StealthWebinar registration events** via a drop-in script served from this app (**`/api/shumard.js`**).
-- Persist a unified visitor timeline using a stable:
-  - **`contact_id`** (device+origin identifier; localStorage + cookie fallback)
-  - **`session_id`** (tab/session identifier used to stitch parent + iframe activity)
-- Mimic key **Hyros tracking patterns**:
-  - Immediate initialization (IIFE)
-  - **Field capture on change/blur** (not only on submit)
-  - Robust field classification (class + attribute + type heuristics)
-  - Attribution capture from URL params (UTMs, `fbclid`, `gclid`, etc.)
-  - SPA navigation detection (URL change polling)
-  - MutationObserver for dynamic/embedded forms
-- **Cross-frame stitching (critical for StealthWebinar iframes):**
-  - Track events in both the landing page and the StealthWebinar iframe.
-  - **Stitch the two origins into one user** using:
-    - `postMessage` bridge (primary)
-    - IP-based auto-stitching (fallback, conservative)
-- Persist a richer attribution model per contact + per visit.
-- Provide a **dark, data-focused dashboard** to view contacts, search, and inspect each contact’s timeline.
-- Provide marketer-ready UX:
-  - Copy-to-clipboard embed snippet
-  - “Live/Active” indicator
-  - Contact detail modal with **Overview / Attribution / URL History**
-  - **Stitched identity indicators** (badge count + merged children list)
-  - **Contact deletion** (backend + UI)
-- Provide developer-visibility UX:
-  - **Always-on console logging** when events are captured (pageviews, attribution, lead field capture, registration, stitch messages).
+- Ship a full-page, flexible Automation Builder at routes:
+  - /automations/new (create)
+  - /automations/builder/:id (edit)
+- Model: persist flexible steps array on automations: steps = [{ id, type, config }]
+  - Supported step types: wait_for, filter, delay, webhook (delay implies refetch before firing)
+- Simple step reordering via Up/Down buttons (no drag-and-drop)
+- Integrate with existing TanStack Query patterns and Shadcn UI
+- Backward compatible: gracefully load legacy automations (required_fields, filters, actions/webhook_url) and allow converting to steps on save
+- POC: Not required (CRUD + simple auth only)
 
-**Current status:** All phases and P0/P1/P2 tasks are implemented and verified. Backend endpoints, Hyros-style tracker (now **Shumard**), cross-frame stitching, MongoDB indexes, dashboard UI (including deletion + no-flash loading) are working. Modal open is driven via **URL-based routing** (`?contact=`).
+## 2) Implementation Steps (Phased)
 
----
+### Phase 1 — V1 Builder Page (In Progress)
+Core pages/components
+- Add routes in App: /automations/new and /automations/builder/:id
+- Create components/AutomationBuilderPage.jsx (full-page)
+  - Header: name, enabled toggle, Save/Cancel
+  - Steps list: render each step with editor + Up/Down + Remove
+  - Add Step menu: Wait For, Filter, Delay + Refetch, Send Webhook
+  - Empty, loading, and error states; data-testid attributes on all interactive controls
+- Data model (frontend):
+  - wait_for: { fields: string[] }
+  - filter: { filters: [{ id, field, operator, value? }] }
+  - delay: { seconds: number, refetch: true }
+  - webhook: { name?, url, headers?: Record<string,string>, field_map?: [{ id, source, target }] }
+- API integration (TanStack Query):
+  - GET /api/automations/:id (edit); POST /api/automations (create); PUT /api/automations/:id (save)
+  - On save, persist only steps (and name/enabled). Legacy fields sent empty unless explicitly needed.
+- Reordering: Up/Down moves array elements (pure function) with optimistic UI; disable when first/last
+- UX: “Back to Automations” breadcrumb, sticky footer Save, toasts via Sonner
+- User Stories (Phase 1)
+  1. As a user, I can create a new automation at /automations/new and set its name and enabled state.
+  2. As a user, I can add a Wait For step and choose multiple required fields (email/phone/name).
+  3. As a user, I can add Filter conditions with field/operator/value and remove conditions.
+  4. As a user, I can add a Delay step and set seconds to wait (with refetch implied).
+  5. As a user, I can add a Webhook step with URL, optional headers, and field mappings.
+  6. As a user, I can reorder steps using Up/Down to change execution order.
+  7. As a user, I can save and see my steps persisted to the automation.
+- Testing (end of phase):
+  - Call testing agent to verify add/remove/reorder/save flows and API payload consistency.
 
-## 2) Implementation Steps
+### Phase 2 — Integrate With Automations Index
+- Update AutomationsPage: New button links to /automations/new; Edit opens /automations/builder/:id
+- Legacy modal (AutomationBuilder.jsx) retained but hidden/not used by default
+- When editing legacy automations (no steps), hydrate builder from legacy fields (required_fields → wait_for; filters → filter step; actions/webhook_url → one or more webhook steps)
+- On save from new builder, store steps[]; keep legacy fields cleared or synced as needed for backend compatibility
+- User Stories (Phase 2)
+  1. As a user, clicking New Automation navigates to the new builder page.
+  2. As a user, clicking Edit on an existing automation opens the full-page builder with prefilled data.
+  3. As a user, a legacy automation loads into the builder as equivalent steps I can edit.
+  4. As a user, saving redirects me back to /automations and refreshes the list.
+  5. As a user, errors show friendly messages with a Retry action.
+- Testing: playwright E2E (navigation, load, edit, save) + API payload snapshots
 
-### Phase 1 — Core Flow POC (Isolation) ✅ Completed
-**Goal:** Prove external JS capture + backend ingest works end-to-end before full UI.
+### Phase 3 — Polish & Reliability
+- Add: duplicate step, confirm on remove, unsaved-changes prompt, keyboard reordering (optional)
+- Improve headers editor UX (JSON textarea with validation for custom headers)
+- Inline validation for URLs, seconds ≥ 0, at least one field in Wait For, etc.
+- Visual pipeline: numbered badges and type icons for quick scanning
+- User Stories (Phase 3)
+  1. As a user, I can duplicate an existing step to speed up configuration.
+  2. As a user, I get a confirm dialog before removing a configured step.
+  3. As a user, I’m warned if I try to navigate away with unsaved changes.
+  4. As a user, invalid inputs are clearly highlighted with guidance.
+  5. As a user, the step list is visually scannable with clear type badges.
+- Testing: validation and guardrails; ensure no regression on core flows
 
-**Delivered (POC outcomes)**
-1. Script loads on any page and initializes immediately.
-2. Pageview events are logged with full URL params + referrer.
-3. Form submissions and field changes can be tied to the same `contact_id`.
-4. Dashboard can be refreshed and new contacts appear.
-5. A contact detail view shows chronological URL timeline.
-
-**Implemented endpoints (POC → carried forward)**
-- `POST /api/track/pageview`
-- `POST /api/track/registration`
-- `GET /api/contacts` (with `visit_count`)
-- `GET /api/contacts/{contact_id}` (contact + visits)
-- `GET /api/shumard.js` *(renamed from `/api/tracker.js`)*
-
-**Notes**
-- Early duplicate-brace bug in tracker generation fixed by switching to a proper JS builder.
-
----
-
-### Phase 2 — V1 App Development (Build around proven core) ✅ Completed
-
-**User stories delivered (V1)**
-1. Copy a script snippet and paste it into the webinar page header.
-2. View a contacts table with key columns and visit counts.
-3. Search contacts client-side (name/email/phone).
-4. Open contact details.
-5. Review visited URLs with params in time order and copy IDs/URLs.
-6. Delete contacts from the dashboard UI.
-
-#### Backend (FastAPI + MongoDB) ✅ Completed (Extended)
-
-**Data models (implemented & extended)**
-- `Contact`
-  - `id`, `contact_id`, `session_id?`
-  - `client_ip?`
-  - `name`, `email`, **`phone`**, `first_name`, `last_name`
-  - `attribution` (UTM + click IDs)
-  - **stitching fields**:
-    - `merged_into?` (child pointer)
-    - `merged_children?` (parent list)
-  - `created_at`, `updated_at`
-- `PageVisit`
-  - `id`, `contact_id`, `session_id?`
-  - `client_ip?`
-  - `current_url`, `referrer_url`, `page_title`, `timestamp`
-  - `attribution` (visit-level)
-  - `original_contact_id?` (set when visits are reassigned during stitch)
-
-**Tracking endpoints (implemented)**
-- `POST /api/track/pageview`
-  - Logs `PageVisit`
-  - Ensures `Contact` exists (upsert)
-  - Captures `client_ip`
-  - Triggers conservative IP auto-stitch
-- `POST /api/track/lead`
-  - Hyros-style “field capture” endpoint (change/blur)
-  - Upserts contact fields without requiring submit
-  - Triggers conservative IP auto-stitch
-- `POST /api/track/registration`
-  - Upserts contact and logs a visit for the registration page
-  - Triggers conservative IP auto-stitch
-- **Stitching endpoints (new)**
-  - `POST /api/track/stitch`
-    - Merges child → parent
-    - Copies identity fields (email/phone/name) into attribution-rich parent
-    - Reassigns visits
-    - **Supports re-stitch override**: un-merge from incorrect parent, then re-merge into correct parent
-  - `POST /api/track/stitch/by-session` *(admin utility)*
-    - Stitches all contacts sharing a `session_id` into the earliest parent
-
-**Contact endpoints (implemented & extended)**
-- `GET /api/contacts`
-  - Returns contacts with `visit_count`
-  - **Hides merged children by default** (`merged_into=None`)
-  - Supports `include_merged=true` if needed
-- `GET /api/contacts/{contact_id}`
-  - Returns contact detail + chronological `visits`
-- **`DELETE /api/contacts/{contact_id}`** *(new + verified)*
-  - Deletes the contact
-  - Deletes associated page visits
-  - Removes contact from any parent’s `merged_children` list
-- `GET /api/stats`
-  - Returns `total_contacts` (excluding merged children), `total_visits`, `today_visits`
-
-**Validation / safety implemented**
-- Defensive attribution parsing with known-field allowlist + `extra` passthrough.
-- Datetime normalization for Mongo serialization.
-- **Auto-stitch safety fix**:
-  - IP auto-stitch only triggers when:
-    - one contact has **attribution**, and
-    - the other has **identity** (email/phone), and
-    - neither has both.
-  - Prevents false positives for anonymous-only traffic.
-
-**MongoDB indexes ✅ Completed**
-Created/verified on startup:
-- `contacts.contact_id` (unique)
-- `contacts.email` (sparse)
-- `contacts.session_id` (sparse)
-- `contacts.client_ip` (sparse)
-- `contacts.merged_into` (sparse)
-- `contacts.created_at`
-- `page_visits.contact_id`
-- `page_visits.session_id` (sparse)
-- `page_visits.timestamp`
-- compound: `page_visits(contact_id, timestamp)`
-
-#### Shumard.js (served from backend) ✅ Completed (Hyros-style + Cross-frame + Always-on Logs)
-
-**Key behaviors implemented**
-- IIFE wrapper, minimal globals.
-- Stable visitor identity:
-  - `contact_id` via localStorage + cookie fallback.
-- **`session_id`** generation:
-  - Stored in sessionStorage; iframe adopts parent’s `session_id` via `postMessage`.
-- Attribution capture:
-  - UTMs + click IDs (`fbclid`, `gclid`, `ttclid`) + tags like `sl`.
-  - Persisted in localStorage/cookie.
-- Pageview tracking:
-  - On init and on SPA URL changes.
-- Form + field capture:
-  - Field classification strategy:
-    - Special classes: `st-email` / `st-phone` + Hyros-compat `hyros-email` / `hyros-phone`.
-    - Type-based detection (`email`, `tel`) + name/id/placeholder heuristics.
-  - Sends `POST /track/lead` on **change/blur** for email/phone.
-  - Sends `POST /track/registration` on submit/click-submit.
-- Cross-frame stitching:
-  - Parent broadcasts `{type:'st_parent_id', contactId, sessionId}` to all iframes for ~30s.
-  - iframe receives identity, adopts sessionId, triggers `/track/stitch`, and replies `{type:'st_child_id', contactId}`.
-  - Parent confirms stitch on child reply.
-  - Includes basic listener for future webinar-platform `postMessage` registration payloads.
-- Robustness:
-  - MutationObserver to bind late-rendered forms.
-  - Does not block submit.
-  - Uses `fetch(keepalive)` with XHR fallback.
-- **Always-on console logs (new)**
-  - Logs initialization, attribution capture/cache, pageview send, email/phone field capture, registration send, and stitch messaging.
-  - Uses `[Shumard]` prefix.
-
-**Public API (updated)**
-- `window.Shumard.getContactId()`
-- `window.Shumard.getSessionId()`
-- `window.Shumard.identify()`
-- `window.Shumard.stitch(parentCid, childCid)`
-- `window.Shumard.trackEvent()`
-- `window.Shumard.store`
-
-#### Frontend Dashboard (React + shadcn/ui) ✅ Completed (Extended)
-
-**Design system delivered**
-- Dark-first analytics aesthetic with cyan/mint/amber accents.
-- Fonts: Space Grotesk (display), Work Sans (body), IBM Plex Mono (IDs/URLs).
-
-**UI delivered**
-- TopNav
-  - Brand + Active indicator + Refresh + Copy Script
-- ScriptEmbedCard
-  - Copyable embed snippet for **`/api/shumard.js`** *(updated from tracker.js)*
-- ContactsTable
-  - Columns: Name, Email, **Source**, Created, Visits
-  - Client-side search (name/email/phone)
-  - Empty state CTA to copy script
-  - **Stitch indicator badge** (merged children count)
-  - **No-flash loading polish (new/verified):** skeleton rows only appear on first load when table is empty (not on background refresh/polling).
-- ContactDetailModal
-  - Tabs: Overview / Attribution / URL History
-  - Copy controls for key fields
-  - Overview includes: `client_ip`, `session_id`, stitched children list
-  - **Delete button (new/verified):** delete contact via confirm dialog; closes modal and removes contact from list.
-
-**Modal routing implementation (important)**
-- Modal open/close is driven by URL query param:
-  - Open: `/?contact=<contact_id>`
-  - Close: clears query params
-- Provides deep-linking and stable state.
-
----
-
-### Phase 3 — Hardening + “Real-time” UX polish (no auth yet) ✅ Completed
-**Delivered**
-- Live-feel polling (dashboard refresh) via periodic fetch.
-- Duplicate reduction:
-  - Script sends pageview once per URL cycle.
-  - Lead events only send when value changes and passes validation.
-- Stitch reliability:
-  - postMessage bridge + explicit stitch endpoint
-  - conservative IP stitch fallback
-  - explicit stitch can override wrong auto-stitch
-- **Deletion hardening (new/verified):** backend cascade deletes visits + removes child reference from merged parent.
-
-**Remaining (optional MVP+)**
-- True real-time transport (SSE/WebSocket).
-- Server-side pagination and date-range filtering.
-- CSV export per contact.
-- Tracking-install verification (“test event” button).
-- Stitch diagnostics view (session graph / merge history audit log).
-
----
-
-### Phase 4 — Expansion (requires user approval)
-- Authentication + workspace separation (multi-tenant).
-- Webhooks / integrations (Zapier, Slack, CRM export).
-- WebSocket live stream + event timeline streaming.
-- Advanced attribution reporting (first-touch vs last-touch, campaign rollups).
-
----
+### Phase 4 — Stabilization & Back-Compat
+- Ensure backend correctly prioritizes steps[] pipeline when present and falls back when absent
+- Add converter in UI: “Convert legacy automation to steps” (one-click)
+- Small migrations: ensure field_map id stability; maintain deterministic payload order
+- Docs: quick how-to and examples for each step type
+- User Stories (Phase 4)
+  1. As a user, I can convert a legacy automation to steps with one click.
+  2. As a user, I can safely revert edits without breaking legacy behavior.
+  3. As a user, I see a short guide for each step type inline.
+  4. As a user, I trust that saved automations won’t silently change behavior.
+  5. As a user, I can export/import an automation JSON (optional later).
+- Testing: verify backend honors steps pipeline; smoke test live triggers in staging
 
 ## 3) Next Actions (Immediate)
-**Current state is shippable** for real StealthWebinar flows that involve an iframe.
+1. Add routes /automations/new and /automations/builder/:id in App
+2. Scaffold components/AutomationBuilderPage.jsx with header, list, and add-step controls
+3. Implement step editors (WaitForEditor, FilterEditor, DelayEditor, WebhookEditor)
+4. Wire TanStack Query: fetch (edit) and save (create/update) with invalidate/redirect
+5. Implement Up/Down reordering and optimistic UI; add data-testid on all controls
+6. Run initial E2E via testing agent; fix critical issues
 
-Recommended next steps:
-1. **StealthWebinar-specific event hooks**
-   - Confirm if `joinnow.live` posts structured registration messages via `postMessage` and parse them.
-2. Add backend query options:
-   - pagination (`limit`, `offset`)
-   - server-side search
-   - date range filtering
-3. Add export:
-   - `GET /api/contacts/{contact_id}/export.csv`
-4. Add a “Stitch Debug” utility:
-   - list contacts by `session_id` and show merge operations.
-
----
-
-## 4) Success Criteria ✅ Met
-- External page with embedded script produces **pageview** records with full URL + referrer params.
-- Field changes (email/phone) can be captured pre-submit (Hyros-style) via `/track/lead`.
-- Cross-origin iframe flows are unified:
-  - landing page + StealthWebinar iframe events are **stitched into one contact**.
-- Dashboard lists contacts with correct visit counts and Source attribution.
-- Contact modal shows:
-  - Overview details (+ session/IP + stitched children)
-  - Attribution details (UTMs + click IDs)
-  - URLs visited in chronological order with params
-  - **Phone field displayed**
-  - **Delete contact available**
-- Embed snippet uses **`/api/shumard.js`**.
-- Script produces **always-on console logs** with `[Shumard]` prefix for captured events.
-- MongoDB indexes are in place for production-like performance.
-- Auto-stitch does not generate false positives (conservative rules) and explicit stitch can override.
+## 4) Success Criteria
+- Dedicated builder routes load and render without console errors
+- All four step types can be added, configured, reordered, and removed
+- Saving persists steps[] to the backend and reloads correctly
+- Legacy automations load into the builder and can be saved as steps
+- TanStack Query cache invalidation keeps /automations list in sync
+- UI follows brand (#030352, #A31800), Shadcn patterns, and includes data-testid
+- Testing agent passes core add/remove/reorder/save scenarios; no regressions in Automations list
