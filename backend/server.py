@@ -2170,6 +2170,11 @@ async def update_automation(auto_id: str, data: AutomationUpdate):
         existing = await db.automations.find_one({"id": auto_id}, {"_id": 0})
         if not existing:
             raise HTTPException(status_code=404, detail="Automation not found")
+        
+        # Validate steps if provided
+        if data.steps is not None:
+            _validate_automation_steps(data.steps)
+        
         now = datetime.now(timezone.utc)
         update: dict = {"updated_at": dt_to_str(now)}
         if data.name            is not None: update["name"]            = data.name
