@@ -230,14 +230,15 @@ class AutomationAction(BaseModel):
 class AutomationCreate(BaseModel):
     name:             str
     enabled:          bool = True
-    # Required fields — contact must have ALL of these before the automation fires.
-    # Defaults to ['email'] for backward compat. Add 'phone' to wait for phone capture.
+    # ── New flexible step pipeline ─────────────────────────────────────────
+    # Each step: { id, type, config }
+    # types: 'wait_for' | 'filter' | 'delay' | 'webhook'
+    # When present, _run_automations uses this instead of the legacy fields.
+    steps: Optional[List[Dict[str, Any]]] = None
+    # ── Legacy fields — kept for backward compat (automations without steps) ──
     required_fields:  List[str] = ['email']
-    # Multiple webhook actions
     actions:          List[AutomationAction] = []
-    # Filters (pre-condition check before firing)
     filters:          List[AutomationFilter] = []
-    # Legacy single-webhook fields — kept for backward compat with existing automations
     webhook_url:      Optional[str] = None
     field_map:        List[AutomationFieldMap] = []
     custom_headers:   Optional[Dict[str, str]] = None
@@ -246,6 +247,7 @@ class AutomationCreate(BaseModel):
 class AutomationUpdate(BaseModel):
     name:             Optional[str] = None
     enabled:          Optional[bool] = None
+    steps:            Optional[List[Dict[str, Any]]] = None
     required_fields:  Optional[List[str]] = None
     actions:          Optional[List[AutomationAction]] = None
     filters:          Optional[List[AutomationFilter]] = None
@@ -259,10 +261,10 @@ class AutomationOut(BaseModel):
     id:                 str
     name:               str
     enabled:            bool
+    steps:              Optional[List[Dict[str, Any]]] = None   # new pipeline
     required_fields:    List[str] = ['email']
     actions:            List[AutomationAction] = []
     filters:            List[AutomationFilter] = []
-    # Legacy single-webhook (still returned for old automations)
     webhook_url:        Optional[str] = None
     field_map:          List[AutomationFieldMap] = []
     custom_headers:     Optional[Dict[str, str]] = None
