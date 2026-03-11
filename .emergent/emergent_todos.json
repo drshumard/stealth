@@ -1,30 +1,30 @@
 [
   {
     "content": "Add routes /automations/new and /automations/builder/:id in App.js",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Create AutomationBuilderPage.jsx with header, steps list, and add-step controls",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Implement step type editors (WaitFor, Filter, Delay, Webhook)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Wire TanStack Query for fetch and save with cache invalidation",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Implement Up/Down reordering with optimistic UI",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Update AutomationsPage to link to new builder routes",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Test the complete flow with testing agent",
-    "status": "pending"
+    "status": "in_progress"
   }
 ]
