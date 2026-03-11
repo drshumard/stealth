@@ -2054,6 +2054,48 @@ async def get_logs(limit: int = 200):
 
 # ─────────────────────────── Automations CRUD ───────────────────────────
 
+def _validate_automation_steps(steps: Optional[List[Dict[str, Any]]]) -> None:
+    """Validate automation steps before saving.
+    Raises HTTPException with 400 status if validation fails."""
+    if not steps:
+        return  # Legacy automation without steps - skip validation
+    
+    for idx, step in enumerate(steps):
+        step_type = step.get('type', '')
+        config = step.get('config', {})
+        step_num = idx + 1
+        
+        if step_type == 'webhook':
+            url = config.get('url', '').strip()
+            if url and not (url.startswith('http://') or url.startswith('https://')):
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Step {step_num}: Webhook URL must start with http:// or https://"
+                )
+        
+        elif step_type == 'filter':
+            filters = config.get('filters', [])
+            for f in filters:
+                operator = f.get('operator', '')
+                value = f.get('value', '')
+                # Operators that require a value
+                if operator in ['equals', 'not_equals', 'contains']:
+                    if not value or not value.strip():
+                        field = f.get('field', 'unknown')
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Step {step_num}: Filter condition on '{field}' with operator '{operator}' requires a value"
+                        )
+        
+        elif step_type == 'wait_for':
+            fields = config.get('fields', [])
+            if not fields:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Step {step_num}: Wait For step must have at least one required field"
+                )
+
+
 @api_router.get("/automations", response_model=List[AutomationOut])
 async def list_automations():
     try:
