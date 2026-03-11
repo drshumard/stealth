@@ -11,6 +11,7 @@ import LeadsPage from '@/components/LeadsPage';
 import VisitorsPage from '@/components/VisitorsPage';
 import LogsPage from '@/components/LogsPage';
 import AutomationsPage from '@/components/AutomationsPage';
+import AutomationBuilderPage from '@/components/AutomationBuilderPage';
 import SalesPage from '@/components/SalesPage';
 import StealthPage from '@/components/StealthPage';
 import LoginPage from '@/components/LoginPage';
@@ -137,6 +138,8 @@ function AppShell() {
           <Route path="/sales"        element={<SalesPage onSelectContact={(id) => handleSelectContact(id, 'sales')} />} />
           <Route path="/visitors"    element={<VisitorsPage {...shared} />} />
           <Route path="/automations" element={<AutomationsPage />} />
+          <Route path="/automations/new" element={<AutomationBuilderPage />} />
+          <Route path="/automations/builder/:id" element={<AutomationBuilderPage />} />
           <Route path="/analytics"   element={<AnalyticsPage stats={stats} contacts={contacts} />} />
           <Route path="/logs"        element={<LogsPage />} />
         </Routes>
