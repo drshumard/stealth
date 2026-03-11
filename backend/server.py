@@ -1951,6 +1951,24 @@ async def create_automation(data: AutomationCreate):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.get("/automations/{auto_id}", response_model=AutomationOut)
+async def get_automation(auto_id: str):
+    """Get a single automation by ID."""
+    try:
+        doc = await db.automations.find_one({"id": auto_id}, {"_id": 0})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Automation not found")
+        doc['created_at'] = str_to_dt(doc['created_at'])
+        doc['updated_at'] = str_to_dt(doc['updated_at'])
+        if doc.get('last_triggered_at'):
+            doc['last_triggered_at'] = str_to_dt(doc['last_triggered_at'])
+        return AutomationOut(**doc)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.put("/automations/{auto_id}", response_model=AutomationOut)
 async def update_automation(auto_id: str, data: AutomationUpdate):
     try:
@@ -1961,6 +1979,7 @@ async def update_automation(auto_id: str, data: AutomationUpdate):
         update: dict = {"updated_at": dt_to_str(now)}
         if data.name            is not None: update["name"]            = data.name
         if data.enabled         is not None: update["enabled"]         = data.enabled
+        if data.steps           is not None: update["steps"]           = data.steps
         if data.required_fields is not None: update["required_fields"] = data.required_fields
         if data.actions         is not None: update["actions"]         = [a.model_dump() for a in data.actions]
         if data.webhook_url     is not None: update["webhook_url"]     = data.webhook_url
