@@ -2115,6 +2115,9 @@ async def list_automations():
 @api_router.post("/automations", response_model=AutomationOut, status_code=201)
 async def create_automation(data: AutomationCreate):
     try:
+        # Validate steps if provided
+        _validate_automation_steps(data.steps)
+        
         now = datetime.now(timezone.utc)
         doc = {
             "id":              str(uuid.uuid4()),
@@ -2137,6 +2140,8 @@ async def create_automation(data: AutomationCreate):
         doc['created_at'] = now
         doc['updated_at'] = now
         return AutomationOut(**doc)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
