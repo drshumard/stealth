@@ -82,18 +82,20 @@ function timeAgo(ts, formatDateTime) {
 // ── CSV export ────────────────────────────────────────────────────────────────
 function exportCsv(runs, automationName) {
   const headers = [
-    'Date', 'Contact Email', 'Contact Name', 'Run Type',
-    'HTTP Status', 'Success', 'Duration (ms)', 'Contact ID',
+    'Date', 'Contact Email', 'Contact Name', 'Contact Phone', 'Run Type',
+    'HTTP Status', 'Success', 'Duration (ms)', 'Contact ID', 'Payload',
   ];
   const rows = runs.map(r => [
     new Date(r.triggered_at).toISOString(),
     r.contact_email  || '',
     r.contact_name   || '',
+    r.payload?.phone || '',
     r.run_type,
     r.http_status    ?? '',
     r.success ? 'Yes' : 'No',
     r.duration_ms    ?? '',
     r.contact_id     || '',
+    r.payload ? JSON.stringify(r.payload) : '',
   ]);
   const csv = [headers, ...rows]
     .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
