@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react';
 import {
-  Activity, Globe, Zap, ChevronDown, ChevronUp, Plus, X, ArrowRight,
-  FlaskConical, Save, Loader2, CheckCircle2, AlertTriangle,
+  Activity, Globe, Zap, Plus, X, ArrowRight, ShieldCheck,
+  FlaskConical, Save, Loader2, CheckCircle2, AlertTriangle, Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Separator } from '@/components/ui/separator';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { toast } from 'sonner';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
@@ -197,54 +196,95 @@ function MappingRow({ mapping, onChange, onRemove }) {
 export function AutomationBuilder({ open, automation, onClose, onSave }) {
   const isEdit = !!automation;
 
-  const [name,        setName]       = useState('');
-  const [enabled,     setEnabled]    = useState(true);
-  const [webhookUrl,  setWebhookUrl] = useState('');
-  const [filters,     setFilters]    = useState([]);
-  const [fieldMap,    setFieldMap]   = useState([]);
-  const [testResult,  setTestResult] = useState(null);
-  const [saving,      setSaving]     = useState(false);
-  const [testing,     setTesting]    = useState(false);
-  const [savedId,     setSavedId]    = useState(null);
+  const [name,           setName]           = useState('');
+  const [enabled,        setEnabled]        = useState(true);
+  const [requiredFields, setRequiredFields] = useState(['email']);
+  // actions: array of { id, name, webhookUrl, fieldMap }
+  const [actions,        setActions]        = useState([{ id: uuid4(), name: '', webhookUrl: '', fieldMap: [] }]);
+  const [filters,        setFilters]        = useState([]);
+  const [testResult,     setTestResult]     = useState(null);
+  const [saving,         setSaving]         = useState(false);
+  const [testing,        setTesting]        = useState(false);
+  const [savedId,        setSavedId]        = useState(null);
 
   useEffect(() => {
     if (open) {
       if (automation) {
         setName(automation.name || '');
         setEnabled(automation.enabled ?? true);
-        setWebhookUrl(automation.webhook_url || '');
+        setRequiredFields(automation.required_fields || ['email']);
         setFilters(automation.filters || []);
-        setFieldMap(automation.field_map || []);
         setSavedId(automation.id || null);
+        // Build actions array from either new `actions` or legacy `webhook_url`
+        if (automation.actions?.length) {
+          setActions(automation.actions.map(a => ({
+            id:         a.id || uuid4(),
+            name:       a.name || '',
+            webhookUrl: a.webhook_url || '',
+            fieldMap:   a.field_map || [],
+          })));
+        } else if (automation.webhook_url) {
+          setActions([{
+            id:         uuid4(),
+            name:       '',
+            webhookUrl: automation.webhook_url || '',
+            fieldMap:   automation.field_map   || [],
+          }]);
+        } else {
+          setActions([{ id: uuid4(), name: '', webhookUrl: '', fieldMap: [] }]);
+        }
       } else {
-        setName(''); setEnabled(true); setWebhookUrl('');
-        setFilters([]); setFieldMap([]); setSavedId(null);
+        setName(''); setEnabled(true);
+        setRequiredFields(['email']);
+        setFilters([]);
+        setActions([{ id: uuid4(), name: '', webhookUrl: '', fieldMap: [] }]);
+        setSavedId(null);
       }
       setTestResult(null);
     }
   }, [open, automation]);
 
+  const toggleRequiredField = (field) => setRequiredFields(prev =>
+    prev.includes(field) ? prev.filter(f => f !== field) : [...prev, field]
+  );
+
   const addFilter = () => setFilters(prev => [...prev, { id: uuid4(), field: 'utm_source', operator: 'equals', value: '' }]);
   const updateFilter = (id, upd) => setFilters(prev => prev.map(f => f.id === id ? upd : f));
   const removeFilter = (id) => setFilters(prev => prev.filter(f => f.id !== id));
 
-  const addMapping = () => setFieldMap(prev => [...prev, { id: uuid4(), source: 'email', target: '' }]);
-  const updateMapping = (id, upd) => setFieldMap(prev => prev.map(m => m.id === id ? upd : m));
-  const removeMapping = (id) => setFieldMap(prev => prev.filter(m => m.id !== id));
+  const addAction    = () => setActions(prev => [...prev, { id: uuid4(), name: '', webhookUrl: '', fieldMap: [] }]);
+  const removeAction = (id) => setActions(prev => prev.filter(a => a.id !== id));
+  const updateAction = (id, patch) => setActions(prev => prev.map(a => a.id === id ? { ...a, ...patch } : a));
+
+  const addActionMapping    = (aId) => updateAction(aId, { fieldMap: [...(actions.find(a=>a.id===aId)?.fieldMap||[]), { id: uuid4(), source: 'email', target: '' }] });
+  const removeActionMapping = (aId, mId) => updateAction(aId, { fieldMap: actions.find(a=>a.id===aId)?.fieldMap.filter(m=>m.id!==mId)||[] });
+  const updateActionMapping = (aId, mId, patch) => updateAction(aId, { fieldMap: actions.find(a=>a.id===aId)?.fieldMap.map(m=>m.id===mId?{...m,...patch}:m)||[] });
 
   const handleSave = async () => {
-    if (!name.trim())       return toast.error('Give your automation a name');
-    if (!webhookUrl.trim()) return toast.error('Enter a webhook URL');
+    if (!name.trim()) return toast.error('Give your automation a name');
+    const validActions = actions.filter(a => a.webhookUrl.trim());
+    if (!validActions.length) return toast.error('Add at least one webhook URL');
+    if (requiredFields.length === 0) return toast.error('Select at least one required field');
     try {
       setSaving(true);
-      const body = { name: name.trim(), enabled, webhook_url: webhookUrl.trim(), filters, field_map: fieldMap };
+      const body = {
+        name: name.trim(),
+        enabled,
+        required_fields: requiredFields,
+        actions: validActions.map(a => ({
+          id:          a.id,
+          name:        a.name.trim() || null,
+          webhook_url: a.webhookUrl.trim(),
+          field_map:   a.fieldMap,
+        })),
+        filters,
+        // Keep legacy fields empty — new model uses actions[]
+        webhook_url: null,
+        field_map:   [],
+      };
       const method = (isEdit && savedId) ? 'PUT' : 'POST';
       const url    = (isEdit && savedId) ? `${API}/automations/${savedId}` : `${API}/automations`;
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       if (!res.ok) throw new Error(await res.text());
       const saved = await res.json();
       setSavedId(saved.id);
@@ -258,9 +298,10 @@ export function AutomationBuilder({ open, automation, onClose, onSave }) {
   };
 
   const handleTest = async () => {
-    if (!webhookUrl.trim()) return toast.error('Enter a webhook URL first');
     const id = savedId;
     if (!id) { toast.error('Save the automation first to test it'); return; }
+    const firstAction = actions.find(a => a.webhookUrl.trim());
+    if (!firstAction) return toast.error('Add a webhook URL first');
     try {
       setTesting(true);
       setTestResult(null);
@@ -326,10 +367,8 @@ export function AutomationBuilder({ open, automation, onClose, onSave }) {
 
           {/* Step 1: Trigger */}
           <StepCard number="1" icon={Activity} title="Trigger — New Lead Identified" accent="#030352">
-            <div
-              className="rounded-xl p-4"
-              style={{ background: 'linear-gradient(135deg, #eef0f8, #f4f5fb)', border: '1px solid #c0c9e8' }}
-            >
+            <div className="rounded-xl p-4"
+              style={{ background: 'linear-gradient(135deg, #eef0f8, #f4f5fb)', border: '1px solid #c0c9e8' }}>
               <p className="text-sm font-semibold mb-1" style={{ color: '#030352' }}>When a contact is identified</p>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                 Fires whenever a contact's <strong>email</strong> or <strong>phone</strong> is first captured — from a form submission, field blur, or registration event.
@@ -337,9 +376,50 @@ export function AutomationBuilder({ open, automation, onClose, onSave }) {
             </div>
           </StepCard>
 
-          {/* Step 2: Filters */}
+          {/* Step 2: Required Fields */}
           <StepCard
-            number="2" icon={Zap} title="Filter — Only send matching leads" accent="#A31800"
+            number="2" icon={ShieldCheck} title="Wait For — Required fields before firing" accent="#059669"
+            badge={`${requiredFields.length} required`}
+          >
+            <p className="text-sm mb-3" style={{ color: 'var(--text-dim)' }}>
+              The automation only fires once <strong>all selected fields</strong> are present on the contact. If phone is missing at email capture, it waits and retries automatically when phone is received.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {[
+                { field: 'email', label: 'Email',  note: 'always recommended' },
+                { field: 'phone', label: 'Phone',  note: 'wait for phone too' },
+                { field: 'name',  label: 'Name',   note: 'optional' },
+              ].map(({ field, label, note }) => {
+                const active = requiredFields.includes(field);
+                return (
+                  <button
+                    key={field}
+                    onClick={() => toggleRequiredField(field)}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 transition-all duration-150 text-sm font-semibold"
+                    style={{
+                      backgroundColor: active ? '#ecfdf5' : '#f8f7f4',
+                      borderColor:     active ? '#059669' : 'var(--stroke)',
+                      color:           active ? '#065f46' : 'var(--text-muted)',
+                    }}
+                  >
+                    <span className={`w-4 h-4 rounded flex items-center justify-center text-xs border transition-all`}
+                      style={{ backgroundColor: active ? '#059669' : 'transparent', borderColor: active ? '#059669' : 'var(--stroke)', color: '#fff' }}>
+                      {active && '✓'}
+                    </span>
+                    {label}
+                    <span className="text-xs font-normal" style={{ color: active ? '#059669' : 'var(--text-dim)', opacity: 0.7 }}>({note})</span>
+                  </button>
+                );
+              })}
+            </div>
+            {requiredFields.length === 0 && (
+              <p className="text-xs mt-2" style={{ color: '#dc2626' }}>⚠ Select at least one required field</p>
+            )}
+          </StepCard>
+
+          {/* Step 3: Filters */}
+          <StepCard
+            number="3" icon={Zap} title="Filter — Only send matching leads" accent="#A31800"
             badge={filters.length > 0 ? `${filters.length} condition${filters.length !== 1 ? 's' : ''}` : 'Optional'}
           >
             {filters.length === 0 ? (
@@ -360,57 +440,76 @@ export function AutomationBuilder({ open, automation, onClose, onSave }) {
             </button>
           </StepCard>
 
-          {/* Step 3: Field mapping */}
+          {/* Step 4: Webhook Actions */}
           <StepCard
-            number="3" icon={Globe} title="Map Fields — Transform your data" accent="#030352"
-            badge={fieldMap.length > 0 ? `${fieldMap.length} mapped` : 'Optional'}
+            number="4" icon={Globe} title="Actions — Webhook destinations" accent="#059669"
+            badge={`${actions.filter(a=>a.webhookUrl.trim()).length} step${actions.filter(a=>a.webhookUrl.trim()).length !== 1 ? 's' : ''}`}
           >
-            {fieldMap.length === 0 ? (
-              <p className="text-sm mb-3" style={{ color: 'var(--text-dim)' }}>No mapping — all non-empty fields will be sent with their Tether names.</p>
-            ) : (
-              <div className="mb-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-bold uppercase tracking-wide w-44" style={{ color: '#030352', opacity: 0.65 }}>Tether Field</span>
-                  <span className="w-4" />
-                  <span className="text-xs font-bold uppercase tracking-wide flex-1" style={{ color: '#A31800', opacity: 0.65 }}>Webhook Field Name</span>
-                </div>
-                {fieldMap.map(m => (
-                  <MappingRow key={m.id} mapping={m} onChange={upd => updateMapping(m.id, upd)} onRemove={() => removeMapping(m.id)} />
-                ))}
-              </div>
-            )}
-            <button
-              onClick={addMapping}
-              className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-lg transition-colors"
-              style={{ color: '#030352', backgroundColor: 'rgba(3,3,82,0.06)', border: '1.5px dashed rgba(3,3,82,0.20)' }}
-            >
-              <Plus size={13} /> Add field mapping
-            </button>
-          </StepCard>
+            <p className="text-sm mb-4" style={{ color: 'var(--text-dim)' }}>
+              Add one or more webhook steps. All steps fire simultaneously when the automation triggers.
+            </p>
 
-          {/* Step 4: Destination */}
-          <StepCard number="4" icon={Globe} title="Send to Webhook — POST destination" accent="#059669">
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs font-bold uppercase tracking-wide mb-1.5 block" style={{ color: '#059669', opacity: 0.75 }}>Webhook URL</label>
-                <Input
-                  value={webhookUrl}
-                  onChange={e => setWebhookUrl(e.target.value)}
-                  placeholder="https://hooks.zapier.com/hooks/catch/…"
-                  className="h-10 text-sm font-mono"
-                  style={{ borderColor: '#a7f3d0', backgroundColor: '#f0fdf4', fontFamily: 'IBM Plex Mono, monospace' }}
-                />
-              </div>
-              <div
-                className="rounded-xl p-3 flex items-start gap-2"
-                style={{ backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0' }}
-              >
-                <CheckCircle2 size={14} className="shrink-0 mt-0.5" style={{ color: '#059669' }} />
-                <p className="text-xs" style={{ color: '#065f46' }}>
-                  Sends a <strong>HTTP POST</strong> with a JSON body to this URL every time a qualifying lead is captured. Compatible with Zapier, Make, n8n, and any custom endpoint.
-                </p>
-              </div>
+            <div className="space-y-4">
+              {actions.map((action, idx) => (
+                <div key={action.id} className="rounded-xl border overflow-hidden"
+                  style={{ borderColor: '#a7f3d0', backgroundColor: '#f0fdf4' }}>
+                  {/* Action header */}
+                  <div className="flex items-center gap-3 px-4 py-3 border-b" style={{ borderColor: '#a7f3d0', backgroundColor: '#ecfdf5' }}>
+                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                      style={{ backgroundColor: '#059669' }}>{idx + 1}</span>
+                    <Input
+                      value={action.name}
+                      onChange={e => updateAction(action.id, { name: e.target.value })}
+                      placeholder={`Step ${idx + 1} name (optional, e.g. "Send to GoHighLevel")`}
+                      className="h-8 text-sm border-0 bg-transparent p-0 focus-visible:ring-0 shadow-none flex-1"
+                      style={{ color: '#065f46', fontFamily: 'Work Sans, sans-serif' }}
+                    />
+                    {actions.length > 1 && (
+                      <button onClick={() => removeAction(action.id)}
+                        className="w-6 h-6 rounded flex items-center justify-center transition-colors"
+                        style={{ color: '#dc2626', backgroundColor: 'rgba(220,38,38,0.08)' }}>
+                        <Trash2 size={12} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Webhook URL */}
+                  <div className="px-4 pt-3 pb-2">
+                    <label className="text-xs font-bold uppercase tracking-wide mb-1 block" style={{ color: '#059669', opacity: 0.75 }}>Webhook URL</label>
+                    <Input
+                      value={action.webhookUrl}
+                      onChange={e => updateAction(action.id, { webhookUrl: e.target.value })}
+                      placeholder="https://hooks.zapier.com/hooks/catch/…"
+                      className="h-9 text-sm font-mono"
+                      style={{ borderColor: '#a7f3d0', backgroundColor: '#ffffff', fontFamily: 'IBM Plex Mono, monospace' }}
+                    />
+                  </div>
+
+                  {/* Per-action field mapping */}
+                  <div className="px-4 pb-3">
+                    <label className="text-xs font-bold uppercase tracking-wide mb-1.5 block" style={{ color: '#059669', opacity: 0.75 }}>
+                      Field Mapping <span style={{ fontWeight: 400, opacity: 0.6 }}>(optional override)</span>
+                    </label>
+                    {action.fieldMap.map(m => (
+                      <MappingRow key={m.id} mapping={m}
+                        onChange={upd => updateActionMapping(action.id, m.id, upd)}
+                        onRemove={() => removeActionMapping(action.id, m.id)} />
+                    ))}
+                    <button onClick={() => addActionMapping(action.id)}
+                      className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-colors mt-1"
+                      style={{ color: '#059669', backgroundColor: 'rgba(5,150,105,0.06)', border: '1px dashed rgba(5,150,105,0.25)' }}>
+                      <Plus size={11} /> Add mapping
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
+
+            <button onClick={addAction}
+              className="flex items-center gap-1.5 text-sm font-semibold px-3 py-2 rounded-lg transition-colors mt-3 w-full justify-center"
+              style={{ color: '#059669', backgroundColor: 'rgba(5,150,105,0.06)', border: '1.5px dashed rgba(5,150,105,0.20)' }}>
+              <Plus size={13} /> Add another webhook step
+            </button>
           </StepCard>
 
           {/* Test result */}

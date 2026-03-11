@@ -1,18 +1,14 @@
 [
   {
-    "content": "Create TimezoneContext - persisted preference + formatDate helper",
+    "content": "Backend: add AutomationAction model, required_fields, update _run_automations + test/retry",
     "status": "in_progress"
   },
   {
-    "content": "Add timezone selector to TopNav user menu",
+    "content": "Frontend: update AutomationBuilder with required-fields checkboxes + multi-action steps",
     "status": "pending"
   },
   {
-    "content": "Replace preset-only date filter in AutomationRuns with calendar range picker + timezone",
-    "status": "pending"
-  },
-  {
-    "content": "Update all timestamp displays throughout the app to respect timezone",
+    "content": "Frontend: update AutomationRuns to show action_name on each run",
     "status": "pending"
   }
 ]

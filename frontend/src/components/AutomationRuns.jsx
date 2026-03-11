@@ -206,6 +206,12 @@ function RunCard({ run, automationId, onRetried }) {
           <div className="flex items-center gap-2 mt-0.5">
             <RunTypeBadge type={run.run_type} />
             <StatusBadge success={run.success} httpStatus={run.http_status} />
+            {run.action_name && (
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                style={{ backgroundColor: 'rgba(5,150,105,0.10)', color: '#059669', border: '1px solid rgba(5,150,105,0.20)' }}>
+                {run.action_name}
+              </span>
+            )}
             {run.duration_ms != null && (
               <span className="text-xs" style={{ color: 'var(--text-dim)' }}>{run.duration_ms}ms</span>
             )}

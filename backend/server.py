@@ -205,67 +205,91 @@ class SaleOut(BaseModel):
 
 class AutomationFilter(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    field: str           # e.g. 'utm_source', 'email', 'phone'
-    operator: str        # 'exists' | 'not_exists' | 'equals' | 'contains' | 'not_equals'
+    field: str
+    operator: str
     value: Optional[str] = None
 
 
 class AutomationFieldMap(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    source: str          # Tether field name
-    target: str          # Target webhook field name
+    source: str
+    target: str
+
+
+class AutomationAction(BaseModel):
+    """A single webhook step within an automation.  Automations can have
+    multiple actions — each fires independently with its own URL and mapping."""
+    id:             str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name:           Optional[str] = None           # e.g. "Send to GoHighLevel"
+    webhook_url:    str = ""
+    field_map:      List[AutomationFieldMap] = []  # per-step overrides; falls back to automation field_map
+    custom_headers: Optional[Dict[str, str]] = None
 
 
 class AutomationCreate(BaseModel):
-    name: str
-    enabled: bool = True
-    webhook_url: str
-    filters: List[AutomationFilter] = []
-    field_map: List[AutomationFieldMap] = []
-    custom_headers: Optional[Dict[str, str]] = None
+    name:             str
+    enabled:          bool = True
+    # Required fields — contact must have ALL of these before the automation fires.
+    # Defaults to ['email'] for backward compat. Add 'phone' to wait for phone capture.
+    required_fields:  List[str] = ['email']
+    # Multiple webhook actions
+    actions:          List[AutomationAction] = []
+    # Filters (pre-condition check before firing)
+    filters:          List[AutomationFilter] = []
+    # Legacy single-webhook fields — kept for backward compat with existing automations
+    webhook_url:      Optional[str] = None
+    field_map:        List[AutomationFieldMap] = []
+    custom_headers:   Optional[Dict[str, str]] = None
 
 
 class AutomationUpdate(BaseModel):
-    name: Optional[str] = None
-    enabled: Optional[bool] = None
-    webhook_url: Optional[str] = None
-    filters: Optional[List[AutomationFilter]] = None
-    field_map: Optional[List[AutomationFieldMap]] = None
-    custom_headers: Optional[Dict[str, str]] = None
+    name:             Optional[str] = None
+    enabled:          Optional[bool] = None
+    required_fields:  Optional[List[str]] = None
+    actions:          Optional[List[AutomationAction]] = None
+    filters:          Optional[List[AutomationFilter]] = None
+    webhook_url:      Optional[str] = None
+    field_map:        Optional[List[AutomationFieldMap]] = None
+    custom_headers:   Optional[Dict[str, str]] = None
 
 
 class AutomationOut(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    id: str
-    name: str
-    enabled: bool
-    webhook_url: str
-    filters: List[AutomationFilter] = []
-    field_map: List[AutomationFieldMap] = []
-    custom_headers: Optional[Dict[str, str]] = None
-    created_at: datetime
-    updated_at: datetime
-    last_triggered_at: Optional[datetime] = None
-    trigger_count: int = 0
+    id:                 str
+    name:               str
+    enabled:            bool
+    required_fields:    List[str] = ['email']
+    actions:            List[AutomationAction] = []
+    filters:            List[AutomationFilter] = []
+    # Legacy single-webhook (still returned for old automations)
+    webhook_url:        Optional[str] = None
+    field_map:          List[AutomationFieldMap] = []
+    custom_headers:     Optional[Dict[str, str]] = None
+    created_at:         datetime
+    updated_at:         datetime
+    last_triggered_at:  Optional[datetime] = None
+    trigger_count:      int = 0
 
 
 class AutomationRunOut(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    id: str
-    automation_id: str
-    run_type: str              # 'live' | 'test'
-    contact_id: Optional[str] = None
-    contact_email: Optional[str] = None
-    contact_name: Optional[str] = None
-    fbclid: Optional[str] = None   # stored for dedup — same click never fires twice
-    payload: Dict[str, Any] = {}
-    webhook_url: str
-    http_status: Optional[int] = None
-    response_body: Optional[str] = None
-    success: bool
-    error: Optional[str] = None
-    duration_ms: Optional[int] = None
-    triggered_at: datetime
+    id:             str
+    automation_id:  str
+    action_id:      Optional[str] = None    # which action step fired
+    action_name:    Optional[str] = None    # human-readable step name
+    run_type:       str
+    contact_id:     Optional[str] = None
+    contact_email:  Optional[str] = None
+    contact_name:   Optional[str] = None
+    fbclid:         Optional[str] = None
+    payload:        Dict[str, Any] = {}
+    webhook_url:    str
+    http_status:    Optional[int] = None
+    response_body:  Optional[str] = None
+    success:        bool
+    error:          Optional[str] = None
+    duration_ms:    Optional[int] = None
+    triggered_at:   datetime
 
 
 # ─────────────────────────── Helpers ───────────────────────────
@@ -784,7 +808,10 @@ def _build_webhook_payload(contact: dict, field_map: list) -> dict:
 
 async def _fire_webhook_task(
     auto_id: str, url: str, payload: dict, headers: dict,
-    run_type: str = "live", contact: Optional[dict] = None, fbclid: Optional[str] = None
+    run_type: str = "live", contact: Optional[dict] = None,
+    fbclid: Optional[str] = None,
+    action_id: Optional[str] = None,
+    action_name: Optional[str] = None,
 ) -> None:
     """Fire a webhook, persist the run record, and update automation stats."""
     import time
@@ -812,6 +839,8 @@ async def _fire_webhook_task(
     run_doc = {
         "id":            str(uuid.uuid4()),
         "automation_id": auto_id,
+        "action_id":     action_id,
+        "action_name":   action_name,
         "run_type":      run_type,
         "contact_id":    contact.get("contact_id")  if contact else None,
         "contact_email": contact.get("email")        if contact else None,
@@ -852,28 +881,36 @@ async def _run_automations(contact_id: str) -> None:
             if not _evaluate_filters(contact, auto.get('filters', [])):
                 continue
 
-            # ── Atomic dedup via unique upsert ───────────────────────────────
-            # Build the dedup key. When fbclid is present, dedup per-click so
-            # a new ad click (new fbclid) is allowed to fire again.
-            # When absent, dedup per contact so each contact fires at most once.
-            dedup_key = f"{auto['id']}:{contact_id}:{fbclid or 'nofbclid'}"
+            # ── Required fields gate ─────────────────────────────────────────
+            # If ANY required field is missing, skip WITHOUT writing a dedup entry
+            # so the automation retries naturally when the field is captured later.
+            # Default required_fields = ['email'] for backward compat.
+            required = auto.get('required_fields') or ['email']
+            missing  = [rf for rf in required if not _get_contact_field(contact, rf)]
+            if missing:
+                logger.info(
+                    f"Automation {auto['id'][:8]} waiting for {missing} "
+                    f"on contact {contact_id[:8]} — will retry when fields arrive"
+                )
+                continue   # no dedup entry written — will try again
+            # ─────────────────────────────────────────────────────────────────
 
-            now_str = dt_to_str(datetime.now(timezone.utc))
-            result = await db.automation_dedup.find_one_and_update(
+            # ── Atomic dedup ─────────────────────────────────────────────────
+            dedup_key = f"{auto['id']}:{contact_id}:{fbclid or 'nofbclid'}"
+            now_str   = dt_to_str(datetime.now(timezone.utc))
+            result    = await db.automation_dedup.find_one_and_update(
                 {"dedup_key": dedup_key},
                 {"$setOnInsert": {
-                    "dedup_key":    dedup_key,
+                    "dedup_key":     dedup_key,
                     "automation_id": auto['id'],
-                    "contact_id":   contact_id,
-                    "fbclid":       fbclid,
-                    "created_at":   now_str,
+                    "contact_id":    contact_id,
+                    "fbclid":        fbclid,
+                    "created_at":    now_str,
                 }},
                 upsert=True,
-                return_document=False,   # returns pre-update doc; None = just inserted
+                return_document=False,
             )
-
             if result is not None:
-                # Record already existed — this delivery has already happened
                 logger.info(
                     f"Automation {auto['id'][:8]} deduped for {contact_id[:8]} "
                     f"(fbclid={fbclid[:12] if fbclid else 'none'})"
@@ -881,14 +918,33 @@ async def _run_automations(contact_id: str) -> None:
                 continue
             # ─────────────────────────────────────────────────────────────────
 
-            payload = _build_webhook_payload(contact, auto.get('field_map', []))
-            hdrs = {"Content-Type": "application/json"}
-            if auto.get('custom_headers'):
-                hdrs.update(auto['custom_headers'])
-            asyncio.create_task(
-                _fire_webhook_task(auto['id'], auto['webhook_url'], payload, hdrs,
-                                   run_type="live", contact=contact, fbclid=fbclid)
-            )
+            # Resolve the action steps — support both new `actions` array and
+            # legacy single `webhook_url` field on old automations.
+            raw_actions = auto.get('actions') or []
+            if not raw_actions and auto.get('webhook_url'):
+                raw_actions = [{
+                    'id':           'legacy',
+                    'name':         None,
+                    'webhook_url':  auto['webhook_url'],
+                    'field_map':    auto.get('field_map', []),
+                    'custom_headers': auto.get('custom_headers') or {},
+                }]
+
+            for action in raw_actions:
+                if not action.get('webhook_url'):
+                    continue
+                # Per-action field_map takes precedence; falls back to automation-level
+                fm      = action.get('field_map') or auto.get('field_map', [])
+                payload = _build_webhook_payload(contact, fm)
+                hdrs    = {"Content-Type": "application/json"}
+                hdrs.update(action.get('custom_headers') or auto.get('custom_headers') or {})
+                asyncio.create_task(
+                    _fire_webhook_task(
+                        auto['id'], action['webhook_url'], payload, hdrs,
+                        run_type="live", contact=contact, fbclid=fbclid,
+                        action_id=action.get('id'), action_name=action.get('name'),
+                    )
+                )
         except Exception as e:
             logger.error(f"Automation eval error {auto.get('id','?')}: {e}")
 
@@ -1839,17 +1895,20 @@ async def create_automation(data: AutomationCreate):
     try:
         now = datetime.now(timezone.utc)
         doc = {
-            "id": str(uuid.uuid4()),
-            "name": data.name,
-            "enabled": data.enabled,
-            "webhook_url": data.webhook_url,
-            "filters": [f.model_dump() for f in data.filters],
-            "field_map": [m.model_dump() for m in data.field_map],
-            "custom_headers": data.custom_headers or {},
-            "created_at": dt_to_str(now),
-            "updated_at": dt_to_str(now),
+            "id":              str(uuid.uuid4()),
+            "name":            data.name,
+            "enabled":         data.enabled,
+            "required_fields": data.required_fields,
+            "actions":         [a.model_dump() for a in data.actions],
+            "filters":         [f.model_dump() for f in data.filters],
+            # Legacy single-webhook fields
+            "webhook_url":     data.webhook_url,
+            "field_map":       [m.model_dump() for m in data.field_map],
+            "custom_headers":  data.custom_headers or {},
+            "created_at":      dt_to_str(now),
+            "updated_at":      dt_to_str(now),
             "last_triggered_at": None,
-            "trigger_count": 0,
+            "trigger_count":   0,
         }
         await db.automations.insert_one(doc)
         doc['created_at'] = now
@@ -1867,12 +1926,14 @@ async def update_automation(auto_id: str, data: AutomationUpdate):
             raise HTTPException(status_code=404, detail="Automation not found")
         now = datetime.now(timezone.utc)
         update: dict = {"updated_at": dt_to_str(now)}
-        if data.name        is not None: update["name"]           = data.name
-        if data.enabled     is not None: update["enabled"]        = data.enabled
-        if data.webhook_url is not None: update["webhook_url"]    = data.webhook_url
-        if data.filters     is not None: update["filters"]        = [f.model_dump() for f in data.filters]
-        if data.field_map   is not None: update["field_map"]      = [m.model_dump() for m in data.field_map]
-        if data.custom_headers is not None: update["custom_headers"] = data.custom_headers
+        if data.name            is not None: update["name"]            = data.name
+        if data.enabled         is not None: update["enabled"]         = data.enabled
+        if data.required_fields is not None: update["required_fields"] = data.required_fields
+        if data.actions         is not None: update["actions"]         = [a.model_dump() for a in data.actions]
+        if data.webhook_url     is not None: update["webhook_url"]     = data.webhook_url
+        if data.filters         is not None: update["filters"]         = [f.model_dump() for f in data.filters]
+        if data.field_map       is not None: update["field_map"]       = [m.model_dump() for m in data.field_map]
+        if data.custom_headers  is not None: update["custom_headers"]  = data.custom_headers
         await db.automations.update_one({"id": auto_id}, {"$set": update})
         doc = await db.automations.find_one({"id": auto_id}, {"_id": 0})
         doc['created_at'] = str_to_dt(doc['created_at'])
