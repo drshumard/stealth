@@ -1931,6 +1931,7 @@ async def create_automation(data: AutomationCreate):
             "id":              str(uuid.uuid4()),
             "name":            data.name,
             "enabled":         data.enabled,
+            "steps":           data.steps,  # New steps format
             "required_fields": data.required_fields,
             "actions":         [a.model_dump() for a in data.actions],
             "filters":         [f.model_dump() for f in data.filters],
