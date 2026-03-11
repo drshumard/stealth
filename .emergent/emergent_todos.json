@@ -1,30 +1,22 @@
 [
   {
-    "content": "Add routes /automations/new and /automations/builder/:id in App.js",
-    "status": "completed"
+    "content": "FIX CRITICAL: Backend needs step pipeline execution logic",
+    "status": "in_progress"
   },
   {
-    "content": "Create AutomationBuilderPage.jsx with header, steps list, and add-step controls",
-    "status": "completed"
+    "content": "Add URL validation for webhook URLs (must start with http/https)",
+    "status": "pending"
   },
   {
-    "content": "Implement step type editors (WaitFor, Filter, Delay, Webhook)",
-    "status": "completed"
+    "content": "Add error state UI when automation fetch fails",
+    "status": "pending"
   },
   {
-    "content": "Wire TanStack Query for fetch and save with cache invalidation",
-    "status": "completed"
+    "content": "Add filter value validation (empty string check)",
+    "status": "pending"
   },
   {
-    "content": "Implement Up/Down reordering with optimistic UI",
-    "status": "completed"
-  },
-  {
-    "content": "Update AutomationsPage to link to new builder routes",
-    "status": "completed"
-  },
-  {
-    "content": "Test the complete flow with testing agent",
-    "status": "completed"
+    "content": "Remove unused imports and clean up hasChanges logic",
+    "status": "pending"
   }
 ]
