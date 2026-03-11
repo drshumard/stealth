@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Zap, Plus, Pencil, Trash2, CheckCircle, XCircle, Activity, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -191,9 +192,8 @@ function EmptyState({ onNew }) {
 }
 
 export default function AutomationsPage() {
+  const navigate = useNavigate();
   const qc = useQueryClient();
-  const [builderOpen, setBuilderOpen] = useState(false);
-  const [editingAuto, setEditingAuto] = useState(null);
   const [runsAuto,    setRunsAuto]    = useState(null);
 
   const { data: automations = [], isLoading: loading } = useQuery({
@@ -225,13 +225,10 @@ export default function AutomationsPage() {
     } catch { toast.error('Failed to update'); }
   };
 
-  const handleSave = () => {
-    qc.invalidateQueries({ queryKey: ['automations'] });
-    setBuilderOpen(false);
-    setEditingAuto(null);
-  };
-
   const activeCount = automations.filter(a => a.enabled).length;
+
+  const handleNewAutomation = () => navigate('/automations/new');
+  const handleEditAutomation = (auto) => navigate(`/automations/builder/${auto.id}`);
 
   return (
     <div className="p-8 md:p-10">
@@ -245,7 +242,7 @@ export default function AutomationsPage() {
               {activeCount} active · {automations.length} total
             </p>
           </div>
-          <Button onClick={() => { setEditingAuto(null); setBuilderOpen(true); }}
+          <Button onClick={handleNewAutomation}
             className="gap-2 h-10 px-6 text-sm font-semibold text-white mt-1"
             style={{ backgroundColor: 'var(--brand-red)' }}
             data-testid="new-automation-button">
@@ -286,12 +283,12 @@ export default function AutomationsPage() {
           {[1,2,3].map(i => <Skeleton key={i} className="h-64 rounded-2xl" style={{ backgroundColor: '#f0ede8' }} />)}
         </div>
       ) : automations.length === 0 ? (
-        <EmptyState onNew={() => { setEditingAuto(null); setBuilderOpen(true); }} />
+        <EmptyState onNew={handleNewAutomation} />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {automations.map(auto => (
             <AutomationCard key={auto.id} auto={auto}
-              onEdit={a => { setEditingAuto(a); setBuilderOpen(true); }}
+              onEdit={handleEditAutomation}
               onDelete={handleDelete}
               onToggle={handleToggle}
               onViewRuns={a => setRunsAuto(a)}
@@ -299,13 +296,6 @@ export default function AutomationsPage() {
           ))}
         </div>
       )}
-
-      <AutomationBuilder
-        open={builderOpen}
-        automation={editingAuto}
-        onClose={() => { setBuilderOpen(false); setEditingAuto(null); }}
-        onSave={handleSave}
-      />
 
       <AutomationRuns
         open={!!runsAuto}
