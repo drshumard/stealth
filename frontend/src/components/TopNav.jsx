@@ -6,6 +6,7 @@ import { useTimezone, TIMEZONE_OPTIONS } from '@/components/TimezoneContext';
 
 const NAV_TABS = [
   { id: 'leads',       label: 'Leads',       icon: Users,       path: '/' },
+  { id: 'stealth',     label: 'Stealth',     icon: Shield,      path: '/stealth' },
   { id: 'sales',       label: 'Sales',       icon: DollarSign,  path: '/sales' },
   { id: 'visitors',    label: 'Visitors',    icon: Globe,       path: '/visitors' },
   { id: 'automations', label: 'Automations', icon: Zap,         path: '/automations' },
