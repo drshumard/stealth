@@ -64,17 +64,21 @@ Core pages/components
 ### Phase 3 — Production Readiness & Code Review (COMPLETED ✅)
 Code review completed with all critical issues fixed:
 - ✅ **CRITICAL**: Implemented `_execute_step_pipeline()` backend function - automations with steps[] now execute correctly
-- ✅ URL validation for webhook URLs (must start with http:// or https://)
-- ✅ Error state UI when automation fetch fails (404, 500 errors show friendly error page)
-- ✅ Filter value validation (empty string check for equals/contains operators)
-- ✅ Removed unused `useMemo` import and fixed `hasChanges` tracking logic
+- ✅ **Backend Validation**: Added `_validate_automation_steps()` function with comprehensive validation:
+  - URL validation: Webhook URLs must start with http:// or https:// (returns 400 error)
+  - Filter value validation: Operators like equals/not_equals/contains require non-empty values (returns 400 error)
+  - Wait For validation: Must have at least one required field selected
+- ✅ **Frontend Validation**: Matching validation in AutomationBuilderPage.jsx before save
+- ✅ Error state UI when automation fetch fails (404, 500 errors show friendly error page with "Return to Automations" button)
+- ✅ Removed unused `useMemo` import and fixed `hasChanges` tracking logic with proper `initialized` state
 - ✅ Backend correctly prioritizes steps[] pipeline when present, falls back to legacy when absent
 
 **Completed User Stories (Phase 3)**:
 1. ✅ As a user, automations with steps[] execute correctly when triggered.
-2. ✅ As a user, invalid webhook URLs are rejected with clear error messages.
+2. ✅ As a user, invalid webhook URLs are rejected with clear error messages (frontend toast + backend 400).
 3. ✅ As a user, I see a friendly error page if an automation fails to load.
-4. ✅ As a user, filter conditions with empty values are caught before save.
+4. ✅ As a user, filter conditions with empty values are caught before save (frontend toast + backend 400).
+5. ✅ As a user, Wait For steps without any fields selected are rejected.
 
 ### Phase 4 — Polish & Enhancements (Not Started - Optional)
 - Add: duplicate step, unsaved-changes prompt, keyboard reordering (optional)
@@ -98,7 +102,8 @@ Code review completed with all critical issues fixed:
 6. ✅ ~~Run initial E2E via testing agent; fix critical issues~~
 7. ✅ ~~Implement backend step pipeline execution for new steps[] format~~
 8. ✅ ~~Code review and production hardening~~
-9. (Optional) Add polish features: duplicate step, unsaved changes warning, animations
+9. ✅ ~~Add backend validation for steps (URL format, filter values, wait_for fields)~~
+10. (Optional) Add polish features: duplicate step, unsaved changes warning, animations
 
 ## 4) Success Criteria (ALL ACHIEVED ✅)
 - ✅ Dedicated builder routes load and render without console errors
@@ -109,8 +114,9 @@ Code review completed with all critical issues fixed:
 - ✅ UI follows brand (#030352, #A31800), Shadcn patterns, and includes data-testid
 - ✅ Testing agent passes core add/remove/reorder/save scenarios; no regressions in Automations list
 - ✅ Backend executes step-based automations correctly when triggered
-- ✅ Input validation prevents invalid data (empty URLs, missing values)
+- ✅ Input validation prevents invalid data on BOTH frontend AND backend
 - ✅ Error states handled gracefully with user-friendly UI
+- ✅ Backend returns proper 400 status codes for validation errors
 
 ## 5) Files Changed/Created
 - `/app/frontend/src/components/AutomationBuilderPage.jsx` - NEW: Full-page Zapier-style builder with validation
@@ -119,11 +125,12 @@ Code review completed with all critical issues fixed:
 - `/app/backend/server.py` - MODIFIED: 
   - Added GET /api/automations/{id} endpoint
   - Added steps field support in PUT /api/automations/{id}
+  - Added `_validate_automation_steps()` function for backend validation
   - Added `_execute_step_pipeline()` function for step-based execution
   - Updated `_run_automations()` to detect and route to step pipeline
 
 ## 6) Summary
-**Phase 1, 2 & 3: COMPLETED** - The Zapier-style Automation Builder is production-ready:
+**Phase 1, 2 & 3: COMPLETED** - The Zapier-style Automation Builder is PRODUCTION READY:
 
 ### Core Features
 - Users can create new automations with a flexible step-based pipeline
@@ -140,10 +147,20 @@ Code review completed with all critical issues fixed:
 - webhook: Fires webhook with optional field mapping
 - Full backward compatibility with legacy automations
 
-### Production Hardening
-- URL validation (http/https required)
-- Filter value validation (empty string check)
+### Production Hardening (Dual-Layer Validation)
+**Frontend Validation:**
+- URL validation (http/https required) - toast error
+- Filter value validation (empty string check) - toast error
+- Wait For field validation - toast error
 - Error state UI for failed loads (404/500)
 - Clean code with proper state management
+
+**Backend Validation:**
+- `_validate_automation_steps()` validates all steps before save
+- Returns HTTP 400 with descriptive error messages:
+  - "Step X: Webhook URL must start with http:// or https://"
+  - "Step X: Filter condition on 'field' with operator 'op' requires a value"
+  - "Step X: Wait For step must have at least one required field"
+- Applied to both POST /api/automations and PUT /api/automations/{id}
 
 ### Ready for Production ✅
