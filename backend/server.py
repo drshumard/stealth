@@ -895,6 +895,104 @@ async def _fire_webhook_task(
         await db.automations.update_one({"id": auto_id}, {"$set": stat_update})
 
 
+async def _execute_step_pipeline(
+    auto_id: str, steps: list, contact: dict, fbclid: Optional[str]
+) -> None:
+    """Execute the new Zapier-style step pipeline sequentially.
+    
+    Steps types:
+    - wait_for: Check if required fields are present (abort pipeline if not)
+    - filter: Evaluate filter conditions (abort pipeline if not matched)
+    - delay: Wait N seconds and refetch contact data
+    - webhook: Fire webhook with optional field mapping
+    """
+    contact_id = contact.get('contact_id', '')
+    logger.info(f"Automation {auto_id[:8]} executing {len(steps)} step(s) for contact {contact_id[:8]}")
+    
+    for idx, step in enumerate(steps):
+        step_type = step.get('type', '')
+        config = step.get('config', {})
+        step_id = step.get('id', f'step-{idx}')
+        
+        try:
+            if step_type == 'wait_for':
+                # Check required fields - abort if any missing
+                fields = config.get('fields', ['email'])
+                missing = [f for f in fields if not _get_contact_field(contact, f)]
+                if missing:
+                    logger.info(
+                        f"Automation {auto_id[:8]} step {idx+1} (wait_for) waiting for {missing} "
+                        f"on contact {contact_id[:8]} — pipeline aborted, will retry later"
+                    )
+                    return  # Abort pipeline - will retry when fields arrive
+                logger.info(f"Automation {auto_id[:8]} step {idx+1} (wait_for) passed — all fields present")
+                
+            elif step_type == 'filter':
+                # Evaluate filter conditions - abort if not matched
+                filters = config.get('filters', [])
+                if filters and not _evaluate_filters(contact, filters):
+                    logger.info(
+                        f"Automation {auto_id[:8]} step {idx+1} (filter) not matched "
+                        f"for contact {contact_id[:8]} — pipeline aborted"
+                    )
+                    return  # Abort pipeline - contact doesn't match
+                logger.info(f"Automation {auto_id[:8]} step {idx+1} (filter) passed")
+                
+            elif step_type == 'delay':
+                # Wait and refetch contact data
+                seconds = int(config.get('seconds', 0))
+                if seconds > 0:
+                    logger.info(
+                        f"Automation {auto_id[:8]} step {idx+1} (delay) waiting {seconds}s "
+                        f"for contact {contact_id[:8]}"
+                    )
+                    await asyncio.sleep(seconds)
+                    # Refetch contact with latest data
+                    fresh = await db.contacts.find_one({"contact_id": contact_id}, {"_id": 0})
+                    if fresh:
+                        contact = fresh
+                        logger.info(
+                            f"Automation {auto_id[:8]} step {idx+1} (delay) refetched contact — "
+                            f"phone={'yes' if fresh.get('phone') else 'no'}"
+                        )
+                        
+            elif step_type == 'webhook':
+                # Fire webhook with field mapping
+                url = config.get('url', '')
+                if not url:
+                    logger.warning(
+                        f"Automation {auto_id[:8]} step {idx+1} (webhook) has no URL — skipping"
+                    )
+                    continue
+                    
+                step_name = config.get('name', '')
+                field_map = config.get('field_map', [])
+                payload = _build_webhook_payload(contact, field_map)
+                headers = {"Content-Type": "application/json"}
+                
+                logger.info(
+                    f"Automation {auto_id[:8]} step {idx+1} (webhook) firing to {url[:50]}..."
+                )
+                
+                # Fire webhook (not in background - sequential execution)
+                await _fire_webhook_task(
+                    auto_id, url, payload, headers,
+                    run_type="live", contact=contact, fbclid=fbclid,
+                    action_id=step_id, action_name=step_name or f"Webhook Step {idx+1}",
+                    delay_seconds=0,  # delay handled separately
+                    field_map=field_map,
+                )
+                
+            else:
+                logger.warning(f"Automation {auto_id[:8]} unknown step type: {step_type}")
+                
+        except Exception as e:
+            logger.error(f"Automation {auto_id[:8]} step {idx+1} error: {e}")
+            # Continue to next step on error (could also abort - configurable later)
+    
+    logger.info(f"Automation {auto_id[:8]} pipeline completed for contact {contact_id[:8]}")
+
+
 async def _run_automations(contact_id: str) -> None:
     contact = await db.contacts.find_one({"contact_id": contact_id}, {"_id": 0})
     if not contact or not (contact.get('email') or contact.get('phone')):
@@ -905,13 +1003,63 @@ async def _run_automations(contact_id: str) -> None:
     automations = await db.automations.find({"enabled": True}, {"_id": 0}).to_list(100)
     for auto in automations:
         try:
+            # ── New step-based pipeline ─────────────────────────────────────
+            # If automation has steps[], use the new pipeline execution
+            steps = auto.get('steps')
+            if steps and len(steps) > 0:
+                # Check for wait_for step at start to determine if we should dedup
+                first_wait_for = next((s for s in steps if s.get('type') == 'wait_for'), None)
+                if first_wait_for:
+                    required = first_wait_for.get('config', {}).get('fields', ['email'])
+                    missing = [rf for rf in required if not _get_contact_field(contact, rf)]
+                    if missing:
+                        logger.info(
+                            f"Automation {auto['id'][:8]} waiting for {missing} "
+                            f"on contact {contact_id[:8]} — will retry when fields arrive"
+                        )
+                        continue  # no dedup entry written — will try again
+                
+                # Check for filter step to determine if contact matches
+                first_filter = next((s for s in steps if s.get('type') == 'filter'), None)
+                if first_filter:
+                    filters = first_filter.get('config', {}).get('filters', [])
+                    if filters and not _evaluate_filters(contact, filters):
+                        continue  # Contact doesn't match, skip
+                
+                # Dedup check for step-based automations
+                dedup_key = f"{auto['id']}:{contact_id}:{fbclid or 'nofbclid'}"
+                now_str = dt_to_str(datetime.now(timezone.utc))
+                result = await db.automation_dedup.find_one_and_update(
+                    {"dedup_key": dedup_key},
+                    {"$setOnInsert": {
+                        "dedup_key":     dedup_key,
+                        "automation_id": auto['id'],
+                        "contact_id":    contact_id,
+                        "fbclid":        fbclid,
+                        "created_at":    now_str,
+                    }},
+                    upsert=True,
+                    return_document=False,
+                )
+                if result is not None:
+                    logger.info(
+                        f"Automation {auto['id'][:8]} deduped for {contact_id[:8]} "
+                        f"(fbclid={fbclid[:12] if fbclid else 'none'})"
+                    )
+                    continue
+                
+                # Execute the step pipeline
+                asyncio.create_task(
+                    _execute_step_pipeline(auto['id'], steps, contact, fbclid)
+                )
+                continue  # Done with this automation
+            # ─────────────────────────────────────────────────────────────────
+            
+            # ── Legacy automation execution (no steps) ──────────────────────
             if not _evaluate_filters(contact, auto.get('filters', [])):
                 continue
 
             # ── Required fields gate ─────────────────────────────────────────
-            # If ANY required field is missing, skip WITHOUT writing a dedup entry
-            # so the automation retries naturally when the field is captured later.
-            # Default required_fields = ['email'] for backward compat.
             required = auto.get('required_fields') or ['email']
             missing  = [rf for rf in required if not _get_contact_field(contact, rf)]
             if missing:
@@ -960,7 +1108,6 @@ async def _run_automations(contact_id: str) -> None:
             for action in raw_actions:
                 if not action.get('webhook_url'):
                     continue
-                # Per-action field_map takes precedence; falls back to automation-level
                 fm      = action.get('field_map') or auto.get('field_map', [])
                 payload = _build_webhook_payload(contact, fm)
                 hdrs    = {"Content-Type": "application/json"}
