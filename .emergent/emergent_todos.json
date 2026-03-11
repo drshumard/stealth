@@ -18,5 +18,9 @@
   {
     "content": "Remove unused imports and clean up hasChanges logic",
     "status": "completed"
+  },
+  {
+    "content": "Add backend validation (_validate_automation_steps) for create/update endpoints",
+    "status": "completed"
   }
 ]
