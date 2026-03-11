@@ -1,22 +1,22 @@
 [
   {
     "content": "FIX CRITICAL: Backend needs step pipeline execution logic",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Add URL validation for webhook URLs (must start with http/https)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Add error state UI when automation fetch fails",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Add filter value validation (empty string check)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Remove unused imports and clean up hasChanges logic",
-    "status": "pending"
+    "status": "completed"
   }
 ]
