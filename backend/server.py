@@ -1977,31 +1977,47 @@ async def test_automation(auto_id: str):
             "created_at": dt_to_str(datetime.now(timezone.utc)),
         }
 
-    payload = _build_webhook_payload(contact, auto.get('field_map', []))
+    # Resolve webhook URL and field_map from actions[] (new) or legacy webhook_url (old)
+    raw_actions = auto.get('actions') or []
+    if raw_actions:
+        # Test fires the first action
+        first_action = raw_actions[0]
+        test_url     = first_action.get('webhook_url', '')
+        test_fm      = first_action.get('field_map') or auto.get('field_map', [])
+        action_id    = first_action.get('id')
+        action_name  = first_action.get('name')
+    else:
+        test_url     = auto.get('webhook_url', '')
+        test_fm      = auto.get('field_map', [])
+        action_id    = None
+        action_name  = None
+
+    if not test_url:
+        raise HTTPException(status_code=400, detail="Automation has no webhook URL configured")
+
+    payload = _build_webhook_payload(contact, test_fm)
     payload['_tether_test'] = True
     hdrs = {"Content-Type": "application/json"}
-    if auto.get('custom_headers'):
-        hdrs.update(auto['custom_headers'])
+    hdrs.update(auto.get('custom_headers') or
+                (raw_actions[0].get('custom_headers') if raw_actions else None) or {})
 
     # Fire synchronously so we can return the full result immediately
     import time
     start         = time.monotonic()
     http_status   = None
     response_body = None
-    response_hint = None   # extracted from error responses (e.g. n8n "hint" field)
+    response_hint = None
     success       = False
     error_msg     = None
 
     try:
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            resp = await client.post(auto['webhook_url'], json=payload, headers=hdrs)
+            resp = await client.post(test_url, json=payload, headers=hdrs)
             http_status = resp.status_code
             raw_text    = resp.text.strip() if resp.text else ''
-            # Normalise: store None for empty body (not empty string) so UI can distinguish
             response_body = raw_text[:2000] if raw_text else None
             success       = 200 <= resp.status_code < 300
 
-            # Extract hint from structured error responses (e.g. n8n {"hint": "..."})
             if not success and response_body:
                 try:
                     parsed = json.loads(response_body)
@@ -2023,12 +2039,14 @@ async def test_automation(auto_id: str):
     run_doc = {
         "id":            str(uuid.uuid4()),
         "automation_id": auto_id,
+        "action_id":     action_id,
+        "action_name":   action_name,
         "run_type":      "test",
         "contact_id":    contact.get("contact_id"),
         "contact_email": contact.get("email"),
         "contact_name":  contact.get("name"),
         "payload":       payload,
-        "webhook_url":   auto['webhook_url'],
+        "webhook_url":   test_url,
         "http_status":   http_status,
         "response_body": response_body,
         "success":       success,
@@ -2109,8 +2127,10 @@ async def retry_automation_run(auto_id: str, run_id: str):
     if not auto:
         raise HTTPException(status_code=404, detail="Automation not found")
 
+    # Use the URL that actually fired originally (stored in the run),
+    # falling back to the automation's current config only if missing.
     payload = original.get("payload") or {}
-    url     = auto.get("webhook_url") or original.get("webhook_url", "")
+    url     = original.get("webhook_url") or auto.get("webhook_url", "")
     if not url:
         raise HTTPException(status_code=400, detail="Automation has no webhook URL configured")
     hdrs    = {"Content-Type": "application/json"}

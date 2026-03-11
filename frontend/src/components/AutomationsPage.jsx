@@ -26,7 +26,12 @@ function timeAgo(ts) {
 
 function AutomationCard({ auto, onEdit, onDelete, onToggle, onViewRuns }) {
   const filterCount = auto.filters?.length || 0;
-  const mapCount    = auto.field_map?.length || 0;
+  // Support both new actions[] and legacy field_map
+  const actionCount = auto.actions?.length || (auto.webhook_url ? 1 : 0);
+  const totalMapped = auto.actions?.reduce((s, a) => s + (a.field_map?.length || 0), 0)
+                   || auto.field_map?.length || 0;
+  // Display URL from first action or legacy webhook_url
+  const displayUrl  = auto.actions?.[0]?.webhook_url || auto.webhook_url || '';
 
   return (
     <div className="rounded-2xl border transition-all duration-150 overflow-hidden"
@@ -50,7 +55,7 @@ function AutomationCard({ auto, onEdit, onDelete, onToggle, onViewRuns }) {
                 {auto.name}
               </h3>
               <p className="text-xs font-mono mt-0.5 max-w-xs truncate" style={{ color: 'var(--text-dim)', fontFamily: 'IBM Plex Mono, monospace' }}>
-                {auto.webhook_url}
+                {displayUrl}
               </p>
             </div>
           </div>
@@ -73,10 +78,16 @@ function AutomationCard({ auto, onEdit, onDelete, onToggle, onViewRuns }) {
               {filterCount} filter{filterCount !== 1 ? 's' : ''}
             </span>
           )}
-          {mapCount > 0 && (
+          {actionCount > 1 && (
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full"
+              style={{ backgroundColor: 'rgba(5,150,105,0.08)', color: '#059669' }}>
+              {actionCount} webhook steps
+            </span>
+          )}
+          {totalMapped > 0 && (
             <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full"
               style={{ backgroundColor: 'rgba(3,3,82,0.05)', color: '#4a5568' }}>
-              {mapCount} field{mapCount !== 1 ? 's' : ''} mapped
+              {totalMapped} field{totalMapped !== 1 ? 's' : ''} mapped
             </span>
           )}
         </div>
