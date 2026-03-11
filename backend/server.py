@@ -224,6 +224,7 @@ class AutomationAction(BaseModel):
     webhook_url:    str = ""
     field_map:      List[AutomationFieldMap] = []  # per-step overrides; falls back to automation field_map
     custom_headers: Optional[Dict[str, str]] = None
+    delay_seconds:  int = 0                        # wait N seconds then refetch contact before firing
 
 
 class AutomationCreate(BaseModel):
@@ -812,14 +813,38 @@ async def _fire_webhook_task(
     fbclid: Optional[str] = None,
     action_id: Optional[str] = None,
     action_name: Optional[str] = None,
+    delay_seconds: int = 0,
+    field_map: Optional[list] = None,   # needed to rebuild payload after refetch
 ) -> None:
-    """Fire a webhook, persist the run record, and update automation stats."""
+    """Fire a webhook, persist the run record, and update automation stats.
+    If delay_seconds > 0: sleep first, then re-read the contact from the DB
+    so the payload contains the freshest data available at fire time."""
+
+    # ── Optional wait + refetch ───────────────────────────────────────────────
+    if delay_seconds > 0 and contact:
+        cid = contact.get("contact_id")
+        logger.info(
+            f"Automation {auto_id[:8]} action '{action_name or action_id or 'step'}' "
+            f"waiting {delay_seconds}s before firing for {(cid or '')[:12]}"
+        )
+        await asyncio.sleep(delay_seconds)
+        if cid:
+            fresh = await db.contacts.find_one({"contact_id": cid}, {"_id": 0})
+            if fresh:
+                contact = fresh
+                payload = _build_webhook_payload(fresh, field_map or [])
+                logger.info(
+                    f"Automation {auto_id[:8]} refetched {cid[:12]} after {delay_seconds}s "
+                    f"— phone={'yes' if fresh.get('phone') else 'no'}"
+                )
+    # ─────────────────────────────────────────────────────────────────────────
+
     import time
-    start       = time.monotonic()
-    http_status = None
+    start         = time.monotonic()
+    http_status   = None
     response_body = None
-    success     = False
-    error_msg   = None
+    success       = False
+    error_msg     = None
 
     try:
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
@@ -943,6 +968,8 @@ async def _run_automations(contact_id: str) -> None:
                         auto['id'], action['webhook_url'], payload, hdrs,
                         run_type="live", contact=contact, fbclid=fbclid,
                         action_id=action.get('id'), action_name=action.get('name'),
+                        delay_seconds=int(action.get('delay_seconds') or 0),
+                        field_map=fm,
                     )
                 )
         except Exception as e:
@@ -2508,7 +2535,8 @@ async def stealth_webhook(request: Request):
         }
         await db.stealth_registrations.insert_one(reg_doc)
 
-        # ── Upsert the contact with phone so required-field automations fire ──
+        # ── Upsert the contact with phone + stealth tag ──────────────────────
+        stealth_tag = 'stealth'
         if contact_id and phone:
             eid = await _resolve_contact_id(contact_id)
             await _upsert_contact({
@@ -2517,6 +2545,11 @@ async def stealth_webhook(request: Request):
                 'phone':      phone,
                 'name':       name or contact.get("name"),
             }, now, ip)
+            # Add stealth tag
+            await db.contacts.update_one(
+                {"contact_id": eid},
+                {"$addToSet": {"tags": stealth_tag}}
+            )
             asyncio.create_task(_run_automations(eid))
         elif not contact_id:
             # Brand new contact — create them with all available data
@@ -2529,6 +2562,11 @@ async def stealth_webhook(request: Request):
             }, now, ip)
             asyncio.create_task(_run_automations(eid))
             contact_id = eid
+            # Add stealth tag to newly created contact
+            await db.contacts.update_one(
+                {"contact_id": eid},
+                {"$addToSet": {"tags": stealth_tag}}
+            )
             # Update the registration with the new contact_id
             await db.stealth_registrations.update_one(
                 {"id": reg_doc["id"]},

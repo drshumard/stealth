@@ -252,7 +252,7 @@ export function AutomationBuilder({ open, automation, onClose, onSave }) {
   const updateFilter = (id, upd) => setFilters(prev => prev.map(f => f.id === id ? upd : f));
   const removeFilter = (id) => setFilters(prev => prev.filter(f => f.id !== id));
 
-  const addAction    = () => setActions(prev => [...prev, { id: uuid4(), name: '', webhookUrl: '', fieldMap: [] }]);
+  const addAction    = () => setActions(prev => [...prev, { id: uuid4(), name: '', webhookUrl: '', fieldMap: [], delaySeconds: 0 }]);
   const removeAction = (id) => setActions(prev => prev.filter(a => a.id !== id));
   const updateAction = (id, patch) => setActions(prev => prev.map(a => a.id === id ? { ...a, ...patch } : a));
 
@@ -483,6 +483,29 @@ export function AutomationBuilder({ open, automation, onClose, onSave }) {
                       className="h-9 text-sm font-mono"
                       style={{ borderColor: '#a7f3d0', backgroundColor: '#ffffff', fontFamily: 'IBM Plex Mono, monospace' }}
                     />
+                  </div>
+
+                  {/* Delay + Refetch */}
+                  <div className="px-4 pb-2">
+                    <label className="text-xs font-bold uppercase tracking-wide mb-1 block" style={{ color: '#059669', opacity: 0.75 }}>
+                      Delay before firing (seconds)
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <Input
+                        type="number"
+                        min="0"
+                        max="3600"
+                        value={action.delaySeconds || 0}
+                        onChange={e => updateAction(action.id, { delaySeconds: Math.max(0, parseInt(e.target.value) || 0) })}
+                        className="h-9 text-sm w-28"
+                        style={{ borderColor: '#a7f3d0', backgroundColor: '#ffffff' }}
+                      />
+                      <p className="text-xs flex-1" style={{ color: 'var(--text-dim)' }}>
+                        {action.delaySeconds > 0
+                          ? `Waits ${action.delaySeconds}s then re-reads the contact's latest data before sending — picks up phone, tags, or any field captured in the meantime.`
+                          : 'Set > 0 to wait and refetch contact data before firing (e.g. 120 = wait 2 min, then send with latest phone/tags).'}
+                      </p>
+                    </div>
                   </div>
 
                   {/* Per-action field mapping */}
