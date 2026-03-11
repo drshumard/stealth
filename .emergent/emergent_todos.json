@@ -1,14 +1,14 @@
 [
   {
-    "content": "Backend: add AutomationAction model, required_fields, update _run_automations + test/retry",
+    "content": "Backend: POST /api/stealth/webhook + GET /api/stealth endpoint + stealth_registrations collection",
     "status": "in_progress"
   },
   {
-    "content": "Frontend: update AutomationBuilder with required-fields checkboxes + multi-action steps",
+    "content": "Frontend: StealthPage.jsx - table with fbclid YES/NO badge",
     "status": "pending"
   },
   {
-    "content": "Frontend: update AutomationRuns to show action_name on each run",
+    "content": "Frontend: Add /stealth to TopNav and App.js",
     "status": "pending"
   }
 ]

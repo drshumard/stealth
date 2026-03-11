@@ -2445,6 +2445,158 @@ async def auth_verify(payload: dict):
     raise HTTPException(status_code=401, detail="Token invalid or expired")
 
 
+
+# ─────────────────────────── StealthWebinar Registrations ────────────────────
+
+@api_router.post("/stealth/webhook")
+async def stealth_webhook(request: Request):
+    """
+    Receives registration data from StealthWebinar (or any external form platform).
+    For each registration:
+      1. Store the raw payload in stealth_registrations
+      2. Look up the email in contacts to check if they came from Facebook (has fbclid)
+      3. Upsert the contact with phone so automations with required_fields=['email','phone'] fire
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Request body must be valid JSON")
+
+    try:
+        now   = datetime.now(timezone.utc)
+        ip    = get_client_ip(request)
+
+        # ── Extract common fields (flexible — handles various platforms) ──────
+        def pick(obj: dict, *keys) -> Optional[str]:
+            for k in keys:
+                v = obj.get(k)
+                if v and isinstance(v, str):
+                    return v.strip()
+            return None
+
+        email = pick(body, 'email', 'Email', 'attendee_email', 'registrant_email')
+        phone = pick(body, 'phone', 'Phone', 'phone_number', 'attendee_phone')
+        name  = pick(body, 'name', 'Name', 'full_name', 'fullName',
+                     'attendee_name', 'first_name', 'firstName')
+
+        if not email:
+            raise HTTPException(status_code=400, detail="'email' field is required")
+
+        email_lower = email.lower()
+
+        # ── Check if contact exists and has fbclid ────────────────────────────
+        contact = await db.contacts.find_one(
+            {"email": {"$regex": f"^{email_lower}$", "$options": "i"},
+             "merged_into": None},
+            {"_id": 0, "contact_id": 1, "attribution": 1, "name": 1, "phone": 1}
+        )
+
+        contact_id = contact.get("contact_id") if contact else None
+        attr       = (contact.get("attribution") or {}) if contact else {}
+        has_fbclid = bool(attr.get("fbclid"))
+
+        # ── Store registration ────────────────────────────────────────────────
+        reg_doc = {
+            "id":           str(uuid.uuid4()),
+            "email":        email_lower,
+            "phone":        phone,
+            "name":         name,
+            "contact_id":   contact_id,
+            "has_fbclid":   has_fbclid,
+            "raw_data":     body,
+            "registered_at": dt_to_str(now),
+        }
+        await db.stealth_registrations.insert_one(reg_doc)
+
+        # ── Upsert the contact with phone so required-field automations fire ──
+        if contact_id and phone:
+            eid = await _resolve_contact_id(contact_id)
+            await _upsert_contact({
+                'contact_id': eid,
+                'email':      email_lower,
+                'phone':      phone,
+                'name':       name or contact.get("name"),
+            }, now, ip)
+            asyncio.create_task(_run_automations(eid))
+        elif not contact_id:
+            # Brand new contact — create them with all available data
+            eid = str(uuid.uuid4())
+            await _upsert_contact({
+                'contact_id': eid,
+                'email':      email_lower,
+                'phone':      phone,
+                'name':       name,
+            }, now, ip)
+            asyncio.create_task(_run_automations(eid))
+            contact_id = eid
+            # Update the registration with the new contact_id
+            await db.stealth_registrations.update_one(
+                {"id": reg_doc["id"]},
+                {"$set": {"contact_id": contact_id}}
+            )
+
+        logger.info(
+            f"Stealth registration: {email_lower} | "
+            f"phone={'yes' if phone else 'no'} | "
+            f"fbclid={'YES' if has_fbclid else 'NO'} | "
+            f"contact={'linked' if contact else 'created'}"
+        )
+
+        return {
+            "status":     "ok",
+            "id":         reg_doc["id"],
+            "email":      email_lower,
+            "contact_id": contact_id,
+            "has_fbclid": has_fbclid,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Stealth webhook error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/stealth")
+async def get_stealth_registrations(limit: int = 1000):
+    """All StealthWebinar registrations, newest first, enriched with latest contact data."""
+    try:
+        regs = await db.stealth_registrations.find({}, {"_id": 0}) \
+            .sort("registered_at", -1).limit(limit).to_list(limit)
+
+        # Enrich with latest contact data (phone/fbclid may have updated since registration)
+        contact_ids = list({r["contact_id"] for r in regs if r.get("contact_id")})
+        contact_map: dict = {}
+        if contact_ids:
+            contacts_raw = await db.contacts.find(
+                {"contact_id": {"$in": contact_ids}},
+                {"_id": 0, "contact_id": 1, "name": 1, "email": 1,
+                 "phone": 1, "attribution": 1, "tags": 1}
+            ).to_list(len(contact_ids))
+            contact_map = {c["contact_id"]: c for c in contacts_raw}
+
+        result = []
+        for r in regs:
+            c = contact_map.get(r.get("contact_id") or "", {})
+            attr = c.get("attribution") or {}
+            # Re-evaluate fbclid from live contact data
+            live_fbclid = bool(attr.get("fbclid"))
+            result.append({
+                "id":           r["id"],
+                "email":        r.get("email"),
+                "phone":        r.get("phone") or c.get("phone"),
+                "name":         r.get("name")  or c.get("name"),
+                "contact_id":   r.get("contact_id"),
+                "has_fbclid":   live_fbclid,
+                "fbclid":       attr.get("fbclid"),
+                "tags":         c.get("tags"),
+                "registered_at": r.get("registered_at"),
+            })
+        return result
+    except Exception as e:
+        logger.error(f"Error fetching stealth registrations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ─────────────────────────── Startup: create indexes ───────────────────────────
 
 @app.on_event("startup")
@@ -2473,6 +2625,10 @@ async def create_indexes():
         # Unique index on dedup collection — enforces at-most-once delivery
         # atomically even under concurrent requests
         await db.automation_dedup.create_index("dedup_key", unique=True)
+        await db.stealth_registrations.create_index("id",           unique=True, sparse=True)
+        await db.stealth_registrations.create_index("email",        sparse=True)
+        await db.stealth_registrations.create_index("contact_id",   sparse=True)
+        await db.stealth_registrations.create_index("registered_at")
         await db.sales.create_index("id",         unique=True, sparse=True)
         await db.sales.create_index("contact_id", sparse=True)
         await db.sales.create_index("email",      sparse=True)

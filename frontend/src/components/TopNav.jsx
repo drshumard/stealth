@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import { Users, Globe, BarChart3, List, Search, Bell, ChevronDown, Zap, DollarSign, LogOut, Clock, Check } from 'lucide-react';
+import { Users, Globe, BarChart3, List, Search, Bell, ChevronDown, Zap, DollarSign, LogOut, Clock, Check, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTimezone, TIMEZONE_OPTIONS } from '@/components/TimezoneContext';
 
@@ -22,6 +22,7 @@ export const TopNav = ({ stats, onLogout }) => {
 
   const active =
     location.pathname === '/analytics'   ? 'analytics'   :
+    location.pathname === '/stealth'     ? 'stealth'     :
     location.pathname === '/visitors'    ? 'visitors'    :
     location.pathname === '/sales'       ? 'sales'       :
     location.pathname === '/automations' ? 'automations' :

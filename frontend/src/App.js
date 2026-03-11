@@ -12,6 +12,7 @@ import VisitorsPage from '@/components/VisitorsPage';
 import LogsPage from '@/components/LogsPage';
 import AutomationsPage from '@/components/AutomationsPage';
 import SalesPage from '@/components/SalesPage';
+import StealthPage from '@/components/StealthPage';
 import LoginPage from '@/components/LoginPage';
 import { ContactDetailModal } from '@/components/ContactDetailModal';
 
@@ -132,7 +133,8 @@ function AppShell() {
         <TopNav stats={stats} onLogout={handleLogout} />
         <Routes>
           <Route path="/"            element={<LeadsPage    {...shared} />} />
-          <Route path="/sales"       element={<SalesPage onSelectContact={(id) => handleSelectContact(id, 'sales')} />} />
+          <Route path="/stealth"      element={<StealthPage onSelectContact={handleSelectContact} />} />
+          <Route path="/sales"        element={<SalesPage onSelectContact={(id) => handleSelectContact(id, 'sales')} />} />
           <Route path="/visitors"    element={<VisitorsPage {...shared} />} />
           <Route path="/automations" element={<AutomationsPage />} />
           <Route path="/analytics"   element={<AnalyticsPage stats={stats} contacts={contacts} />} />
