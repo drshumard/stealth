@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -538,13 +538,17 @@ export default function AutomationBuilderPage() {
   const [hasChanges, setHasChanges] = useState(false);
 
   // Fetch existing automation for edit mode
-  const { data: automation, isLoading } = useQuery({
+  const { data: automation, isLoading, isError, error } = useQuery({
     queryKey: ['automation', id],
     queryFn: () => fetch(`${API}/automations/${id}`).then(r => {
-      if (!r.ok) throw new Error('Failed to load automation');
+      if (!r.ok) {
+        if (r.status === 404) throw new Error('Automation not found');
+        throw new Error('Failed to load automation');
+      }
       return r.json();
     }),
     enabled: !isNew,
+    retry: 1,
   });
 
   // Hydrate form when automation loads
@@ -604,10 +608,15 @@ export default function AutomationBuilderPage() {
     }
   }, [automation]);
 
-  // Track changes
+  // Track changes (only after initial load)
+  const [initialized, setInitialized] = useState(false);
   useEffect(() => {
-    if (!isLoading) setHasChanges(true);
-  }, [name, enabled, steps]);
+    if (automation && !initialized) {
+      setInitialized(true);
+      return;
+    }
+    if (initialized) setHasChanges(true);
+  }, [name, enabled, steps, automation, initialized]);
 
   // Add a step
   const addStep = (type) => {
@@ -650,16 +659,41 @@ export default function AutomationBuilderPage() {
       return false;
     }
     // Check for at least one webhook step with URL
-    const hasWebhook = steps.some(s => s.type === 'webhook' && s.config?.url?.trim());
-    if (!hasWebhook) {
-      toast.error('Add at least one Webhook step with a URL');
+    const webhookSteps = steps.filter(s => s.type === 'webhook');
+    if (webhookSteps.length === 0) {
+      toast.error('Add at least one Webhook step');
       return false;
+    }
+    // Validate each webhook URL
+    for (const ws of webhookSteps) {
+      const url = ws.config?.url?.trim() || '';
+      if (!url) {
+        toast.error('All Webhook steps must have a URL');
+        return false;
+      }
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        toast.error('Webhook URLs must start with http:// or https://');
+        return false;
+      }
     }
     // Check wait_for has at least one field
     const waitFor = steps.find(s => s.type === 'wait_for');
     if (waitFor && (!waitFor.config?.fields?.length)) {
       toast.error('Wait For step must have at least one field selected');
       return false;
+    }
+    // Check filter values are not empty when required
+    for (const step of steps) {
+      if (step.type === 'filter') {
+        const filters = step.config?.filters || [];
+        for (const f of filters) {
+          const needsValue = !['exists', 'not_exists'].includes(f.operator);
+          if (needsValue && !f.value?.trim()) {
+            toast.error('Filter conditions with equals/contains require a value');
+            return false;
+          }
+        }
+      }
     }
     return true;
   };
@@ -710,6 +744,37 @@ export default function AutomationBuilderPage() {
         <Skeleton className="h-12 w-64 mb-6" style={{ backgroundColor: '#f0ede8' }} />
         <Skeleton className="h-40 w-full mb-4" style={{ backgroundColor: '#f0ede8' }} />
         <Skeleton className="h-40 w-full" style={{ backgroundColor: '#f0ede8' }} />
+      </div>
+    );
+  }
+
+  // Error state
+  if (!isNew && isError) {
+    return (
+      <div className="p-8 md:p-10 max-w-4xl mx-auto">
+        <button
+          onClick={() => navigate('/automations')}
+          className="flex items-center gap-2 text-sm font-semibold mb-4 transition-colors hover:opacity-80"
+          style={{ color: 'var(--brand-navy)' }}
+        >
+          <ArrowLeft size={16} /> Back to Automations
+        </button>
+        <div className="rounded-2xl border-2 border-dashed p-8 text-center" style={{ borderColor: '#fecaca', backgroundColor: '#fef2f2' }}>
+          <AlertTriangle size={48} className="mx-auto mb-4" style={{ color: '#dc2626' }} />
+          <h3 className="text-lg font-bold mb-2" style={{ fontFamily: 'Space Grotesk, sans-serif', color: '#991b1b' }}>
+            Failed to load automation
+          </h3>
+          <p className="text-sm" style={{ color: '#b91c1c' }}>
+            {error?.message || 'An unexpected error occurred'}
+          </p>
+          <Button
+            onClick={() => navigate('/automations')}
+            className="mt-4 h-10 px-6 text-sm font-semibold text-white"
+            style={{ backgroundColor: 'var(--brand-red)' }}
+          >
+            Return to Automations
+          </Button>
+        </div>
       </div>
     );
   }
