@@ -16,11 +16,14 @@ function localDateStr(d) {
 export async function exportLeadsToPdf(contactsToExport, filterLabel, timezone) {
   if (!contactsToExport.length) throw new Error('No leads to export');
 
-  // Send only the IDs we need — avoids fetching thousands of unused contacts
-  const ids    = contactsToExport.map(c => c.contact_id);
-  const params = new URLSearchParams({ limit: String(ids.length + 10) });
-  ids.forEach(id => params.append('ids', id));
-  const res = await fetch(`${BACKEND_URL}/api/leads/export?${params}`);
+  // POST the IDs in the request body — avoids nginx URL length limits
+  // (306 contacts × 36-char UUIDs ≈ 12 KB as GET params, which nginx rejects)
+  const ids = contactsToExport.map(c => c.contact_id);
+  const res = await fetch(`${BACKEND_URL}/api/leads/export`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ ids, limit: ids.length + 10 }),
+  });
   if (!res.ok) throw new Error(`Export API returned ${res.status}: ${await res.text()}`);
   const allData = await res.json();
   if (!Array.isArray(allData)) throw new Error(`Unexpected API response: ${JSON.stringify(allData).slice(0, 200)}`);

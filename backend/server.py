@@ -1676,15 +1676,17 @@ async def get_stats():
 
 @api_router.get("/logs")
 
-@api_router.get("/leads/export")
-async def export_contacts(
-    since: Optional[str] = None,
-    until: Optional[str] = None,
-    tz: Optional[str] = None,
-    search: Optional[str] = None,
-    ids: Optional[List[str]] = Query(default=None),   # explicit contact IDs — used by PDF export
-    limit: int = 5000,
-):
+class LeadsExportRequest(BaseModel):
+    ids:    Optional[List[str]] = None   # specific contact IDs (PDF export path)
+    since:  Optional[str] = None
+    until:  Optional[str] = None
+    tz:     Optional[str] = None
+    search: Optional[str] = None
+    limit:  int = 5000
+
+
+@api_router.post("/leads/export")
+async def export_contacts(body: LeadsExportRequest):
     """
     Returns identified contacts (with email/phone/name) including their full
     page-visit history. Used by the PDF export on the Leads page.
@@ -1702,27 +1704,27 @@ async def export_contacts(
     }
 
     # If specific IDs provided (PDF export path), skip other filters for efficiency
-    if ids:
-        query = {"contact_id": {"$in": ids}, "merged_into": None}
+    if body.ids:
+        query = {"contact_id": {"$in": body.ids}, "merged_into": None}
 
 
     # Date filter on updated_at (when the lead was last identified)
-    if since or until:
+    if body.since or body.until:
         ts_filter: dict = {}
-        if since:
-            ts_filter["$gte"] = _tz_day_start(since, tz)
-        if until:
-            ts_filter["$lte"] = _tz_day_end(until, tz)
+        if body.since:
+            ts_filter["$gte"] = _tz_day_start(body.since, body.tz)
+        if body.until:
+            ts_filter["$lte"] = _tz_day_end(body.until, body.tz)
         query["updated_at"] = ts_filter
 
-    # Optional text search (email / name / phone)
-    if search:
-        sq = {"$regex": search, "$options": "i"}
+    # Optional text search
+    if body.search:
+        sq = {"$regex": body.search, "$options": "i"}
         query["$and"] = [{"$or": [{"email": sq}, {"name": sq}, {"phone": sq}]}]
 
     try:
         contacts_raw = await db.contacts.find(query, {"_id": 0}) \
-            .sort("updated_at", -1).limit(limit).to_list(limit)
+            .sort("updated_at", -1).limit(body.limit).to_list(body.limit)
 
         if not contacts_raw:
             return []
