@@ -1730,14 +1730,17 @@ async def get_stats():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@api_router.get("/logs")
-
 class LeadsExportRequest(BaseModel):
     ids:    Optional[List[str]] = None   # specific contact IDs (PDF export path)
     since:  Optional[str] = None
     until:  Optional[str] = None
     tz:     Optional[str] = None
     search: Optional[str] = None
+    limit:  int = 5000
+
+
+@api_router.post("/leads/export")
+async def export_contacts(body: LeadsExportRequest):
     limit:  int = 5000
 
 
@@ -1823,6 +1826,7 @@ async def export_contacts(body: LeadsExportRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.get("/logs")
 async def get_logs(limit: int = 200):
     """Recent activity feed: page visits enriched with contact identity."""
     try:
