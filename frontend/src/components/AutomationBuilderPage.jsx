@@ -386,7 +386,7 @@ function WebhookEditor({ config, onChange }) {
 
 // ─────────────────────────── Step Card ───────────────────────────
 
-function StepCard({ step, index, total, onUpdate, onRemove, onMoveUp, onMoveDown }) {
+function StepCard({ step, index, total, onUpdate, onRemove, onMoveUp, onMoveDown, onDuplicate }) {
   const typeInfo = STEP_TYPES.find(t => t.type === step.type) || STEP_TYPES[0];
   const Icon = typeInfo.icon;
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -404,7 +404,7 @@ function StepCard({ step, index, total, onUpdate, onRemove, onMoveUp, onMoveDown
   return (
     <>
       <div
-        className="rounded-2xl border overflow-hidden transition-all"
+        className="rounded-2xl border overflow-hidden"
         style={{ borderColor: `${typeInfo.color}30`, backgroundColor: '#ffffff', boxShadow: `0 2px 12px ${typeInfo.color}0d` }}
         data-testid={`step-card-${step.id}`}
       >
@@ -447,6 +447,7 @@ function StepCard({ step, index, total, onUpdate, onRemove, onMoveUp, onMoveDown
               className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-100"
               style={{ color: 'var(--text-muted)' }}
               data-testid={`step-move-up-${step.id}`}
+              title="Move up"
             >
               <ChevronUp size={16} />
             </button>
@@ -456,10 +457,22 @@ function StepCard({ step, index, total, onUpdate, onRemove, onMoveUp, onMoveDown
               className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-100"
               style={{ color: 'var(--text-muted)' }}
               data-testid={`step-move-down-${step.id}`}
+              title="Move down"
             >
               <ChevronDown size={16} />
             </button>
           </div>
+
+          {/* Duplicate button */}
+          <button
+            onClick={onDuplicate}
+            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-blue-50"
+            style={{ color: '#0284c7' }}
+            data-testid={`step-duplicate-${step.id}`}
+            title="Duplicate step"
+          >
+            <Copy size={15} />
+          </button>
 
           {/* Delete */}
           <button
@@ -467,6 +480,7 @@ function StepCard({ step, index, total, onUpdate, onRemove, onMoveUp, onMoveDown
             className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-red-50"
             style={{ color: '#dc2626' }}
             data-testid={`step-remove-${step.id}`}
+            title="Delete step"
           >
             <Trash2 size={15} />
           </button>
@@ -477,13 +491,6 @@ function StepCard({ step, index, total, onUpdate, onRemove, onMoveUp, onMoveDown
           {renderEditor()}
         </div>
       </div>
-
-      {/* Connector line */}
-      {index < total - 1 && (
-        <div className="flex justify-center py-2">
-          <div className="w-0.5 h-6 rounded-full" style={{ backgroundColor: '#d2d8ef' }} />
-        </div>
-      )}
 
       {/* Delete confirmation */}
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
