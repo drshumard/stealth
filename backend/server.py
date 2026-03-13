@@ -1643,6 +1643,20 @@ def build_tracker_js(backend_url: str, auto_tag: str = '') -> str:
     watchDOM();
     sendPageview();
 
+    /* ─── Delayed fbc/fbp re-capture ─── */
+    /* Facebook Pixel often sets _fbc/_fbp cookies AFTER initial page load.
+       Re-check cookies after a delay to capture them if FB Pixel was slow. */
+    setTimeout(function() {
+      var fbc = getCookie('_fbc');
+      var fbp = getCookie('_fbp');
+      if ((fbc && store.source.fbc !== fbc) || (fbp && store.source.fbp !== fbp)) {
+        if (fbc) store.source.fbc = fbc;
+        if (fbp) store.source.fbp = fbp;
+        lsSet(ATTR_KEY, JSON.stringify(store.source));
+        logger('FB cookies captured (delayed)', {fbc: fbc, fbp: fbp});
+      }
+    }, 2000);  /* 2 second delay for FB Pixel to set cookies */
+
     /* ─── Auto-tag: fire when script was loaded with ?tag=... ─── */
     if (AUTO_TAG) {
       send('/track/tag', {
