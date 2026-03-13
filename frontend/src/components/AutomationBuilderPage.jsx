@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useNavigate, useLocation, UNSAFE_NavigationContext as NavigationContext } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -20,43 +20,6 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import React from 'react';
-
-// Custom hook for blocking navigation with BrowserRouter
-function useNavigationBlock(when, onBlock) {
-  const { navigator } = React.useContext(NavigationContext);
-  const blockerRef = useRef(null);
-  
-  useEffect(() => {
-    if (!when) return;
-    
-    const push = navigator.push;
-    const replace = navigator.replace;
-    
-    navigator.push = (...args) => {
-      if (onBlock) {
-        blockerRef.current = { type: 'push', args, proceed: () => push.apply(navigator, args) };
-        onBlock(blockerRef.current);
-      } else {
-        push.apply(navigator, args);
-      }
-    };
-    
-    navigator.replace = (...args) => {
-      if (onBlock) {
-        blockerRef.current = { type: 'replace', args, proceed: () => replace.apply(navigator, args) };
-        onBlock(blockerRef.current);
-      } else {
-        replace.apply(navigator, args);
-      }
-    };
-    
-    return () => {
-      navigator.push = push;
-      navigator.replace = replace;
-    };
-  }, [navigator, when, onBlock]);
-}
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
 const API = `${BACKEND_URL}/api`;
