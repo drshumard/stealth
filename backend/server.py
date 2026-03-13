@@ -69,6 +69,7 @@ class Contact(BaseModel):
     contact_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     session_id: Optional[str] = None
     client_ip: Optional[str] = None
+    user_agent: Optional[str] = None          # Browser user agent (for FB CAPI: client_user_agent)
     name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
@@ -89,6 +90,7 @@ class PageViewCreate(BaseModel):
     referrer_url: Optional[str] = None
     page_title: Optional[str] = None
     attribution: Optional[Dict[str, Any]] = None
+    user_agent: Optional[str] = None          # Browser user agent string
 
 
 class RegistrationCreate(BaseModel):
@@ -103,6 +105,7 @@ class RegistrationCreate(BaseModel):
     referrer_url: Optional[str] = None
     page_title: Optional[str] = None
     attribution: Optional[Dict[str, Any]] = None
+    user_agent: Optional[str] = None          # Browser user agent string
 
 
 class LeadCreate(BaseModel):
@@ -117,6 +120,7 @@ class LeadCreate(BaseModel):
     referrer_url: Optional[str] = None
     page_title: Optional[str] = None
     attribution: Optional[Dict[str, Any]] = None
+    user_agent: Optional[str] = None          # Browser user agent string
 
 
 class StitchRequest(BaseModel):
