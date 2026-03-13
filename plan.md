@@ -9,7 +9,8 @@
 - Simple step reordering via Up/Down buttons (no drag-and-drop)
 - Integrate with existing TanStack Query patterns and Shadcn UI
 - Backward compatible: gracefully load legacy automations (required_fields, filters, actions/webhook_url) and allow converting to steps on save
-- **NEW**: Track user_agent for Facebook Conversions API compatibility
+- **Track user_agent for Facebook Conversions API compatibility**
+- **Track fbc/fbp cookies for enhanced Facebook CAPI matching**
 - POC: Not required (CRUD + simple auth only)
 
 ## 2) Implementation Steps (Phased)
@@ -81,8 +82,10 @@ Code review completed with all critical issues fixed:
 4. ✅ As a user, filter conditions with empty values are caught before save (frontend toast + backend 400).
 5. ✅ As a user, Wait For steps without any fields selected are rejected.
 
-### Phase 4 — User Agent Tracking for FB CAPI (COMPLETED ✅)
-Added user_agent tracking for Facebook Conversions API compatibility:
+### Phase 4 — Facebook CAPI Integration (COMPLETED ✅)
+Added comprehensive tracking for Facebook Conversions API compatibility:
+
+#### User Agent Tracking
 - ✅ Added `user_agent` field to all Pydantic models:
   - Contact, ContactWithStats, ContactDetail (response models)
   - PageViewCreate, LeadCreate, RegistrationCreate (request models)
@@ -95,11 +98,28 @@ Added user_agent tracking for Facebook Conversions API compatibility:
 - ✅ Added `user_agent` to TETHER_FIELDS in AutomationBuilderPage for field mapping
   - Label: "User Agent (FB CAPI)"
 
+#### fbc/fbp Cookie Tracking
+- ✅ Added `fbc` and `fbp` fields to Attribution model:
+  - `fbc`: Facebook Click ID cookie (_fbc) - Format: `fb.1.{timestamp}.{fbclid}`
+  - `fbp`: Facebook Browser ID cookie (_fbp) - Format: `fb.1.{timestamp}.{random}`
+- ✅ Updated `safe_attribution()` to recognize fbc/fbp as known fields
+- ✅ Updated `shumard.js` tracker to capture `_fbc` and `_fbp` cookies:
+  - Captured on initial page load
+  - Refreshed on each attribution capture (cookies may be set after initial cache)
+- ✅ Updated `_build_webhook_payload()` to include fbc/fbp in webhook data
+- ✅ Added fbc/fbp to TETHER_FIELDS in AutomationBuilderPage for field mapping:
+  - "Facebook Click ID (fbc)"
+  - "Facebook Browser ID (fbp)"
+
 **Completed User Stories (Phase 4)**:
 1. ✅ As a user, the tracker script captures and sends the browser's user agent string.
 2. ✅ As a user, I can see user_agent in contact details via the API.
 3. ✅ As a user, I can map user_agent to custom webhook fields for FB CAPI integration.
 4. ✅ As a user, webhook payloads include user_agent automatically for FB CAPI compatibility.
+5. ✅ As a user, the tracker script captures _fbc and _fbp cookies from the browser.
+6. ✅ As a user, fbc/fbp values are stored in the contact's attribution data.
+7. ✅ As a user, I can map fbc/fbp to custom webhook fields for enhanced FB CAPI matching.
+8. ✅ As a user, webhook payloads include fbc/fbp automatically when available.
 
 ### Phase 5 — Polish & Enhancements (Not Started - Optional)
 - Add: duplicate step, unsaved-changes prompt, keyboard reordering (optional)
@@ -125,7 +145,8 @@ Added user_agent tracking for Facebook Conversions API compatibility:
 8. ✅ ~~Code review and production hardening~~
 9. ✅ ~~Add backend validation for steps (URL format, filter values, wait_for fields)~~
 10. ✅ ~~Add user_agent tracking for Facebook Conversions API compatibility~~
-11. (Optional) Add polish features: duplicate step, unsaved changes warning, animations
+11. ✅ ~~Add fbc/fbp cookie tracking for enhanced Facebook CAPI matching~~
+12. (Optional) Add polish features: duplicate step, unsaved changes warning, animations
 
 ## 4) Success Criteria (ALL ACHIEVED ✅)
 - ✅ Dedicated builder routes load and render without console errors
@@ -139,10 +160,11 @@ Added user_agent tracking for Facebook Conversions API compatibility:
 - ✅ Input validation prevents invalid data on BOTH frontend AND backend
 - ✅ Error states handled gracefully with user-friendly UI
 - ✅ Backend returns proper 400 status codes for validation errors
-- ✅ **NEW**: User agent captured, stored, and available in webhook payloads for FB CAPI
+- ✅ User agent captured, stored, and available in webhook payloads for FB CAPI
+- ✅ **NEW**: fbc/fbp cookies captured, stored in attribution, and available for FB CAPI matching
 
 ## 5) Files Changed/Created
-- `/app/frontend/src/components/AutomationBuilderPage.jsx` - NEW: Full-page Zapier-style builder with validation + user_agent in TETHER_FIELDS
+- `/app/frontend/src/components/AutomationBuilderPage.jsx` - NEW: Full-page Zapier-style builder with validation + FB CAPI fields (user_agent, fbc, fbp) in TETHER_FIELDS
 - `/app/frontend/src/App.js` - MODIFIED: Added routes for /automations/new and /automations/builder/:id
 - `/app/frontend/src/components/AutomationsPage.jsx` - MODIFIED: Updated to use navigation instead of modal
 - `/app/backend/server.py` - MODIFIED: 
@@ -151,13 +173,15 @@ Added user_agent tracking for Facebook Conversions API compatibility:
   - Added `_validate_automation_steps()` function for backend validation
   - Added `_execute_step_pipeline()` function for step-based execution
   - Updated `_run_automations()` to detect and route to step pipeline
-  - **NEW**: Added `user_agent` field to Contact, ContactWithStats, ContactDetail, PageViewCreate, LeadCreate, RegistrationCreate models
-  - **NEW**: Updated `_upsert_contact()` to store user_agent (first-seen wins, truncated to 1000 chars)
-  - **NEW**: Updated `_build_webhook_payload()` to include user_agent
-  - **NEW**: Updated `shumard.js` tracker (embedded in build_tracker_js) to capture navigator.userAgent
+  - Added `user_agent` field to Contact, ContactWithStats, ContactDetail, PageViewCreate, LeadCreate, RegistrationCreate models
+  - Updated `_upsert_contact()` to store user_agent (first-seen wins, truncated to 1000 chars)
+  - Updated `_build_webhook_payload()` to include user_agent, fbc, fbp
+  - **NEW**: Added `fbc` and `fbp` fields to Attribution model
+  - **NEW**: Updated `safe_attribution()` to recognize fbc/fbp as known fields
+  - **NEW**: Updated `shumard.js` tracker to capture `navigator.userAgent`, `_fbc`, and `_fbp` cookies
 
 ## 6) Summary
-**Phase 1, 2, 3 & 4: COMPLETED** - The Zapier-style Automation Builder is PRODUCTION READY with FB CAPI support:
+**Phase 1, 2, 3 & 4: COMPLETED** - The Zapier-style Automation Builder is PRODUCTION READY with full FB CAPI support:
 
 ### Core Features
 - Users can create new automations with a flexible step-based pipeline
@@ -190,11 +214,21 @@ Added user_agent tracking for Facebook Conversions API compatibility:
   - "Step X: Wait For step must have at least one required field"
 - Applied to both POST /api/automations and PUT /api/automations/{id}
 
-### Facebook Conversions API Support
+### Facebook Conversions API Support (Complete)
+**User Agent Tracking:**
 - `user_agent` field added to all contact models
 - Tracker script captures `navigator.userAgent` automatically
 - User agent stored on first contact (first-seen wins)
 - Webhook payloads include `user_agent` for FB CAPI `client_user_agent` mapping
 - Available in automation builder field mapping dropdown
+
+**fbc/fbp Cookie Tracking:**
+- `fbc` (Facebook Click ID) and `fbp` (Facebook Browser ID) fields added to Attribution model
+- Tracker script captures `_fbc` and `_fbp` cookies from browser
+- Cookies refreshed on each attribution capture (handles late cookie setting)
+- Webhook payloads include `fbc` and `fbp` for enhanced FB CAPI event matching
+- Available in automation builder field mapping dropdown:
+  - "Facebook Click ID (fbc)" → maps to FB CAPI `fbc`
+  - "Facebook Browser ID (fbp)" → maps to FB CAPI `fbp`
 
 ### Ready for Production ✅
