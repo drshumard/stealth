@@ -2830,13 +2830,17 @@ async def auth_verify(payload: dict):
 # ─────────────────────────── StealthWebinar Registrations ────────────────────
 
 @api_router.post("/stealth/webhook")
-async def stealth_webhook(request: Request):
+async def stealth_webhook(request: Request, tag: Optional[str] = None):
     """
     Receives registration data from StealthWebinar (or any external form platform).
     For each registration:
       1. Store the raw payload in stealth_registrations
       2. Look up the email in contacts to check if they came from Facebook (has fbclid)
       3. Upsert the contact with phone so automations with required_fields=['email','phone'] fire
+    
+    Query params:
+      - tag: Optional custom tag to add (e.g., ?tag=replay). If not provided, defaults to 'stealth'.
+             Multiple tags can be added via comma-separation: ?tag=replay,webinar
     """
     try:
         body = await request.json()
@@ -2865,6 +2869,16 @@ async def stealth_webhook(request: Request):
 
         email_lower = email.lower()
 
+        # ── Determine tags to add ────────────────────────────────────────────────
+        # If ?tag= is provided, use that (can be comma-separated for multiple tags)
+        # Otherwise default to 'stealth'
+        tags_to_add = []
+        if tag:
+            # Support comma-separated tags: ?tag=replay,webinar
+            tags_to_add = [t.strip().lower() for t in tag.split(',') if t.strip()]
+        if not tags_to_add:
+            tags_to_add = ['stealth']
+
         # ── Check if contact exists and has fbclid ────────────────────────────
         contact = await db.contacts.find_one(
             {"email": {"$regex": f"^{email_lower}$", "$options": "i"},
@@ -2884,13 +2898,13 @@ async def stealth_webhook(request: Request):
             "name":         name,
             "contact_id":   contact_id,
             "has_fbclid":   has_fbclid,
+            "tags":         tags_to_add,  # Store tags in registration record too
             "raw_data":     body,
             "registered_at": dt_to_str(now),
         }
         await db.stealth_registrations.insert_one(reg_doc)
 
-        # ── Upsert the contact with phone + stealth tag ──────────────────────
-        stealth_tag = 'stealth'
+        # ── Upsert the contact with phone + tags ──────────────────────────────
         if contact_id and phone:
             eid = await _resolve_contact_id(contact_id)
             await _upsert_contact({
@@ -2899,10 +2913,10 @@ async def stealth_webhook(request: Request):
                 'phone':      phone,
                 'name':       name or contact.get("name"),
             }, now, ip)
-            # Add stealth tag
+            # Add tags
             await db.contacts.update_one(
                 {"contact_id": eid},
-                {"$addToSet": {"tags": stealth_tag}}
+                {"$addToSet": {"tags": {"$each": tags_to_add}}}
             )
             asyncio.create_task(_run_automations(eid))
         elif not contact_id:
@@ -2916,10 +2930,10 @@ async def stealth_webhook(request: Request):
             }, now, ip)
             asyncio.create_task(_run_automations(eid))
             contact_id = eid
-            # Add stealth tag to newly created contact
+            # Add tags to newly created contact
             await db.contacts.update_one(
                 {"contact_id": eid},
-                {"$addToSet": {"tags": stealth_tag}}
+                {"$addToSet": {"tags": {"$each": tags_to_add}}}
             )
             # Update the registration with the new contact_id
             await db.stealth_registrations.update_one(
