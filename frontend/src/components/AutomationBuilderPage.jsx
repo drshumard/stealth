@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate, useBlocker } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Plus, ChevronUp, ChevronDown, Trash2, Save, Loader2,
   Clock, Filter, Globe, ShieldCheck, Zap, GripVertical, X,
-  Activity, ArrowRight, AlertTriangle
+  Activity, ArrowRight, AlertTriangle, Copy
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
