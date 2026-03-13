@@ -1010,6 +1010,7 @@ async def _execute_step_pipeline(
                     action_id=step_id, action_name=step_name or f"Webhook Step {idx+1}",
                     delay_seconds=0,  # delay handled separately
                     field_map=field_map,
+                    exclude_nulls=exclude_nulls,
                 )
                 
             else:
