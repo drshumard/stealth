@@ -477,10 +477,19 @@ async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = 
     """
     Create or update a contact record.
     Caller is responsible for passing the resolved (non-merged) contact_id via _resolve_contact_id.
+    Auto-parses full name into first_name/last_name if not already provided.
     """
     cid = data.get('contact_id')
     if not cid:
         return
+
+    # Auto-parse name into first_name/last_name if name exists but first/last don't
+    if data.get('name') and not data.get('first_name') and not data.get('last_name'):
+        parsed_first, parsed_last = parse_full_name(data.get('name'))
+        if parsed_first:
+            data['first_name'] = parsed_first
+        if parsed_last:
+            data['last_name'] = parsed_last
 
     existing = await db.contacts.find_one({"contact_id": cid}, {"_id": 0})
     now_str = dt_to_str(now)
@@ -489,6 +498,9 @@ async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = 
         update: dict = {"updated_at": now_str}
         for field in ['name', 'email', 'phone', 'first_name', 'last_name', 'session_id']:
             if data.get(field):
+                # Only update first_name/last_name if they don't already exist
+                if field in ('first_name', 'last_name') and existing.get(field):
+                    continue
                 update[field] = data[field]
         if client_ip and not existing.get('client_ip'):
             update['client_ip'] = client_ip
