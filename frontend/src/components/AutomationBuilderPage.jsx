@@ -564,6 +564,8 @@ export default function AutomationBuilderPage() {
   const [steps, setSteps] = useState([]);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState(null);
 
   // Fetch existing automation for edit mode
   const { data: automation, isLoading, isError, error } = useQuery({
@@ -627,6 +629,7 @@ export default function AutomationBuilderPage() {
               name: action.name || '',
               url: action.webhook_url || '',
               field_map: action.field_map || [],
+              exclude_nulls: true, // Default for converted legacy automations
             }
           });
         });
@@ -643,8 +646,57 @@ export default function AutomationBuilderPage() {
       setInitialized(true);
       return;
     }
-    if (initialized) setHasChanges(true);
-  }, [name, enabled, steps, automation, initialized]);
+    if (initialized || isNew) setHasChanges(true);
+  }, [name, enabled, steps, automation, initialized, isNew]);
+
+  // Reset hasChanges for new automations after initial render
+  useEffect(() => {
+    if (isNew) {
+      // Don't mark as changed until user actually makes a change
+      const timer = setTimeout(() => setHasChanges(false), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isNew]);
+
+  // Browser beforeunload warning
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasChanges]);
+
+  // React Router navigation blocker
+  const blocker = useBlocker(
+    useCallback(
+      ({ currentLocation, nextLocation }) =>
+        hasChanges && currentLocation.pathname !== nextLocation.pathname,
+      [hasChanges]
+    )
+  );
+
+  // Handle blocker state changes
+  useEffect(() => {
+    if (blocker.state === 'blocked') {
+      setShowUnsavedDialog(true);
+      setPendingNavigation(blocker);
+    }
+  }, [blocker.state]);
+
+  // Safe navigation that checks for changes
+  const safeNavigate = useCallback((path) => {
+    if (hasChanges) {
+      setShowUnsavedDialog(true);
+      setPendingNavigation({ proceed: () => navigate(path), reset: () => {} });
+    } else {
+      navigate(path);
+    }
+  }, [hasChanges, navigate]);
 
   // Add a step
   const addStep = (type) => {
@@ -652,7 +704,7 @@ export default function AutomationBuilderPage() {
       wait_for: { fields: ['email'] },
       filter: { filters: [] },
       delay: { seconds: 60 },
-      webhook: { name: '', url: '', field_map: [] },
+      webhook: { name: '', url: '', field_map: [], exclude_nulls: true },
     };
     setSteps(prev => [...prev, { id: uuid4(), type, config: defaultConfig[type] }]);
   };
@@ -671,9 +723,30 @@ export default function AutomationBuilderPage() {
   const moveStep = (index, direction) => {
     const newIndex = index + direction;
     if (newIndex < 0 || newIndex >= steps.length) return;
-    const newSteps = [...steps];
-    [newSteps[index], newSteps[newIndex]] = [newSteps[newIndex], newSteps[index]];
-    setSteps(newSteps);
+    setSteps(prev => {
+      const newSteps = [...prev];
+      [newSteps[index], newSteps[newIndex]] = [newSteps[newIndex], newSteps[index]];
+      return newSteps;
+    });
+  };
+
+  // Duplicate a step
+  const duplicateStep = (index) => {
+    const stepToDuplicate = steps[index];
+    const duplicatedStep = {
+      ...JSON.parse(JSON.stringify(stepToDuplicate)), // Deep clone
+      id: uuid4(), // New unique ID
+    };
+    // If webhook step, append "(copy)" to name if it has one
+    if (duplicatedStep.type === 'webhook' && duplicatedStep.config?.name) {
+      duplicatedStep.config.name = `${duplicatedStep.config.name} (copy)`;
+    }
+    setSteps(prev => {
+      const newSteps = [...prev];
+      newSteps.splice(index + 1, 0, duplicatedStep);
+      return newSteps;
+    });
+    toast.success('Step duplicated');
   };
 
   // Validate before save
@@ -755,6 +828,7 @@ export default function AutomationBuilderPage() {
 
       if (!res.ok) throw new Error(await res.text());
 
+      setHasChanges(false); // Reset changes flag before navigation
       toast.success(isNew ? 'Automation created!' : 'Automation saved!');
       qc.invalidateQueries({ queryKey: ['automations'] });
       navigate('/automations');
@@ -809,10 +883,45 @@ export default function AutomationBuilderPage() {
 
   return (
     <div className="p-8 md:p-10 max-w-4xl mx-auto">
+      {/* Unsaved changes dialog */}
+      <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+        <AlertDialogContent style={{ backgroundColor: '#fff', borderColor: 'var(--stroke)' }}>
+          <AlertDialogHeader>
+            <AlertDialogTitle style={{ color: 'var(--brand-navy)' }}>Unsaved Changes</AlertDialogTitle>
+            <AlertDialogDescription style={{ color: 'var(--text-muted)' }}>
+              You have unsaved changes to this automation. Are you sure you want to leave? Your changes will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={() => {
+                setShowUnsavedDialog(false);
+                if (pendingNavigation?.reset) pendingNavigation.reset();
+                setPendingNavigation(null);
+              }}
+              style={{ borderColor: 'var(--stroke)' }}
+            >
+              Stay
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                setShowUnsavedDialog(false);
+                setHasChanges(false);
+                if (pendingNavigation?.proceed) pendingNavigation.proceed();
+                setPendingNavigation(null);
+              }}
+              style={{ backgroundColor: '#dc2626', color: '#fff', border: 'none' }}
+            >
+              Leave Without Saving
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Header */}
       <div className="mb-8">
         <button
-          onClick={() => navigate('/automations')}
+          onClick={() => safeNavigate('/automations')}
           className="flex items-center gap-2 text-sm font-semibold mb-4 transition-colors hover:opacity-80"
           style={{ color: 'var(--brand-navy)' }}
           data-testid="back-to-automations"
@@ -832,6 +941,7 @@ export default function AutomationBuilderPage() {
             />
             <p className="text-sm font-medium mt-1" style={{ color: 'var(--text-dim)' }}>
               {isNew ? 'New automation' : 'Edit automation'}
+              {hasChanges && <span className="ml-2 text-amber-600">• Unsaved changes</span>}
             </p>
           </div>
 
@@ -876,20 +986,45 @@ export default function AutomationBuilderPage() {
         </div>
       )}
 
-      {/* Steps */}
+      {/* Steps with animation */}
       <div className="space-y-0">
-        {steps.map((step, idx) => (
-          <StepCard
-            key={step.id}
-            step={step}
-            index={idx}
-            total={steps.length}
-            onUpdate={updated => updateStep(step.id, updated)}
-            onRemove={() => removeStep(step.id)}
-            onMoveUp={() => moveStep(idx, -1)}
-            onMoveDown={() => moveStep(idx, 1)}
-          />
-        ))}
+        <AnimatePresence mode="popLayout">
+          {steps.map((step, idx) => (
+            <motion.div
+              key={step.id}
+              layout
+              initial={{ opacity: 0, y: -20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.15 } }}
+              transition={{ 
+                type: 'spring',
+                stiffness: 500,
+                damping: 30,
+                mass: 1,
+              }}
+            >
+              <StepCard
+                step={step}
+                index={idx}
+                total={steps.length}
+                onUpdate={updated => updateStep(step.id, updated)}
+                onRemove={() => removeStep(step.id)}
+                onMoveUp={() => moveStep(idx, -1)}
+                onMoveDown={() => moveStep(idx, 1)}
+                onDuplicate={() => duplicateStep(idx)}
+              />
+              {/* Connector line between steps */}
+              {idx < steps.length - 1 && (
+                <motion.div 
+                  layout
+                  className="flex justify-center py-2"
+                >
+                  <div className="w-0.5 h-6 rounded-full" style={{ backgroundColor: '#d2d8ef' }} />
+                </motion.div>
+              )}
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
 
       {/* Add step button */}
@@ -919,7 +1054,7 @@ export default function AutomationBuilderPage() {
       >
         <Button
           variant="outline"
-          onClick={() => navigate('/automations')}
+          onClick={() => safeNavigate('/automations')}
           className="h-11 px-6 text-sm font-semibold"
           style={{ borderColor: 'var(--stroke)', color: 'var(--text-muted)' }}
           data-testid="cancel-button"
