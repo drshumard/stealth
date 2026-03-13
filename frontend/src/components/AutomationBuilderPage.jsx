@@ -671,23 +671,34 @@ export default function AutomationBuilderPage() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasChanges]);
 
-  // React Router navigation blocker using custom hook
-  const handleNavigationBlock = useCallback((blockedNav) => {
-    setShowUnsavedDialog(true);
-    setPendingNavigation(blockedNav);
-  }, []);
-  
-  useNavigationBlock(hasChanges, handleNavigationBlock);
+  // Store pending navigation target for dialog
+  const pendingTargetRef = useRef(null);
 
   // Safe navigation that checks for changes
   const safeNavigate = useCallback((path) => {
     if (hasChanges) {
+      pendingTargetRef.current = path;
       setShowUnsavedDialog(true);
-      setPendingNavigation({ proceed: () => { setHasChanges(false); navigate(path); }, reset: () => {} });
     } else {
       navigate(path);
     }
   }, [hasChanges, navigate]);
+
+  // Handle leaving after unsaved changes dialog
+  const handleLeaveWithoutSaving = useCallback(() => {
+    setShowUnsavedDialog(false);
+    setHasChanges(false);
+    const target = pendingTargetRef.current || '/automations';
+    pendingTargetRef.current = null;
+    // Use setTimeout to ensure state updates are processed before navigation
+    setTimeout(() => navigate(target), 0);
+  }, [navigate]);
+
+  // Handle staying on page
+  const handleStay = useCallback(() => {
+    setShowUnsavedDialog(false);
+    pendingTargetRef.current = null;
+  }, []);
 
   // Add a step
   const addStep = (type) => {
