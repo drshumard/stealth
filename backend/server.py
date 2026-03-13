@@ -441,6 +441,9 @@ async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = 
                 update[field] = data[field]
         if client_ip and not existing.get('client_ip'):
             update['client_ip'] = client_ip
+        # Store user_agent if provided and not already set (first-seen wins)
+        if data.get('user_agent') and not existing.get('user_agent'):
+            update['user_agent'] = data['user_agent'][:1000]  # Truncate to prevent bloat
         if data.get('attribution'):
             existing_attr = existing.get('attribution')
             if not existing_attr or not isinstance(existing_attr, dict):
