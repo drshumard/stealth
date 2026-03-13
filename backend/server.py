@@ -504,8 +504,10 @@ async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = 
         cdoc = strip_nulls(contact.model_dump())
         cdoc['created_at'] = dt_to_str(contact.created_at)
         cdoc['updated_at'] = dt_to_str(contact.updated_at)
+        logger.info(f"_upsert_contact: inserting cdoc with user_agent={cdoc.get('user_agent')}")
         try:
             await db.contacts.insert_one(cdoc)
+            logger.info(f"_upsert_contact: inserted successfully")
         except DuplicateKeyError:
             # Race condition: two concurrent requests both saw "no existing document"
             # and both tried to insert. The second one wins with a graceful update
