@@ -799,6 +799,7 @@ def _build_webhook_payload(contact: dict, field_map: list) -> dict:
         'first_name': contact.get('first_name'), 'last_name': contact.get('last_name'),
         'phone': contact.get('phone'), 'contact_id': contact.get('contact_id'),
         'client_ip': contact.get('client_ip'),
+        'user_agent': contact.get('user_agent'),  # For FB CAPI: client_user_agent
         'created_at': dt_to_str(contact.get('created_at')),
         'updated_at': dt_to_str(contact.get('updated_at')),
         'utm_source': attr.get('utm_source'), 'utm_medium': attr.get('utm_medium'),
