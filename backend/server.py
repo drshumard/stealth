@@ -42,6 +42,8 @@ class Attribution(BaseModel):
     adset_id: Optional[str] = None
     ad_id: Optional[str] = None
     fbclid: Optional[str] = None
+    fbc: Optional[str] = None              # Facebook Click ID cookie (_fbc)
+    fbp: Optional[str] = None              # Facebook Browser ID cookie (_fbp)
     gclid: Optional[str] = None
     ttclid: Optional[str] = None
     source_link_tag: Optional[str] = None
