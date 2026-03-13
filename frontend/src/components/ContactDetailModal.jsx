@@ -405,6 +405,7 @@ const ModalInner = ({ contactId, defaultTab, onClose, onDelete }) => {
                     <InfoRow icon={Phone}    label="Phone"        value={contact.phone} />
                     <InfoRow icon={Hash}     label="Contact ID"   value={contact.contact_id} mono copyable />
                     <InfoRow icon={Wifi}     label="IP Address"   value={contact.client_ip} mono />
+                    <InfoRow icon={Globe}    label="User Agent"   value={contact.user_agent} mono copyable />
                     <InfoRow icon={Layers}   label="Session ID"   value={contact.session_id} mono copyable />
                     <InfoRow icon={Calendar} label="First Seen"   value={fmt(contact.created_at)} />
                     <InfoRow icon={Calendar} label="Last Updated" value={fmt(contact.updated_at)} />
@@ -508,11 +509,13 @@ const ModalInner = ({ contactId, defaultTab, onClose, onDelete }) => {
                         </div>
                       </div>
                     )}
-                    {(contact.attribution?.fbclid || contact.attribution?.gclid || contact.attribution?.ttclid || contact.attribution?.source_link_tag) && (
+                    {(contact.attribution?.fbclid || contact.attribution?.fbc || contact.attribution?.fbp || contact.attribution?.gclid || contact.attribution?.ttclid || contact.attribution?.source_link_tag) && (
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-widest mb-2 px-1" style={{ color: 'var(--text-dim)' }}>Click IDs</p>
+                        <p className="text-xs font-semibold uppercase tracking-widest mb-2 px-1" style={{ color: 'var(--text-dim)' }}>Click IDs & FB Cookies</p>
                         <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff' }}>
                           <AttrRow label="fbclid" value={contact.attribution?.fbclid} />
+                          <AttrRow label="fbc (FB Click)" value={contact.attribution?.fbc} />
+                          <AttrRow label="fbp (FB Browser)" value={contact.attribution?.fbp} />
                           <AttrRow label="gclid" value={contact.attribution?.gclid} />
                           <AttrRow label="ttclid" value={contact.attribution?.ttclid} />
                           <AttrRow label="source_link_tag" value={contact.attribution?.source_link_tag} />
