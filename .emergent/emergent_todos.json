@@ -1,14 +1,18 @@
 [
   {
     "content": "Add fbc/fbp display to ContactDetailModal",
-    "status": "in_progress"
+    "status": "completed"
+  },
+  {
+    "content": "Add user_agent display to ContactDetailModal Overview",
+    "status": "completed"
   },
   {
     "content": "Add 'Exclude null fields' option to webhook step config",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Update _build_webhook_payload to filter nulls when option enabled",
-    "status": "pending"
+    "status": "completed"
   }
 ]
