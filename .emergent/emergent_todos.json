@@ -1,22 +1,22 @@
 [
   {
     "content": "Add user_agent field to Contact and Pydantic models",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Update _upsert_contact to store user_agent",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Update shumard.js to capture navigator.userAgent",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Add user_agent to webhook payload builder",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Add user_agent to TETHER_FIELDS in AutomationBuilderPage",
-    "status": "pending"
+    "status": "completed"
   }
 ]
