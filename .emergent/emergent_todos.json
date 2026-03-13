@@ -16,11 +16,15 @@
     "status": "completed"
   },
   {
+    "content": "FIX: _fire_webhook_task missing exclude_nulls param for delay+refetch",
+    "status": "completed"
+  },
+  {
     "content": "Review: Legacy automation support for fbc/fbp",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Test: End-to-end fbc/fbp tracking flow",
-    "status": "pending"
+    "status": "in_progress"
   }
 ]
