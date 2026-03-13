@@ -811,6 +811,8 @@ def _build_webhook_payload(contact: dict, field_map: list) -> dict:
         'utm_content': attr.get('utm_content'), 'utm_id': attr.get('utm_id'),
         'campaign_id': attr.get('campaign_id'), 'adset_id': attr.get('adset_id'),
         'ad_id': attr.get('ad_id'), 'fbclid': attr.get('fbclid'),
+        'fbc': attr.get('fbc'),       # Facebook Click ID cookie (_fbc)
+        'fbp': attr.get('fbp'),       # Facebook Browser ID cookie (_fbp)
     }
     if not field_map:
         return {k: v for k, v in src.items() if v is not None}
