@@ -387,6 +387,52 @@ def strip_nulls(d: dict) -> dict:
     return result
 
 
+def parse_full_name(full_name: Optional[str]) -> tuple[Optional[str], Optional[str]]:
+    """
+    Parse a full name string into (first_name, last_name).
+    
+    Logic:
+    - Single word: first_name only, no last_name
+    - Two words: first = first_name, second = last_name
+    - Three+ words: 
+      - If last word is hyphenated (e.g., "Smith-Jones"), all before it = first_name
+      - Otherwise: first N-1 words = first_name, last word = last_name
+    - Hyphenated first names (e.g., "Mary-Jane") stay together as first_name
+    
+    Examples:
+    - "John" → ("John", None)
+    - "John Smith" → ("John", "Smith")
+    - "John Paul Smith" → ("John Paul", "Smith")
+    - "Mary-Jane Watson" → ("Mary-Jane", "Watson")
+    - "John Smith-Jones" → ("John", "Smith-Jones")
+    - "John Paul Smith-Jones" → ("John Paul", "Smith-Jones")
+    """
+    if not full_name or not isinstance(full_name, str):
+        return (None, None)
+    
+    # Clean and normalize
+    name = ' '.join(full_name.strip().split())  # Normalize whitespace
+    if not name:
+        return (None, None)
+    
+    parts = name.split()
+    
+    if len(parts) == 1:
+        # Single name - treat as first name only
+        return (parts[0], None)
+    
+    if len(parts) == 2:
+        # Two names - simple first/last split
+        return (parts[0], parts[1])
+    
+    # Three or more parts
+    # Last word is the last name, everything else is first name
+    last_name = parts[-1]
+    first_name = ' '.join(parts[:-1])
+    
+    return (first_name, last_name)
+
+
 def _tz_day_start(date_str: str, tz_name: Optional[str]) -> str:
     """UTC ISO string for 00:00:00 of date_str in tz_name. Falls back to treating date as UTC."""
     try:
