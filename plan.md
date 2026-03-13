@@ -157,14 +157,62 @@ Enhanced Contact Detail Modal and webhook configuration:
 5. ✅ As a user, null fields are excluded from webhooks by default for cleaner integrations.
 6. ✅ As a user, I can disable null field exclusion if my webhook endpoint requires all fields.
 
-### Phase 6 — Polish & Future Enhancements (Not Started - Optional)
+### Phase 6 — Critical fbc/fbp Bug Fixes (COMPLETED ✅)
+**Critical code review identified and fixed 5 bugs affecting fbc/fbp tracking in production:**
+
+#### Bug 1: localStorage Not Updated When Using Cached Attribution
+- **Issue**: shumard.js captured fbc/fbp cookies but returned immediately without saving to localStorage when using cached attribution data
+- **Fix**: Added `needsUpdate` flag and `lsSet()` call to persist updated fbc/fbp values to localStorage
+- **Impact**: fbc/fbp would be lost on subsequent page loads
+
+#### Bug 2: attr_signal_fields Missing fbc/fbp
+- **Issue**: Backend `_upsert_contact()` function's `attr_signal_fields` set didn't include fbc/fbp
+- **Fix**: Added `'fbc', 'fbp'` to the `attr_signal_fields` set
+- **Impact**: Contacts with only FB cookies (no UTMs, no fbclid) wouldn't be created properly
+
+#### Bug 3: No Delayed Re-capture for Slow FB Pixel
+- **Issue**: Facebook Pixel often sets `_fbc` and `_fbp` cookies AFTER initial page load (async script loading)
+- **Fix**: Added 2-second delayed re-capture in `init()` function to catch cookies set after page load
+- **Impact**: fbc/fbp would be null if FB Pixel loaded slowly
+
+#### Bug 4: sendLead/sendRegistration Not Refreshing Cookies
+- **Issue**: Form submissions used cached attribution without checking for newly-set FB cookies
+- **Fix**: Added fbc/fbp cookie refresh at the start of `sendLead()` and `sendRegistration()` functions
+- **Impact**: Lead data sent without latest fbc/fbp values even if cookies were set after page load
+
+#### Bug 5: _fire_webhook_task Missing exclude_nulls Parameter
+- **Issue**: When delay_seconds > 0, `_fire_webhook_task()` rebuilt payload without passing `exclude_nulls`
+- **Fix**: Added `exclude_nulls` parameter to `_fire_webhook_task()` and passed it through from step executor
+- **Impact**: Delayed webhooks would include null fields even when exclude_nulls was enabled
+
+**End-to-End Test Verified:**
+```json
+{
+  "email": "e2etest@example.com",
+  "fbc": "fb.1.1710000000000.TestFbc123",
+  "fbp": "fb.1.1710000000000.TestFbp456",
+  "fbclid": "e2e-fbclid",
+  "user_agent": "Mozilla/5.0 E2E Test",
+  "utm_source": "facebook"
+}
+```
+
+**Completed User Stories (Phase 6)**:
+1. ✅ As a user, fbc/fbp values are correctly persisted to localStorage even when using cached attribution.
+2. ✅ As a user, contacts are created properly when only FB cookies are present (no UTMs required).
+3. ✅ As a user, fbc/fbp cookies set by slow-loading FB Pixel are captured within 2 seconds of page load.
+4. ✅ As a user, form submissions include the latest fbc/fbp values even if cookies were set after page load.
+5. ✅ As a user, delayed webhooks correctly respect the exclude_nulls setting.
+6. ✅ As a user, fbc/fbp flow correctly from tracker script → backend → webhook payload.
+
+### Phase 7 — Polish & Future Enhancements (Not Started - Optional)
 - Add: duplicate step, unsaved-changes prompt, keyboard reordering (optional)
 - Improve headers editor UX (JSON textarea with validation for custom headers)
 - Visual pipeline enhancements: animation on reorder, better visual feedback
 - Add converter in UI: "Convert legacy automation to steps" (one-click)
 - Docs: quick how-to and examples for each step type
 - Add gclid/wbraid/gbraid tracking for Google Ads Enhanced Conversions
-- User Stories (Phase 6)
+- User Stories (Phase 7)
   1. As a user, I can duplicate an existing step to speed up configuration.
   2. As a user, I'm warned if I try to navigate away with unsaved changes.
   3. As a user, the step list has smooth animations when reordering.
@@ -185,8 +233,9 @@ Enhanced Contact Detail Modal and webhook configuration:
 11. ✅ ~~Add fbc/fbp cookie tracking for enhanced Facebook CAPI matching~~
 12. ✅ ~~Add fbc/fbp/user_agent display to Contact Detail Modal~~
 13. ✅ ~~Add "Exclude null fields" option to webhook steps~~
-14. (Optional) Add polish features: duplicate step, unsaved changes warning, animations
-15. (Optional) Add Google Ads tracking (gclid/wbraid/gbraid)
+14. ✅ ~~Critical code review: Fix 5 bugs affecting fbc/fbp tracking in production~~
+15. (Optional) Add polish features: duplicate step, unsaved changes warning, animations
+16. (Optional) Add Google Ads tracking (gclid/wbraid/gbraid)
 
 ## 4) Success Criteria (ALL ACHIEVED ✅)
 - ✅ Dedicated builder routes load and render without console errors
@@ -202,8 +251,10 @@ Enhanced Contact Detail Modal and webhook configuration:
 - ✅ Backend returns proper 400 status codes for validation errors
 - ✅ User agent captured, stored, and available in webhook payloads for FB CAPI
 - ✅ fbc/fbp cookies captured, stored in attribution, and available for FB CAPI matching
-- ✅ **NEW**: Contact Detail Modal displays user_agent, fbc, and fbp with copy functionality
-- ✅ **NEW**: Webhook steps support "Exclude null fields" option for cleaner payloads
+- ✅ Contact Detail Modal displays user_agent, fbc, and fbp with copy functionality
+- ✅ Webhook steps support "Exclude null fields" option for cleaner payloads
+- ✅ **NEW**: fbc/fbp tracking is production-ready with all critical bugs fixed
+- ✅ **NEW**: End-to-end test verified fbc/fbp flow from tracker → backend → webhook
 
 ## 5) Files Changed/Created
 - `/app/frontend/src/components/AutomationBuilderPage.jsx` - NEW: Full-page Zapier-style builder with validation + FB CAPI fields (user_agent, fbc, fbp) in TETHER_FIELDS + exclude_nulls checkbox
@@ -221,10 +272,16 @@ Enhanced Contact Detail Modal and webhook configuration:
   - Updated `_build_webhook_payload()` to include user_agent, fbc, fbp and support `exclude_nulls` parameter
   - Added `fbc` and `fbp` fields to Attribution model
   - Updated `safe_attribution()` to recognize fbc/fbp as known fields
-  - Updated `shumard.js` tracker to capture `navigator.userAgent`, `_fbc`, and `_fbp` cookies
+  - **Added `fbc`, `fbp` to `attr_signal_fields` in `_upsert_contact()` (Bug #2 fix)**
+  - **Added `exclude_nulls` parameter to `_fire_webhook_task()` (Bug #5 fix)**
+  - Updated `shumard.js` tracker:
+    - Captures `navigator.userAgent`, `_fbc`, and `_fbp` cookies
+    - **Saves updated fbc/fbp to localStorage when using cached attribution (Bug #1 fix)**
+    - **Added 2-second delayed re-capture for slow FB Pixel (Bug #3 fix)**
+    - **Refreshes fbc/fbp in sendLead/sendRegistration before sending (Bug #4 fix)**
 
 ## 6) Summary
-**Phases 1-5: COMPLETED** - The Zapier-style Automation Builder is PRODUCTION READY with full FB CAPI support and enhanced UX:
+**Phases 1-6: COMPLETED** - The Zapier-style Automation Builder is PRODUCTION READY with full FB CAPI support, enhanced UX, and all critical bugs fixed:
 
 ### Core Features
 - Users can create new automations with a flexible step-based pipeline
@@ -257,21 +314,25 @@ Enhanced Contact Detail Modal and webhook configuration:
   - "Step X: Wait For step must have at least one required field"
 - Applied to both POST /api/automations and PUT /api/automations/{id}
 
-### Facebook Conversions API Support (Complete)
+### Facebook Conversions API Support (Complete & Production-Ready)
 **User Agent Tracking:**
 - `user_agent` field added to all contact models
 - Tracker script captures `navigator.userAgent` automatically
 - User agent stored on first contact (first-seen wins)
 - Webhook payloads include `user_agent` for FB CAPI `client_user_agent` mapping
-- **Displayed in Contact Detail Modal Overview tab with copy button**
+- Displayed in Contact Detail Modal Overview tab with copy button
 - Available in automation builder field mapping dropdown
 
-**fbc/fbp Cookie Tracking:**
+**fbc/fbp Cookie Tracking (5 Critical Bugs Fixed):**
 - `fbc` (Facebook Click ID) and `fbp` (Facebook Browser ID) fields added to Attribution model
 - Tracker script captures `_fbc` and `_fbp` cookies from browser
-- Cookies refreshed on each attribution capture (handles late cookie setting)
+- **Bug Fix #1**: Cookies now saved to localStorage when using cached attribution
+- **Bug Fix #2**: `attr_signal_fields` now includes fbc/fbp for proper contact creation
+- **Bug Fix #3**: 2-second delayed re-capture handles slow FB Pixel loading
+- **Bug Fix #4**: sendLead/sendRegistration refresh cookies before sending
+- **Bug Fix #5**: `_fire_webhook_task` passes exclude_nulls for delayed webhooks
 - Webhook payloads include `fbc` and `fbp` for enhanced FB CAPI event matching
-- **Displayed in Contact Detail Modal Attribution tab "Click IDs & FB Cookies" section**
+- Displayed in Contact Detail Modal Attribution tab "Click IDs & FB Cookies" section
 - Available in automation builder field mapping dropdown:
   - "Facebook Click ID (fbc)" → maps to FB CAPI `fbc`
   - "Facebook Browser ID (fbp)" → maps to FB CAPI `fbp`
@@ -285,3 +346,4 @@ Enhanced Contact Detail Modal and webhook configuration:
 - Reduces payload clutter for integrations that don't need null fields
 
 ### Ready for Production ✅
+All features implemented, tested, and critical bugs fixed. fbc/fbp tracking verified end-to-end.
