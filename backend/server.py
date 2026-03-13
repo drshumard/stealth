@@ -157,6 +157,7 @@ class ContactDetail(BaseModel):
     contact_id: str
     session_id: Optional[str] = None
     client_ip: Optional[str] = None
+    user_agent: Optional[str] = None          # Browser user agent (for FB CAPI)
     name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
