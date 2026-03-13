@@ -11,6 +11,8 @@
 - Backward compatible: gracefully load legacy automations (required_fields, filters, actions/webhook_url) and allow converting to steps on save
 - **Track user_agent for Facebook Conversions API compatibility**
 - **Track fbc/fbp cookies for enhanced Facebook CAPI matching**
+- **Display FB CAPI data (user_agent, fbc, fbp) in Contact Detail Modal**
+- **Support excluding null fields from webhook payloads for cleaner integrations**
 - POC: Not required (CRUD + simple auth only)
 
 ## 2) Implementation Steps (Phased)
@@ -27,7 +29,7 @@ Core pages/components
   - wait_for: { fields: string[] }
   - filter: { filters: [{ id, field, operator, value? }] }
   - delay: { seconds: number }
-  - webhook: { name?, url, field_map?: [{ id, source, target }] }
+  - webhook: { name?, url, field_map?: [{ id, source, target }], exclude_nulls?: boolean }
 - ✅ API integration (TanStack Query):
   - GET /api/automations/:id (edit); POST /api/automations (create); PUT /api/automations/:id (save)
   - On save, persist steps[] (and name/enabled). Legacy fields cleared.
@@ -121,13 +123,48 @@ Added comprehensive tracking for Facebook Conversions API compatibility:
 7. ✅ As a user, I can map fbc/fbp to custom webhook fields for enhanced FB CAPI matching.
 8. ✅ As a user, webhook payloads include fbc/fbp automatically when available.
 
-### Phase 5 — Polish & Enhancements (Not Started - Optional)
+### Phase 5 — UI Enhancements & Webhook Options (COMPLETED ✅)
+Enhanced Contact Detail Modal and webhook configuration:
+
+#### Contact Detail Modal Enhancements
+- ✅ Added **User Agent** display to Overview tab:
+  - Shows full user agent string with copy button
+  - Displayed alongside IP Address and Session ID
+- ✅ Enhanced Attribution tab with **"Click IDs & FB Cookies"** section:
+  - Renamed section from "Click IDs" to "Click IDs & FB Cookies"
+  - Displays fbc (FB Click) with copy button
+  - Displays fbp (FB Browser) with copy button
+  - Shows alongside existing fbclid, gclid, ttclid, source_link_tag
+
+#### Webhook "Exclude Null Fields" Option
+- ✅ Added **"Exclude null fields"** checkbox to webhook step config:
+  - Default: checked (true) - null fields are excluded by default
+  - UI: Checkbox with label "Exclude null fields — Don't send fields that have no value"
+  - Stored in step config as `exclude_nulls: boolean`
+- ✅ Updated `_build_webhook_payload()` to respect `exclude_nulls` parameter:
+  - When `exclude_nulls=True`: Filters out null and empty string values from payload
+  - When `exclude_nulls=False`: Includes all fields (original behavior)
+  - Works with both default payload and custom field mappings
+- ✅ Updated `_execute_step_pipeline()` to pass `exclude_nulls` config to payload builder:
+  - Reads `config.exclude_nulls` from webhook step (defaults to True)
+  - Passes to `_build_webhook_payload()` function
+
+**Completed User Stories (Phase 5)**:
+1. ✅ As a user, I can see the user agent in the contact detail modal Overview tab.
+2. ✅ As a user, I can see fbc and fbp cookies in the contact detail modal Attribution tab.
+3. ✅ As a user, I can copy fbc/fbp/user_agent values with one click.
+4. ✅ As a user, I can toggle "Exclude null fields" on webhook steps to reduce payload clutter.
+5. ✅ As a user, null fields are excluded from webhooks by default for cleaner integrations.
+6. ✅ As a user, I can disable null field exclusion if my webhook endpoint requires all fields.
+
+### Phase 6 — Polish & Future Enhancements (Not Started - Optional)
 - Add: duplicate step, unsaved-changes prompt, keyboard reordering (optional)
 - Improve headers editor UX (JSON textarea with validation for custom headers)
 - Visual pipeline enhancements: animation on reorder, better visual feedback
 - Add converter in UI: "Convert legacy automation to steps" (one-click)
 - Docs: quick how-to and examples for each step type
-- User Stories (Phase 5)
+- Add gclid/wbraid/gbraid tracking for Google Ads Enhanced Conversions
+- User Stories (Phase 6)
   1. As a user, I can duplicate an existing step to speed up configuration.
   2. As a user, I'm warned if I try to navigate away with unsaved changes.
   3. As a user, the step list has smooth animations when reordering.
@@ -146,7 +183,10 @@ Added comprehensive tracking for Facebook Conversions API compatibility:
 9. ✅ ~~Add backend validation for steps (URL format, filter values, wait_for fields)~~
 10. ✅ ~~Add user_agent tracking for Facebook Conversions API compatibility~~
 11. ✅ ~~Add fbc/fbp cookie tracking for enhanced Facebook CAPI matching~~
-12. (Optional) Add polish features: duplicate step, unsaved changes warning, animations
+12. ✅ ~~Add fbc/fbp/user_agent display to Contact Detail Modal~~
+13. ✅ ~~Add "Exclude null fields" option to webhook steps~~
+14. (Optional) Add polish features: duplicate step, unsaved changes warning, animations
+15. (Optional) Add Google Ads tracking (gclid/wbraid/gbraid)
 
 ## 4) Success Criteria (ALL ACHIEVED ✅)
 - ✅ Dedicated builder routes load and render without console errors
@@ -161,10 +201,13 @@ Added comprehensive tracking for Facebook Conversions API compatibility:
 - ✅ Error states handled gracefully with user-friendly UI
 - ✅ Backend returns proper 400 status codes for validation errors
 - ✅ User agent captured, stored, and available in webhook payloads for FB CAPI
-- ✅ **NEW**: fbc/fbp cookies captured, stored in attribution, and available for FB CAPI matching
+- ✅ fbc/fbp cookies captured, stored in attribution, and available for FB CAPI matching
+- ✅ **NEW**: Contact Detail Modal displays user_agent, fbc, and fbp with copy functionality
+- ✅ **NEW**: Webhook steps support "Exclude null fields" option for cleaner payloads
 
 ## 5) Files Changed/Created
-- `/app/frontend/src/components/AutomationBuilderPage.jsx` - NEW: Full-page Zapier-style builder with validation + FB CAPI fields (user_agent, fbc, fbp) in TETHER_FIELDS
+- `/app/frontend/src/components/AutomationBuilderPage.jsx` - NEW: Full-page Zapier-style builder with validation + FB CAPI fields (user_agent, fbc, fbp) in TETHER_FIELDS + exclude_nulls checkbox
+- `/app/frontend/src/components/ContactDetailModal.jsx` - MODIFIED: Added user_agent to Overview tab, added fbc/fbp to Attribution tab "Click IDs & FB Cookies" section
 - `/app/frontend/src/App.js` - MODIFIED: Added routes for /automations/new and /automations/builder/:id
 - `/app/frontend/src/components/AutomationsPage.jsx` - MODIFIED: Updated to use navigation instead of modal
 - `/app/backend/server.py` - MODIFIED: 
@@ -175,13 +218,13 @@ Added comprehensive tracking for Facebook Conversions API compatibility:
   - Updated `_run_automations()` to detect and route to step pipeline
   - Added `user_agent` field to Contact, ContactWithStats, ContactDetail, PageViewCreate, LeadCreate, RegistrationCreate models
   - Updated `_upsert_contact()` to store user_agent (first-seen wins, truncated to 1000 chars)
-  - Updated `_build_webhook_payload()` to include user_agent, fbc, fbp
-  - **NEW**: Added `fbc` and `fbp` fields to Attribution model
-  - **NEW**: Updated `safe_attribution()` to recognize fbc/fbp as known fields
-  - **NEW**: Updated `shumard.js` tracker to capture `navigator.userAgent`, `_fbc`, and `_fbp` cookies
+  - Updated `_build_webhook_payload()` to include user_agent, fbc, fbp and support `exclude_nulls` parameter
+  - Added `fbc` and `fbp` fields to Attribution model
+  - Updated `safe_attribution()` to recognize fbc/fbp as known fields
+  - Updated `shumard.js` tracker to capture `navigator.userAgent`, `_fbc`, and `_fbp` cookies
 
 ## 6) Summary
-**Phase 1, 2, 3 & 4: COMPLETED** - The Zapier-style Automation Builder is PRODUCTION READY with full FB CAPI support:
+**Phases 1-5: COMPLETED** - The Zapier-style Automation Builder is PRODUCTION READY with full FB CAPI support and enhanced UX:
 
 ### Core Features
 - Users can create new automations with a flexible step-based pipeline
@@ -195,7 +238,7 @@ Added comprehensive tracking for Facebook Conversions API compatibility:
 - wait_for: Checks required fields, aborts pipeline if missing (will retry later)
 - filter: Evaluates conditions, aborts if not matched
 - delay: Waits N seconds and refetches contact data
-- webhook: Fires webhook with optional field mapping
+- webhook: Fires webhook with optional field mapping and null exclusion
 - Full backward compatibility with legacy automations
 
 ### Production Hardening (Dual-Layer Validation)
@@ -220,6 +263,7 @@ Added comprehensive tracking for Facebook Conversions API compatibility:
 - Tracker script captures `navigator.userAgent` automatically
 - User agent stored on first contact (first-seen wins)
 - Webhook payloads include `user_agent` for FB CAPI `client_user_agent` mapping
+- **Displayed in Contact Detail Modal Overview tab with copy button**
 - Available in automation builder field mapping dropdown
 
 **fbc/fbp Cookie Tracking:**
@@ -227,8 +271,17 @@ Added comprehensive tracking for Facebook Conversions API compatibility:
 - Tracker script captures `_fbc` and `_fbp` cookies from browser
 - Cookies refreshed on each attribution capture (handles late cookie setting)
 - Webhook payloads include `fbc` and `fbp` for enhanced FB CAPI event matching
+- **Displayed in Contact Detail Modal Attribution tab "Click IDs & FB Cookies" section**
 - Available in automation builder field mapping dropdown:
   - "Facebook Click ID (fbc)" → maps to FB CAPI `fbc`
   - "Facebook Browser ID (fbp)" → maps to FB CAPI `fbp`
+
+### Webhook Enhancements
+**Exclude Null Fields Option:**
+- Checkbox in webhook step config: "Exclude null fields — Don't send fields that have no value"
+- Default: enabled (true) - cleaner payloads out of the box
+- Backend `_build_webhook_payload()` filters null/empty values when enabled
+- Works with both default payload and custom field mappings
+- Reduces payload clutter for integrations that don't need null fields
 
 ### Ready for Production ✅
