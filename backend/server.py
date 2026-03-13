@@ -1742,6 +1742,7 @@ async def track_lead(data: LeadCreate, request: Request):
         now = datetime.now(timezone.utc)
         ip  = get_client_ip(request)
         eid = await _resolve_contact_id(data.contact_id)
+        logger.info(f"track_lead: user_agent from data = {data.user_agent}")
         await _upsert_contact({
             'contact_id': eid, 'session_id': data.session_id,
             'email': data.email, 'phone': data.phone, 'name': data.name,
