@@ -565,7 +565,6 @@ export default function AutomationBuilderPage() {
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
-  const [pendingNavigation, setPendingNavigation] = useState(null);
 
   // Fetch existing automation for edit mode
   const { data: automation, isLoading, isError, error } = useQuery({
