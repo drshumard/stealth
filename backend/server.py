@@ -1388,6 +1388,12 @@ def build_tracker_js(backend_url: str, auto_tag: str = '') -> str:
   }
 
   function sendLead(fields) {
+    /* Refresh fbc/fbp from cookies right before sending (FB Pixel may have set them) */
+    var fbc = getCookie('_fbc');
+    var fbp = getCookie('_fbp');
+    if (fbc && store.source.fbc !== fbc) { store.source.fbc = fbc; lsSet(ATTR_KEY, JSON.stringify(store.source)); }
+    if (fbp && store.source.fbp !== fbp) { store.source.fbp = fbp; lsSet(ATTR_KEY, JSON.stringify(store.source)); }
+    
     var email = fields && fields.email;
     var phone = fields && fields.phone;
     if (email || phone) {
@@ -1400,6 +1406,12 @@ def build_tracker_js(backend_url: str, auto_tag: str = '') -> str:
   }
 
   function sendRegistration(fields) {
+    /* Refresh fbc/fbp from cookies right before sending (FB Pixel may have set them) */
+    var fbc = getCookie('_fbc');
+    var fbp = getCookie('_fbp');
+    if (fbc && store.source.fbc !== fbc) { store.source.fbc = fbc; lsSet(ATTR_KEY, JSON.stringify(store.source)); }
+    if (fbp && store.source.fbp !== fbp) { store.source.fbp = fbp; lsSet(ATTR_KEY, JSON.stringify(store.source)); }
+    
     var parts = [];
     if (fields && fields.email) parts.push('email: ' + fields.email);
     if (fields && fields.phone) parts.push('phone: ' + fields.phone);
