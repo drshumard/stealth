@@ -488,6 +488,7 @@ async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = 
             contact_id=cid,
             session_id=data.get('session_id'),
             client_ip=client_ip,
+            user_agent=data.get('user_agent')[:1000] if data.get('user_agent') else None,
             name=data.get('name'),
             email=data.get('email'),
             phone=data.get('phone'),
