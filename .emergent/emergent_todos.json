@@ -1,18 +1,22 @@
 [
   {
-    "content": "Add fbc/fbp display to ContactDetailModal",
+    "content": "FIX: shumard.js not saving fbc/fbp to localStorage when using cached attribution",
     "status": "completed"
   },
   {
-    "content": "Add user_agent display to ContactDetailModal Overview",
-    "status": "completed"
+    "content": "Review: _upsert_contact attribution merging logic",
+    "status": "in_progress"
   },
   {
-    "content": "Add 'Exclude null fields' option to webhook step config",
-    "status": "completed"
+    "content": "Review: Legacy automation support for fbc/fbp",
+    "status": "pending"
   },
   {
-    "content": "Update _build_webhook_payload to filter nulls when option enabled",
-    "status": "completed"
+    "content": "Review: _build_webhook_payload for edge cases",
+    "status": "pending"
+  },
+  {
+    "content": "Test: End-to-end fbc/fbp tracking flow",
+    "status": "pending"
   }
 ]
