@@ -797,7 +797,7 @@ def _evaluate_filters(contact: dict, filters: list) -> bool:
     return True
 
 
-def _build_webhook_payload(contact: dict, field_map: list) -> dict:
+def _build_webhook_payload(contact: dict, field_map: list, exclude_nulls: bool = False) -> dict:
     attr = contact.get('attribution') or {}
     src = {
         'email': contact.get('email'), 'name': contact.get('name'),
@@ -815,13 +815,23 @@ def _build_webhook_payload(contact: dict, field_map: list) -> dict:
         'fbc': attr.get('fbc'),       # Facebook Click ID cookie (_fbc)
         'fbp': attr.get('fbp'),       # Facebook Browser ID cookie (_fbp)
     }
+    
+    # Filter out null/empty values if exclude_nulls is True
+    if exclude_nulls:
+        src = {k: v for k, v in src.items() if v is not None and v != ''}
+    
     if not field_map:
         return {k: v for k, v in src.items() if v is not None}
     payload = {}
     for m in field_map:
         s = m.get('source') if isinstance(m,dict) else getattr(m,'source','')
         t = (m.get('target') if isinstance(m,dict) else getattr(m,'target','')) or s
-        if s in src: payload[t] = src[s]
+        if s in src:
+            val = src[s]
+            # Skip null values if exclude_nulls is enabled
+            if exclude_nulls and (val is None or val == ''):
+                continue
+            payload[t] = val
     return payload
 
 
