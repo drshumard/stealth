@@ -708,28 +708,19 @@ export default function AutomationBuilderPage() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasChanges]);
 
-  // React Router navigation blocker
-  const blocker = useBlocker(
-    useCallback(
-      ({ currentLocation, nextLocation }) =>
-        hasChanges && currentLocation.pathname !== nextLocation.pathname,
-      [hasChanges]
-    )
-  );
-
-  // Handle blocker state changes
-  useEffect(() => {
-    if (blocker.state === 'blocked') {
-      setShowUnsavedDialog(true);
-      setPendingNavigation(blocker);
-    }
-  }, [blocker.state]);
+  // React Router navigation blocker using custom hook
+  const handleNavigationBlock = useCallback((blockedNav) => {
+    setShowUnsavedDialog(true);
+    setPendingNavigation(blockedNav);
+  }, []);
+  
+  useNavigationBlock(hasChanges, handleNavigationBlock);
 
   // Safe navigation that checks for changes
   const safeNavigate = useCallback((path) => {
     if (hasChanges) {
       setShowUnsavedDialog(true);
-      setPendingNavigation({ proceed: () => navigate(path), reset: () => {} });
+      setPendingNavigation({ proceed: () => { setHasChanges(false); navigate(path); }, reset: () => {} });
     } else {
       navigate(path);
     }
