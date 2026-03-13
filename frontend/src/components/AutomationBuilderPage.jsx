@@ -63,6 +63,8 @@ const TETHER_FIELDS = [
   { value: 'contact_id',   label: 'Contact ID' },
   { value: 'client_ip',    label: 'IP Address' },
   { value: 'user_agent',   label: 'User Agent (FB CAPI)' },
+  { value: 'fbc',          label: 'Facebook Click ID (fbc)' },
+  { value: 'fbp',          label: 'Facebook Browser ID (fbp)' },
   { value: 'created_at',   label: 'First Seen' },
   { value: 'updated_at',   label: 'Last Updated' },
   { value: 'utm_source',   label: 'UTM Source' },
