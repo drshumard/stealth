@@ -433,6 +433,9 @@ async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = 
 
     existing = await db.contacts.find_one({"contact_id": cid}, {"_id": 0})
     now_str = dt_to_str(now)
+    
+    user_agent = data.get('user_agent')
+    logger.info(f"_upsert_contact: cid={cid[:12]}, exists={bool(existing)}, user_agent={user_agent[:30] if user_agent else None}")
 
     if existing:
         update: dict = {"updated_at": now_str}
