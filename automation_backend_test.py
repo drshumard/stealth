@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 
 class AutomationAPITester:
-    def __init__(self, base_url="https://contact-tracker-49.preview.emergentagent.com"):
+    def __init__(self, base_url="https://tether-workflows.preview.emergentagent.com"):
         self.base_url = base_url
         self.api_url = f"{base_url}/api"
         self.tests_run = 0
