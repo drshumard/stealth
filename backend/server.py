@@ -1278,12 +1278,16 @@ def build_tracker_js(backend_url: str, auto_tag: str = '') -> str:
     if (cached) {
       try {
         Object.assign(store.source, JSON.parse(cached));
-        var hasCached = Object.keys(store.source).some(function(k){ return k !== 'extra' && !!store.source[k]; });
         // Always refresh fbc/fbp cookies (they may have been set after initial cache)
         var fbc = getCookie('_fbc');
         var fbp = getCookie('_fbp');
-        if (fbc) store.source.fbc = fbc;
-        if (fbp) store.source.fbp = fbp;
+        var needsUpdate = false;
+        if (fbc && store.source.fbc !== fbc) { store.source.fbc = fbc; needsUpdate = true; }
+        if (fbp && store.source.fbp !== fbp) { store.source.fbp = fbp; needsUpdate = true; }
+        // Save updated attribution if fbc/fbp changed
+        if (needsUpdate) {
+          lsSet(ATTR_KEY, JSON.stringify(store.source));
+        }
         return;
       } catch (e) {}
     }
