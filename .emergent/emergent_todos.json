@@ -4,16 +4,20 @@
     "status": "completed"
   },
   {
-    "content": "Review: _upsert_contact attribution merging logic",
-    "status": "in_progress"
+    "content": "FIX: attr_signal_fields missing fbc/fbp - contacts not created properly",
+    "status": "completed"
+  },
+  {
+    "content": "FIX: Add delayed fbc/fbp re-capture (2s) for slow FB Pixel",
+    "status": "completed"
+  },
+  {
+    "content": "FIX: Refresh fbc/fbp in sendLead/sendRegistration before sending",
+    "status": "completed"
   },
   {
     "content": "Review: Legacy automation support for fbc/fbp",
-    "status": "pending"
-  },
-  {
-    "content": "Review: _build_webhook_payload for edge cases",
-    "status": "pending"
+    "status": "in_progress"
   },
   {
     "content": "Test: End-to-end fbc/fbp tracking flow",
