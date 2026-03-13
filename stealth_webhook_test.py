@@ -39,6 +39,8 @@ class StealthWebhookTester:
                 response = requests.get(url, headers=headers, params=params, timeout=15)
             elif method == 'POST':
                 response = requests.post(url, json=data, headers=headers, params=params, timeout=15)
+            elif method == 'DELETE':
+                response = requests.delete(url, headers=headers, params=params, timeout=15)
             
             print(f"   Status: {response.status_code}")
             success = response.status_code == expected_status
