@@ -1267,6 +1267,11 @@ def build_tracker_js(backend_url: str, auto_tag: str = '') -> str:
       try {
         Object.assign(store.source, JSON.parse(cached));
         var hasCached = Object.keys(store.source).some(function(k){ return k !== 'extra' && !!store.source[k]; });
+        // Always refresh fbc/fbp cookies (they may have been set after initial cache)
+        var fbc = getCookie('_fbc');
+        var fbp = getCookie('_fbp');
+        if (fbc) store.source.fbc = fbc;
+        if (fbp) store.source.fbp = fbp;
         return;
       } catch (e) {}
     }
@@ -1304,6 +1309,12 @@ def build_tracker_js(backend_url: str, auto_tag: str = '') -> str:
         if (p[param]) { store.source[key] = p[param]; found = true; }
       });
     });
+
+    /* Capture Facebook cookies (_fbc and _fbp) for FB CAPI matching */
+    var fbc = getCookie('_fbc');
+    var fbp = getCookie('_fbp');
+    if (fbc) { store.source.fbc = fbc; found = true; }
+    if (fbp) { store.source.fbp = fbp; found = true; }
 
     /* Capture EVERY remaining unknown param into extra */
     var extra = {};
