@@ -885,7 +885,7 @@ export default function AutomationBuilderPage() {
   return (
     <div className="p-8 md:p-10 max-w-4xl mx-auto">
       {/* Unsaved changes dialog */}
-      <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+      <AlertDialog open={showUnsavedDialog} onOpenChange={(open) => { if (!open) handleStay(); }}>
         <AlertDialogContent style={{ backgroundColor: '#fff', borderColor: 'var(--stroke)' }}>
           <AlertDialogHeader>
             <AlertDialogTitle style={{ color: 'var(--brand-navy)' }}>Unsaved Changes</AlertDialogTitle>
@@ -895,23 +895,15 @@ export default function AutomationBuilderPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel 
-              onClick={() => {
-                setShowUnsavedDialog(false);
-                if (pendingNavigation?.reset) pendingNavigation.reset();
-                setPendingNavigation(null);
-              }}
+              onClick={handleStay}
               style={{ borderColor: 'var(--stroke)' }}
             >
               Stay
             </AlertDialogCancel>
             <AlertDialogAction 
-              onClick={() => {
-                setShowUnsavedDialog(false);
-                setHasChanges(false);
-                if (pendingNavigation?.proceed) pendingNavigation.proceed();
-                setPendingNavigation(null);
-              }}
+              onClick={handleLeaveWithoutSaving}
               style={{ backgroundColor: '#dc2626', color: '#fff', border: 'none' }}
+              data-testid="leave-without-saving-btn"
             >
               Leave Without Saving
             </AlertDialogAction>
