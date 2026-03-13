@@ -1,18 +1,14 @@
 [
   {
-    "content": "Add fbc/fbp fields to Attribution model and safe_attribution",
-    "status": "completed"
+    "content": "Add fbc/fbp display to ContactDetailModal",
+    "status": "in_progress"
   },
   {
-    "content": "Update shumard.js to capture _fbc and _fbp cookies",
-    "status": "completed"
+    "content": "Add 'Exclude null fields' option to webhook step config",
+    "status": "pending"
   },
   {
-    "content": "Update _build_webhook_payload to include fbc/fbp",
-    "status": "completed"
-  },
-  {
-    "content": "Add fbc/fbp to TETHER_FIELDS in AutomationBuilderPage",
-    "status": "completed"
+    "content": "Update _build_webhook_payload to filter nulls when option enabled",
+    "status": "pending"
   }
 ]
