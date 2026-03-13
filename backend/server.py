@@ -1341,7 +1341,8 @@ def build_tracker_js(backend_url: str, auto_tag: str = '') -> str:
       current_url:  window.location.href,
       referrer_url: store.config.prevUrl || null,
       page_title:   document.title || null,
-      attribution:  store.source
+      attribution:  store.source,
+      user_agent:   navigator.userAgent || null   /* For FB CAPI: client_user_agent */
     }, extra || {});
   }
 
