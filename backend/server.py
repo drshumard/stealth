@@ -1722,7 +1722,10 @@ async def track_pageview(data: PageViewCreate, request: Request):
         ip  = get_client_ip(request)
         # Always resolve the effective (non-merged) contact_id before any operation
         eid = await _resolve_contact_id(data.contact_id)
-        await _upsert_contact({'contact_id': eid, 'session_id': data.session_id, 'attribution': data.attribution}, now, ip)
+        await _upsert_contact({
+            'contact_id': eid, 'session_id': data.session_id,
+            'attribution': data.attribution, 'user_agent': data.user_agent
+        }, now, ip)
         vid = await _log_visit(eid, data.session_id, data.current_url, data.referrer_url, data.page_title, data.attribution, now, ip)
         await _ip_auto_stitch(eid, ip, now)
         return {"status": "ok", "visit_id": vid, "contact_id": data.contact_id}
@@ -1741,7 +1744,7 @@ async def track_lead(data: LeadCreate, request: Request):
             'contact_id': eid, 'session_id': data.session_id,
             'email': data.email, 'phone': data.phone, 'name': data.name,
             'first_name': data.first_name, 'last_name': data.last_name,
-            'attribution': data.attribution
+            'attribution': data.attribution, 'user_agent': data.user_agent
         }, now, ip)
         await _session_auto_stitch(eid, data.session_id, now)
         await _ip_auto_stitch(eid, ip, now)
@@ -1762,7 +1765,7 @@ async def track_registration(data: RegistrationCreate, request: Request):
             'contact_id': eid, 'session_id': data.session_id,
             'email': data.email, 'phone': data.phone, 'name': data.name,
             'first_name': data.first_name, 'last_name': data.last_name,
-            'attribution': data.attribution
+            'attribution': data.attribution, 'user_agent': data.user_agent
         }, now, ip)
         if data.current_url:
             await _log_visit(eid, data.session_id, data.current_url, data.referrer_url, data.page_title or "Registration", data.attribution, now, ip)
