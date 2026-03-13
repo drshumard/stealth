@@ -1,22 +1,22 @@
 [
   {
-    "content": "Add user_agent field to Contact and Pydantic models",
-    "status": "completed"
+    "content": "Add fbc/fbp fields to Contact and response Pydantic models",
+    "status": "in_progress"
   },
   {
-    "content": "Update _upsert_contact to store user_agent",
-    "status": "completed"
+    "content": "Update shumard.js to capture _fbc and _fbp cookies",
+    "status": "pending"
   },
   {
-    "content": "Update shumard.js to capture navigator.userAgent",
-    "status": "completed"
+    "content": "Update _upsert_contact to store fbc/fbp",
+    "status": "pending"
   },
   {
-    "content": "Add user_agent to webhook payload builder",
-    "status": "completed"
+    "content": "Update _build_webhook_payload to include fbc/fbp",
+    "status": "pending"
   },
   {
-    "content": "Add user_agent to TETHER_FIELDS in AutomationBuilderPage",
-    "status": "completed"
+    "content": "Add fbc/fbp to TETHER_FIELDS in AutomationBuilderPage",
+    "status": "pending"
   }
 ]
