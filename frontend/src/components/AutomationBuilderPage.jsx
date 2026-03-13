@@ -260,6 +260,7 @@ function WebhookEditor({ config, onChange }) {
   const url = config?.url || '';
   const name = config?.name || '';
   const fieldMap = config?.field_map || [];
+  const excludeNulls = config?.exclude_nulls ?? true;  // Default to true
 
   const addMapping = () => {
     onChange({
@@ -311,6 +312,22 @@ function WebhookEditor({ config, onChange }) {
           data-testid="webhook-url-input"
         />
         {!url && <p className="text-xs mt-1" style={{ color: '#dc2626' }}>Webhook URL is required</p>}
+      </div>
+
+      {/* Exclude null fields option */}
+      <div className="flex items-center gap-3 py-2 px-3 rounded-lg" style={{ backgroundColor: 'rgba(2,132,199,0.04)', border: '1px solid rgba(2,132,199,0.12)' }}>
+        <input
+          type="checkbox"
+          id="exclude-nulls"
+          checked={excludeNulls}
+          onChange={e => onChange({ ...config, exclude_nulls: e.target.checked })}
+          className="w-4 h-4 rounded border-2 accent-sky-600"
+          data-testid="webhook-exclude-nulls"
+        />
+        <label htmlFor="exclude-nulls" className="text-sm cursor-pointer" style={{ color: 'var(--text-muted)' }}>
+          <span className="font-semibold" style={{ color: '#0284c7' }}>Exclude null fields</span>
+          <span className="text-xs ml-1.5" style={{ color: 'var(--text-dim)' }}>— Don't send fields that have no value</span>
+        </label>
       </div>
 
       <div>
