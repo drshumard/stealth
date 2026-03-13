@@ -479,7 +479,8 @@ async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = 
         attr_signal_fields = {
             'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
             'utm_id', 'campaign_id', 'adset_id', 'ad_id',
-            'fbclid', 'gclid', 'ttclid', 'source_link_tag', 'fb_ad_set_id', 'google_campaign_id'
+            'fbclid', 'fbc', 'fbp',  # fbc/fbp are FB cookies for CAPI matching
+            'gclid', 'ttclid', 'source_link_tag', 'fb_ad_set_id', 'google_campaign_id'
         }
         has_attribution = any(raw_attr.get(k) for k in attr_signal_fields)
         # Also allow contacts that carry URL extra params (e.g. ?layout=styled-0 from joinnow.live).
