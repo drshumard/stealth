@@ -844,6 +844,7 @@ async def _fire_webhook_task(
     action_name: Optional[str] = None,
     delay_seconds: int = 0,
     field_map: Optional[list] = None,   # needed to rebuild payload after refetch
+    exclude_nulls: bool = False,        # filter null values from payload
 ) -> None:
     """Fire a webhook, persist the run record, and update automation stats.
     If delay_seconds > 0: sleep first, then re-read the contact from the DB
@@ -861,7 +862,7 @@ async def _fire_webhook_task(
             fresh = await db.contacts.find_one({"contact_id": cid}, {"_id": 0})
             if fresh:
                 contact = fresh
-                payload = _build_webhook_payload(fresh, field_map or [])
+                payload = _build_webhook_payload(fresh, field_map or [], exclude_nulls=exclude_nulls)
                 logger.info(
                     f"Automation {auto_id[:8]} refetched {cid[:12]} after {delay_seconds}s "
                     f"— phone={'yes' if fresh.get('phone') else 'no'}"
