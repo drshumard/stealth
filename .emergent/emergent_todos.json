@@ -1,22 +1,18 @@
 [
   {
-    "content": "Add fbc/fbp fields to Contact and response Pydantic models",
-    "status": "in_progress"
+    "content": "Add fbc/fbp fields to Attribution model and safe_attribution",
+    "status": "completed"
   },
   {
     "content": "Update shumard.js to capture _fbc and _fbp cookies",
-    "status": "pending"
-  },
-  {
-    "content": "Update _upsert_contact to store fbc/fbp",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Update _build_webhook_payload to include fbc/fbp",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Add fbc/fbp to TETHER_FIELDS in AutomationBuilderPage",
-    "status": "pending"
+    "status": "completed"
   }
 ]
