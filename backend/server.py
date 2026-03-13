@@ -993,7 +993,8 @@ async def _execute_step_pipeline(
                     
                 step_name = config.get('name', '')
                 field_map = config.get('field_map', [])
-                payload = _build_webhook_payload(contact, field_map)
+                exclude_nulls = config.get('exclude_nulls', True)  # Default to excluding nulls
+                payload = _build_webhook_payload(contact, field_map, exclude_nulls=exclude_nulls)
                 headers = {"Content-Type": "application/json"}
                 
                 logger.info(
