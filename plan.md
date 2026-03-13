@@ -9,6 +9,7 @@
 - Simple step reordering via Up/Down buttons (no drag-and-drop)
 - Integrate with existing TanStack Query patterns and Shadcn UI
 - Backward compatible: gracefully load legacy automations (required_fields, filters, actions/webhook_url) and allow converting to steps on save
+- **NEW**: Track user_agent for Facebook Conversions API compatibility
 - POC: Not required (CRUD + simple auth only)
 
 ## 2) Implementation Steps (Phased)
@@ -80,13 +81,33 @@ Code review completed with all critical issues fixed:
 4. ✅ As a user, filter conditions with empty values are caught before save (frontend toast + backend 400).
 5. ✅ As a user, Wait For steps without any fields selected are rejected.
 
-### Phase 4 — Polish & Enhancements (Not Started - Optional)
+### Phase 4 — User Agent Tracking for FB CAPI (COMPLETED ✅)
+Added user_agent tracking for Facebook Conversions API compatibility:
+- ✅ Added `user_agent` field to all Pydantic models:
+  - Contact, ContactWithStats, ContactDetail (response models)
+  - PageViewCreate, LeadCreate, RegistrationCreate (request models)
+- ✅ Updated `_upsert_contact()` to store user_agent:
+  - First-seen wins (won't overwrite existing user_agent)
+  - Truncated to 1000 chars to prevent database bloat
+- ✅ Updated `shumard.js` tracker to capture `navigator.userAgent` and include in all payloads
+- ✅ Updated `_build_webhook_payload()` to include user_agent in webhook data
+  - Field name: `user_agent` (maps to FB CAPI: `client_user_agent`)
+- ✅ Added `user_agent` to TETHER_FIELDS in AutomationBuilderPage for field mapping
+  - Label: "User Agent (FB CAPI)"
+
+**Completed User Stories (Phase 4)**:
+1. ✅ As a user, the tracker script captures and sends the browser's user agent string.
+2. ✅ As a user, I can see user_agent in contact details via the API.
+3. ✅ As a user, I can map user_agent to custom webhook fields for FB CAPI integration.
+4. ✅ As a user, webhook payloads include user_agent automatically for FB CAPI compatibility.
+
+### Phase 5 — Polish & Enhancements (Not Started - Optional)
 - Add: duplicate step, unsaved-changes prompt, keyboard reordering (optional)
 - Improve headers editor UX (JSON textarea with validation for custom headers)
 - Visual pipeline enhancements: animation on reorder, better visual feedback
 - Add converter in UI: "Convert legacy automation to steps" (one-click)
 - Docs: quick how-to and examples for each step type
-- User Stories (Phase 4)
+- User Stories (Phase 5)
   1. As a user, I can duplicate an existing step to speed up configuration.
   2. As a user, I'm warned if I try to navigate away with unsaved changes.
   3. As a user, the step list has smooth animations when reordering.
@@ -103,7 +124,8 @@ Code review completed with all critical issues fixed:
 7. ✅ ~~Implement backend step pipeline execution for new steps[] format~~
 8. ✅ ~~Code review and production hardening~~
 9. ✅ ~~Add backend validation for steps (URL format, filter values, wait_for fields)~~
-10. (Optional) Add polish features: duplicate step, unsaved changes warning, animations
+10. ✅ ~~Add user_agent tracking for Facebook Conversions API compatibility~~
+11. (Optional) Add polish features: duplicate step, unsaved changes warning, animations
 
 ## 4) Success Criteria (ALL ACHIEVED ✅)
 - ✅ Dedicated builder routes load and render without console errors
@@ -117,9 +139,10 @@ Code review completed with all critical issues fixed:
 - ✅ Input validation prevents invalid data on BOTH frontend AND backend
 - ✅ Error states handled gracefully with user-friendly UI
 - ✅ Backend returns proper 400 status codes for validation errors
+- ✅ **NEW**: User agent captured, stored, and available in webhook payloads for FB CAPI
 
 ## 5) Files Changed/Created
-- `/app/frontend/src/components/AutomationBuilderPage.jsx` - NEW: Full-page Zapier-style builder with validation
+- `/app/frontend/src/components/AutomationBuilderPage.jsx` - NEW: Full-page Zapier-style builder with validation + user_agent in TETHER_FIELDS
 - `/app/frontend/src/App.js` - MODIFIED: Added routes for /automations/new and /automations/builder/:id
 - `/app/frontend/src/components/AutomationsPage.jsx` - MODIFIED: Updated to use navigation instead of modal
 - `/app/backend/server.py` - MODIFIED: 
@@ -128,9 +151,13 @@ Code review completed with all critical issues fixed:
   - Added `_validate_automation_steps()` function for backend validation
   - Added `_execute_step_pipeline()` function for step-based execution
   - Updated `_run_automations()` to detect and route to step pipeline
+  - **NEW**: Added `user_agent` field to Contact, ContactWithStats, ContactDetail, PageViewCreate, LeadCreate, RegistrationCreate models
+  - **NEW**: Updated `_upsert_contact()` to store user_agent (first-seen wins, truncated to 1000 chars)
+  - **NEW**: Updated `_build_webhook_payload()` to include user_agent
+  - **NEW**: Updated `shumard.js` tracker (embedded in build_tracker_js) to capture navigator.userAgent
 
 ## 6) Summary
-**Phase 1, 2 & 3: COMPLETED** - The Zapier-style Automation Builder is PRODUCTION READY:
+**Phase 1, 2, 3 & 4: COMPLETED** - The Zapier-style Automation Builder is PRODUCTION READY with FB CAPI support:
 
 ### Core Features
 - Users can create new automations with a flexible step-based pipeline
@@ -162,5 +189,12 @@ Code review completed with all critical issues fixed:
   - "Step X: Filter condition on 'field' with operator 'op' requires a value"
   - "Step X: Wait For step must have at least one required field"
 - Applied to both POST /api/automations and PUT /api/automations/{id}
+
+### Facebook Conversions API Support
+- `user_agent` field added to all contact models
+- Tracker script captures `navigator.userAgent` automatically
+- User agent stored on first contact (first-seen wins)
+- Webhook payloads include `user_agent` for FB CAPI `client_user_agent` mapping
+- Available in automation builder field mapping dropdown
 
 ### Ready for Production ✅
