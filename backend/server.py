@@ -484,24 +484,25 @@ async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = 
         return
 
     # Auto-parse name into first_name/last_name if name exists but first/last don't
-    if data.get('name') and not data.get('first_name') and not data.get('last_name'):
-        parsed_first, parsed_last = parse_full_name(data.get('name'))
-        if parsed_first:
-            data['first_name'] = parsed_first
-        if parsed_last:
-            data['last_name'] = parsed_last
+    # Use local variables to avoid mutating the input dict
+    parsed_first_name = data.get('first_name')
+    parsed_last_name = data.get('last_name')
+    if data.get('name') and not parsed_first_name and not parsed_last_name:
+        parsed_first_name, parsed_last_name = parse_full_name(data.get('name'))
 
     existing = await db.contacts.find_one({"contact_id": cid}, {"_id": 0})
     now_str = dt_to_str(now)
 
     if existing:
         update: dict = {"updated_at": now_str}
-        for field in ['name', 'email', 'phone', 'first_name', 'last_name', 'session_id']:
+        for field in ['name', 'email', 'phone', 'session_id']:
             if data.get(field):
-                # Only update first_name/last_name if they don't already exist
-                if field in ('first_name', 'last_name') and existing.get(field):
-                    continue
                 update[field] = data[field]
+        # Handle first_name/last_name separately - only update if they don't already exist
+        if parsed_first_name and not existing.get('first_name'):
+            update['first_name'] = parsed_first_name
+        if parsed_last_name and not existing.get('last_name'):
+            update['last_name'] = parsed_last_name
         if client_ip and not existing.get('client_ip'):
             update['client_ip'] = client_ip
         # Store user_agent if provided and not already set (first-seen wins)
@@ -532,7 +533,7 @@ async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = 
         # Only create a new contact if it has identity OR meaningful attribution.
         # Pure anonymous page loads (no UTMs, no email) are skipped -- their visits
         # are still logged in page_visits and will be attached once identified.
-        has_identity = any(data.get(f) for f in ['name', 'email', 'phone', 'first_name', 'last_name'])
+        has_identity = any(data.get(f) for f in ['name', 'email', 'phone', 'first_name', 'last_name']) or parsed_first_name or parsed_last_name
         raw_attr = data.get('attribution') or {}
         attr_signal_fields = {
             'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
@@ -556,8 +557,8 @@ async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = 
             name=data.get('name'),
             email=data.get('email'),
             phone=data.get('phone'),
-            first_name=data.get('first_name'),
-            last_name=data.get('last_name'),
+            first_name=parsed_first_name,
+            last_name=parsed_last_name,
             attribution=safe_attribution(data.get('attribution')),
             created_at=now,
             updated_at=now
@@ -572,10 +573,17 @@ async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = 
             # and both tried to insert. The second one wins with a graceful update
             # instead of crashing the endpoint with a 500.
             logger.info(f"DuplicateKey on insert for {cid[:12]} — falling back to update")
+            # Re-fetch to check existing values before updating
+            existing_doc = await db.contacts.find_one({"contact_id": cid}, {"_id": 0})
             update: dict = {"updated_at": dt_to_str(now)}
-            for field in ['name', 'email', 'phone', 'first_name', 'last_name', 'session_id']:
+            for field in ['name', 'email', 'phone', 'session_id']:
                 if data.get(field):
                     update[field] = data[field]
+            # Respect first_name/last_name protection even in race condition
+            if parsed_first_name and (not existing_doc or not existing_doc.get('first_name')):
+                update['first_name'] = parsed_first_name
+            if parsed_last_name and (not existing_doc or not existing_doc.get('last_name')):
+                update['last_name'] = parsed_last_name
             if client_ip:
                 update.setdefault('client_ip', client_ip)
             await db.contacts.update_one({"contact_id": cid}, {"$set": update})
