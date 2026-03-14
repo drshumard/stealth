@@ -395,9 +395,9 @@ def parse_full_name(full_name: Optional[str]) -> tuple[Optional[str], Optional[s
     - Single word: first_name only, no last_name
     - Two words: first = first_name, second = last_name
     - Three+ words: 
-      - If last word is hyphenated (e.g., "Smith-Jones"), all before it = first_name
+      - If last word is a suffix (Jr., Sr., III, etc.), use second-to-last as last name
       - Otherwise: first N-1 words = first_name, last word = last_name
-    - Hyphenated first names (e.g., "Mary-Jane") stay together as first_name
+    - Hyphenated names stay together (e.g., "Mary-Jane" or "Smith-Jones")
     
     Examples:
     - "John" → ("John", None)
@@ -405,7 +405,8 @@ def parse_full_name(full_name: Optional[str]) -> tuple[Optional[str], Optional[s
     - "John Paul Smith" → ("John Paul", "Smith")
     - "Mary-Jane Watson" → ("Mary-Jane", "Watson")
     - "John Smith-Jones" → ("John", "Smith-Jones")
-    - "John Paul Smith-Jones" → ("John Paul", "Smith-Jones")
+    - "John Smith Jr." → ("John", "Smith")
+    - "John Paul Smith III" → ("John Paul", "Smith")
     """
     if not full_name or not isinstance(full_name, str):
         return (None, None)
@@ -416,6 +417,17 @@ def parse_full_name(full_name: Optional[str]) -> tuple[Optional[str], Optional[s
         return (None, None)
     
     parts = name.split()
+    
+    # Common name suffixes to strip from last name consideration
+    suffixes = {'jr', 'jr.', 'sr', 'sr.', 'ii', 'iii', 'iv', 'v', 'phd', 'ph.d', 'ph.d.', 
+                'md', 'm.d', 'm.d.', 'esq', 'esq.', 'dds', 'd.d.s', 'd.d.s.'}
+    
+    # Remove suffix if present at the end
+    while len(parts) > 1 and parts[-1].lower().rstrip('.') in suffixes or parts[-1].lower() in suffixes:
+        parts = parts[:-1]
+    
+    if len(parts) == 0:
+        return (None, None)
     
     if len(parts) == 1:
         # Single name - treat as first name only
