@@ -2837,6 +2837,30 @@ async def auth_verify(payload: dict):
 
 # ─────────────────────────── StealthWebinar Registrations ────────────────────
 
+def _sanitize_tag(tag: str) -> Optional[str]:
+    """
+    Sanitize a tag string for safe storage and display.
+    - Lowercase
+    - Strip whitespace
+    - Remove or replace unsafe characters
+    - Limit length to 50 characters
+    Returns None if tag is empty after sanitization.
+    """
+    if not tag or not isinstance(tag, str):
+        return None
+    # Lowercase and strip
+    tag = tag.lower().strip()
+    # Allow only alphanumeric, hyphen, underscore, and space
+    # Replace other characters with empty string
+    import re
+    tag = re.sub(r'[^a-z0-9\-_\s]', '', tag)
+    # Normalize whitespace (multiple spaces to single)
+    tag = ' '.join(tag.split())
+    # Limit length
+    tag = tag[:50]
+    return tag if tag else None
+
+
 @api_router.post("/stealth/webhook")
 async def stealth_webhook(request: Request, tag: Optional[str] = None):
     """
@@ -2883,7 +2907,10 @@ async def stealth_webhook(request: Request, tag: Optional[str] = None):
         tags_to_add = []
         if tag:
             # Support comma-separated tags: ?tag=replay,webinar
-            tags_to_add = [t.strip().lower() for t in tag.split(',') if t.strip()]
+            for t in tag.split(','):
+                sanitized = _sanitize_tag(t)
+                if sanitized:
+                    tags_to_add.append(sanitized)
         if not tags_to_add:
             tags_to_add = ['stealth']
 
@@ -2912,13 +2939,14 @@ async def stealth_webhook(request: Request, tag: Optional[str] = None):
         }
         await db.stealth_registrations.insert_one(reg_doc)
 
-        # ── Upsert the contact with phone + tags ──────────────────────────────
-        if contact_id and phone:
+        # ── Upsert the contact + tags ──────────────────────────────────────────
+        if contact_id:
+            # Existing contact - update with new info and add tags
             eid = await _resolve_contact_id(contact_id)
             await _upsert_contact({
                 'contact_id': eid,
                 'email':      email_lower,
-                'phone':      phone,
+                'phone':      phone,  # Could be None, _upsert_contact handles it
                 'name':       name or contact.get("name"),
             }, now, ip)
             # Add tags
@@ -2927,7 +2955,7 @@ async def stealth_webhook(request: Request, tag: Optional[str] = None):
                 {"$addToSet": {"tags": {"$each": tags_to_add}}}
             )
             asyncio.create_task(_run_automations(eid))
-        elif not contact_id:
+        else:
             # Brand new contact — create them with all available data
             eid = str(uuid.uuid4())
             await _upsert_contact({
