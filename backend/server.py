@@ -3008,8 +3008,11 @@ async def stealth_webhook(request: Request, tag: Optional[str] = None):
             tags_to_add = ['stealth']
 
         # ── Check if contact exists and has fbclid ────────────────────────────
+        # Escape email for safe regex matching (handles + . etc in email addresses)
+        import re
+        email_escaped = re.escape(email_lower)
         contact = await db.contacts.find_one(
-            {"email": {"$regex": f"^{email_lower}$", "$options": "i"},
+            {"email": {"$regex": f"^{email_escaped}$", "$options": "i"},
              "merged_into": None},
             {"_id": 0, "contact_id": 1, "attribution": 1, "name": 1, "phone": 1}
         )
