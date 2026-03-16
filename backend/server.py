@@ -1989,7 +1989,7 @@ async def track_registration(data: RegistrationCreate, request: Request):
         await _session_auto_stitch(eid, data.session_id, now)
         await _ip_auto_stitch(eid, ip, now)
         asyncio.create_task(_run_automations(eid))
-        return {"status": "ok", "contact_id": data.contact_id}
+        return {"status": "ok", "contact_id": eid}  # Return the final contact_id (may have changed after merge)
     except Exception as e:
         logger.error(f"Error tracking registration: {e}")
         raise HTTPException(status_code=500, detail=str(e))
