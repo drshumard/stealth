@@ -422,8 +422,8 @@ def parse_full_name(full_name: Optional[str]) -> tuple[Optional[str], Optional[s
     suffixes = {'jr', 'jr.', 'sr', 'sr.', 'ii', 'iii', 'iv', 'v', 'phd', 'ph.d', 'ph.d.', 
                 'md', 'm.d', 'm.d.', 'esq', 'esq.', 'dds', 'd.d.s', 'd.d.s.'}
     
-    # Remove suffix if present at the end
-    while len(parts) > 1 and parts[-1].lower().rstrip('.') in suffixes or parts[-1].lower() in suffixes:
+    # Remove suffix if present at the end (but keep at least one part)
+    while len(parts) > 1 and (parts[-1].lower().rstrip('.') in suffixes or parts[-1].lower() in suffixes):
         parts = parts[:-1]
     
     if len(parts) == 0:
