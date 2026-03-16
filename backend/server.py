@@ -864,9 +864,13 @@ async def _email_auto_stitch(contact_id: str, email: Optional[str], now: datetim
     if not email_lower:
         return contact_id
     
+    # Escape special regex characters in email for safe matching
+    import re
+    email_escaped = re.escape(email_lower)
+    
     # Find any existing contact with this email (not the current one, not merged)
     existing = await db.contacts.find_one({
-        "email": {"$regex": f"^{email_lower}$", "$options": "i"},
+        "email": {"$regex": f"^{email_escaped}$", "$options": "i"},
         "contact_id": {"$ne": contact_id},
         "merged_into": None
     }, {"_id": 0})
@@ -878,7 +882,9 @@ async def _email_auto_stitch(contact_id: str, email: Optional[str], now: datetim
     if not current or current.get('merged_into'):
         return contact_id
     
-    existing_cid = existing['contact_id']
+    existing_cid = existing.get('contact_id')
+    if not existing_cid:
+        return contact_id  # Safety check
     
     # Determine which contact should be the "parent" (richer data wins)
     def richness_score(c):
