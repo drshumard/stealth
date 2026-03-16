@@ -1957,10 +1957,13 @@ async def track_lead(data: LeadCreate, request: Request):
             'first_name': data.first_name, 'last_name': data.last_name,
             'attribution': data.attribution, 'user_agent': data.user_agent
         }, now, ip)
+        # Auto-stitch by email FIRST (most reliable identity match)
+        if data.email:
+            eid = await _email_auto_stitch(eid, data.email, now)
         await _session_auto_stitch(eid, data.session_id, now)
         await _ip_auto_stitch(eid, ip, now)
         asyncio.create_task(_run_automations(eid))
-        return {"status": "ok", "contact_id": data.contact_id}
+        return {"status": "ok", "contact_id": eid}  # Return the final contact_id (may have changed after merge)
     except Exception as e:
         logger.error(f"Error tracking lead: {e}")
         raise HTTPException(status_code=500, detail=str(e))
