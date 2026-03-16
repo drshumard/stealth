@@ -847,6 +847,75 @@ async def _ip_auto_stitch(contact_id: str, client_ip: Optional[str], now: dateti
             break
 
 
+async def _email_auto_stitch(contact_id: str, email: Optional[str], now: datetime) -> str:
+    """
+    Auto-stitch contacts that share the same email address.
+    
+    When a user submits their email via a form, we check if another contact
+    already has that email. If found, we merge the contacts together, preserving
+    the richer data (attribution, visits, etc.).
+    
+    Returns the final contact_id to use (may be different if merged into existing).
+    """
+    if not email:
+        return contact_id
+    
+    email_lower = email.lower().strip()
+    if not email_lower:
+        return contact_id
+    
+    # Find any existing contact with this email (not the current one, not merged)
+    existing = await db.contacts.find_one({
+        "email": {"$regex": f"^{email_lower}$", "$options": "i"},
+        "contact_id": {"$ne": contact_id},
+        "merged_into": None
+    }, {"_id": 0})
+    
+    if not existing:
+        return contact_id
+    
+    current = await db.contacts.find_one({"contact_id": contact_id}, {"_id": 0})
+    if not current or current.get('merged_into'):
+        return contact_id
+    
+    existing_cid = existing['contact_id']
+    
+    # Determine which contact should be the "parent" (richer data wins)
+    def richness_score(c):
+        """Higher score = richer contact data, should be the parent."""
+        score = 0
+        # Attribution signals are valuable
+        attr = c.get('attribution') or {}
+        if attr.get('fbclid'): score += 10
+        if attr.get('gclid'): score += 10
+        if any(attr.get(k) for k in ['utm_source', 'utm_medium', 'utm_campaign']): score += 5
+        # Identity fields
+        if c.get('phone'): score += 3
+        if c.get('name'): score += 2
+        if c.get('first_name') and c.get('last_name'): score += 2
+        # Tags indicate engagement
+        if c.get('tags'): score += len(c.get('tags', []))
+        return score
+    
+    current_score = richness_score(current)
+    existing_score = richness_score(existing)
+    
+    # Parent is the richer one; if tied, prefer the older one (existing)
+    if current_score > existing_score:
+        parent_id, child_id = contact_id, existing_cid
+    else:
+        parent_id, child_id = existing_cid, contact_id
+    
+    logger.info(
+        f"Email auto-stitch: merging {child_id[:8]} into {parent_id[:8]} "
+        f"(email={email_lower}, scores: current={current_score}, existing={existing_score})"
+    )
+    
+    await _do_stitch(parent_id, child_id, now)
+    
+    # Return the parent contact_id (the one that remains active)
+    return parent_id
+
 
 # ─────────────────────────── Automation Engine ───────────────────────────
 
