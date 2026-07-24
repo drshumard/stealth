@@ -20,7 +20,8 @@
   - Archive old attribution to `attribution_history` (cap 20)
 - Automation triggering:
   - Support firing for new contacts, returning contacts, or both via `trigger_audience`
-- ✅ **Tech debt completed:** migrate React Router to Data Router for native navigation blocking (`useBlocker`) so unsaved-changes protection applies to *all* in-app navigation (TopNav + back button)
+- ✅ React Router tech debt: migrated to React Router Data Router for native navigation blocking (`useBlocker`)
+- ✅ UI reliability goal: **Radix Dialog/AlertDialog stability in production builds** (avoid dependency-drift breakages)
 
 ## 2) Implementation Steps (Phased)
 
@@ -112,6 +113,9 @@ Core pages/components
 - ✅ Frontend builder supports selecting trigger audience; list shows badge
 - ✅ testing_agent iteration_3: 36/36 backend PASS, frontend verified
 
+**Operational note (from production logs):**
+- The log line `Attribution refreshed for ... — new click detected (fbclid=...)` is expected and indicates a **returning re-identification** via a fresh click id.
+
 ### Phase 8 — Polish & Future Enhancements (Not Started - Optional)
 - **P1:** Google Ads click-id tracking (gclid/wbraid/gbraid) for Enhanced Conversions attribution
 - Improve headers editor UX
@@ -120,7 +124,7 @@ Core pages/components
 ---
 
 ## Phase 9 — React Router Data Router Refactor (COMPLETED ✅)
-**Motivation (resolved):** the unsaved-changes warning previously used a custom `safeNavigate` workaround and could not intercept all in-app navigation (notably TopNav/sidebar links and certain history navigations). Data Router enables native blocking via `useBlocker`.
+**Motivation (resolved):** the unsaved-changes warning previously used a custom `safeNavigate` workaround and could not intercept all in-app navigation (notably TopNav/sidebar links and history nav). Data Router enables native blocking via `useBlocker`.
 
 ### Phase 9A — Migrate App Router Setup (COMPLETED ✅)
 **File:** `/app/frontend/src/App.js`
@@ -142,7 +146,7 @@ Core pages/components
   - “Stay” → `blocker.reset()`
   - “Leave without saving” → `blocker.proceed()`
 - ✅ Kept `beforeunload` warning for refresh/close-tab
-- ✅ Result: unsaved-changes protection now intercepts **TopNav navigation + browser back button** (previously uncovered edge cases)
+- ✅ Result: unsaved-changes protection now intercepts **TopNav navigation + browser back button**
 
 ### Phase 9C — Testing (COMPLETED ✅)
 - ✅ Compile check
@@ -152,10 +156,42 @@ Core pages/components
   - `LogsPage.jsx` `timeAgo()` referenced `timezone` out of scope causing a white-screen error
   - Fix: `timeAgo(ts, timezone)` now accepts timezone as a parameter; all call sites updated
 
+---
+
+## Phase 10 — Production Modal Vanishing Bug (COMPLETED ✅ — requires redeploy)
+**User report (prod: https://tether.drshumard.com):** Opening a Lead modal then clicking “URL History” (or any tab) caused the modal to vanish.
+
+**Observed behavior:**
+- Any click inside the modal closed it and cleared `?contact=...` search params.
+- This manifested on production only due to dependency drift.
+
+**Root cause:**
+- `/app/frontend/src/components/ui/dialog.jsx` wrapped Radix Dialog primitives with `framer-motion` via `asChild`.
+- `frontend/yarn.lock` was **not committed**, so production installs could resolve **newer Radix / framer-motion versions** than the workspace.
+- With those newer versions, Radix’s DismissableLayer/refs were not correctly attached to the `motion.div`, so Radix treated *inside* clicks as “outside” clicks → dialog closed.
+
+**Fix implemented:**
+1. ✅ Rewrote `ui/dialog.jsx` to the standard shadcn/Radix implementation using CSS animations (`tailwindcss-animate`) — **no framer-motion `asChild` interop**.
+   - Preserved the custom `hideClose` prop used by `ContactDetailModal`.
+2. ✅ Added `frontend/yarn.lock` to git so future deploy builds use pinned dependency versions and don’t silently drift.
+
+**Verification (required testing complete):**
+- ✅ Local production build (`yarn build` + serve) shows modal stays open across tab clicks.
+- ✅ testing_agent iteration_5: **primary bug fix = 100%** and dialog regressions passed:
+  - Contact modal tabs do not close the modal
+  - Copy buttons/scrolling do not close the modal
+  - X button / Escape close works
+  - AlertDialog cancel flows work
+  - Deep-link `/?contact=...&tab=urls` opens modal on correct tab
+
+**Deployment note:**
+- This phase requires a **frontend redeploy** to production for the fix to take effect.
+
 ## 3) Next Actions (Immediate)
 1. 🔥 **P1:** Add Google Ads click-id tracking (gclid/wbraid/gbraid) for Enhanced Conversions
 2. (Optional) Improve webhook headers editor UX
 3. (Optional) Documentation/examples for automation steps and triggers
+4. 🚀 Redeploy frontend to production to ship Phase 10 dialog fix
 
 ## 4) Success Criteria
 ### Phases 1–7 (ACHIEVED ✅)
@@ -175,6 +211,12 @@ Core pages/components
 - ✅ Save flow does not trigger a blocker
 - ✅ testing_agent regression passed (iteration_4)
 
+### Phase 10 (ACHIEVED ✅ — pending deploy)
+- ✅ Clicking any ContactDetailModal tab does not close the modal
+- ✅ No “inside click closes modal” behavior due to Radix/framer interop
+- ✅ Dependency versions pinned via committed `frontend/yarn.lock`
+- ✅ testing_agent iteration_5 verified the exact bug scenario
+
 ## 5) Files Changed/Created
 ### Already changed (Phases 1–7)
 - `/app/frontend/src/components/AutomationBuilderPage.jsx`
@@ -190,9 +232,16 @@ Core pages/components
 - `/app/frontend/src/components/LogsPage.jsx` (timezone scope crash fix)
 - `/app/test_reports/iteration_4.json`
 
+### Phase 10 changes
+- `/app/frontend/src/components/ui/dialog.jsx` (rewritten to standard Radix + CSS animations)
+- `/app/frontend/yarn.lock` (committed to pin dependency versions)
+- `/app/test_reports/iteration_5.json`
+
 ## 6) Summary
 Phases 1–7 are complete and production-ready, including returning-lead attribution refresh and returning/new automation trigger audiences.
 
-**Phase 9 is now complete:** the frontend uses React Router Data Router and the automation builder now uses native `useBlocker`, so unsaved-changes protection applies to *all* in-app navigation (TopNav + back button). A pre-existing `/logs` crash was also fixed and verified.
+Phase 9 is complete: the frontend uses React Router Data Router and the automation builder uses native `useBlocker`, so unsaved-changes protection applies to *all* in-app navigation.
+
+Phase 10 is complete (requires redeploy): production-only modal vanishing bug was fixed by removing fragile Radix↔framer-motion `asChild` interop and pinning frontend dependencies via committed `frontend/yarn.lock`.
 
 **Next priority:** Google Ads click-id tracking (gclid/wbraid/gbraid) for Enhanced Conversions attribution (P1).
