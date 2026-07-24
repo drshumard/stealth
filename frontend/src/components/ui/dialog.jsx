@@ -1,6 +1,5 @@
 import * as React from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
-import { motion } from "framer-motion"
 import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -10,50 +9,42 @@ const DialogPortal  = DialogPrimitive.Portal
 const DialogClose   = DialogPrimitive.Close
 
 // ── Overlay ───────────────────────────────────────────────────────────────────
-// asChild merges Radix's aria/role/data-state props onto the motion.div,
-// so Framer Motion can animate it without fighting Radix.
+// Standard Radix overlay with CSS (tailwindcss-animate) transitions.
+// NOTE: we intentionally do NOT wrap Radix primitives with framer-motion via
+// asChild here. That interop proved fragile across minor Radix/framer versions
+// in production builds (Radix's role/refs failed to attach to the motion.div,
+// making every click inside the dialog register as "outside" and close it).
 const DialogOverlay = React.forwardRef(({ className, ...props }, ref) => (
-  <DialogPrimitive.Overlay asChild {...props}>
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      // No exit — instant close feels snappy and avoids forceMount complexity
-      transition={{ duration: 0.18, ease: "easeOut" }}
-      className={cn("fixed inset-0 z-50 bg-black/60", className)}
-    />
-  </DialogPrimitive.Overlay>
+  <DialogPrimitive.Overlay
+    ref={ref}
+    className={cn(
+      "fixed inset-0 z-50 bg-black/60 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      className
+    )}
+    {...props}
+  />
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
 // ── Content ───────────────────────────────────────────────────────────────────
 const DialogContent = React.forwardRef(({ className, children, hideClose, ...props }, ref) => (
-  // Standard portal — NO forceMount (avoids portal staying in DOM when closed
-  // and blocking pointer events on the page behind it).
   <DialogPortal>
     <DialogOverlay />
-    <DialogPrimitive.Content asChild {...props}>
-      <motion.div
-        ref={ref}
-        // Enter: coordinated fade + gentle scale + 2px slide up
-        initial={{ opacity: 0, scale: 0.97, x: "-50%", y: "-48%" }}
-        animate={{ opacity: 1, scale: 1,    x: "-50%", y: "-50%" }}
-        // No exit animation — modal disappears instantly on close (snappy)
-        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-        // Remove ALL Radix CSS animation classes — Framer Motion owns transitions
-        className={cn(
-          "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg sm:rounded-lg",
-          className
-        )}
-      >
-        {children}
-        {!hideClose && (
-          <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
-          </DialogPrimitive.Close>
-        )}
-      </motion.div>
+    <DialogPrimitive.Content
+      ref={ref}
+      className={cn(
+        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg",
+        className
+      )}
+      {...props}
+    >
+      {children}
+      {!hideClose && (
+        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+          <X className="h-4 w-4" />
+          <span className="sr-only">Close</span>
+        </DialogPrimitive.Close>
+      )}
     </DialogPrimitive.Content>
   </DialogPortal>
 ))
