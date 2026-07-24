@@ -1,30 +1,18 @@
 [
   {
-    "content": "Backend: attribution refresh helpers + attribution_history",
-    "status": "completed"
+    "content": "Refactor App.js to createBrowserRouter + RouterProvider with layout route + Outlet context",
+    "status": "in_progress"
   },
   {
-    "content": "Backend: wire refresh into _upsert_contact and _do_stitch",
-    "status": "completed"
+    "content": "Replace safeNavigate workaround with native useBlocker in AutomationBuilderPage",
+    "status": "pending"
   },
   {
-    "content": "Backend: is_returning detection + _run_automations audience filtering",
-    "status": "completed"
+    "content": "Compile check + screenshot verification (TopNav navigation now blocked)",
+    "status": "pending"
   },
   {
-    "content": "Backend: trigger_audience in models + create/update endpoints",
-    "status": "completed"
-  },
-  {
-    "content": "Frontend: trigger audience Select in builder + save/hydrate + list badge",
-    "status": "completed"
-  },
-  {
-    "content": "Lint + local smoke checks",
-    "status": "completed"
-  },
-  {
-    "content": "Run testing_agent to verify the reported bug fix (mandatory)",
-    "status": "completed"
+    "content": "testing_agent regression run (routing + unsaved-changes flows)",
+    "status": "pending"
   }
 ]

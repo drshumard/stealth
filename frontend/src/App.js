@@ -1,6 +1,9 @@
 import '@/App.css';
-import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, useSearchParams } from 'react-router-dom';
+import { useState } from 'react';
+import {
+  createBrowserRouter, RouterProvider, Outlet,
+  useSearchParams, useOutletContext,
+} from 'react-router-dom';
 import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
@@ -132,17 +135,8 @@ function AppShell() {
       />
       <div className="main-card">
         <TopNav stats={stats} onLogout={handleLogout} />
-        <Routes>
-          <Route path="/"            element={<LeadsPage    {...shared} />} />
-          <Route path="/stealth"      element={<StealthPage onSelectContact={handleSelectContact} />} />
-          <Route path="/sales"        element={<SalesPage onSelectContact={(id) => handleSelectContact(id, 'sales')} />} />
-          <Route path="/visitors"    element={<VisitorsPage {...shared} />} />
-          <Route path="/automations" element={<AutomationsPage />} />
-          <Route path="/automations/new" element={<AutomationBuilderPage />} />
-          <Route path="/automations/builder/:id" element={<AutomationBuilderPage />} />
-          <Route path="/analytics"   element={<AnalyticsPage stats={stats} contacts={contacts} />} />
-          <Route path="/logs"        element={<LogsPage />} />
-        </Routes>
+        {/* Child routes render here and receive the shared context */}
+        <Outlet context={shared} />
       </div>
 
       <ContactDetailModal
@@ -156,13 +150,63 @@ function AppShell() {
   );
 }
 
+// ── Thin route wrappers ───────────────────────────────────────
+// They read the shared context from the AppShell layout route and
+// spread it into the existing page components, so page components
+// stay completely unchanged by the Data Router migration.
+
+function LeadsRoute() {
+  const shared = useOutletContext();
+  return <LeadsPage {...shared} />;
+}
+
+function StealthRoute() {
+  const { onSelectContact } = useOutletContext();
+  return <StealthPage onSelectContact={onSelectContact} />;
+}
+
+function SalesRoute() {
+  const { onSelectContact } = useOutletContext();
+  return <SalesPage onSelectContact={(id) => onSelectContact(id, 'sales')} />;
+}
+
+function VisitorsRoute() {
+  const shared = useOutletContext();
+  return <VisitorsPage {...shared} />;
+}
+
+function AnalyticsRoute() {
+  const { stats, contacts } = useOutletContext();
+  return <AnalyticsPage stats={stats} contacts={contacts} />;
+}
+
+// ── Data Router ───────────────────────────────────────────────
+// createBrowserRouter enables data-router-only features such as
+// useBlocker (used by the automation builder to guard against
+// navigating away with unsaved changes).
+
+const router = createBrowserRouter([
+  {
+    element: <AppShell />,
+    children: [
+      { path: '/',                        element: <LeadsRoute /> },
+      { path: '/stealth',                 element: <StealthRoute /> },
+      { path: '/sales',                   element: <SalesRoute /> },
+      { path: '/visitors',                element: <VisitorsRoute /> },
+      { path: '/automations',             element: <AutomationsPage /> },
+      { path: '/automations/new',         element: <AutomationBuilderPage /> },
+      { path: '/automations/builder/:id', element: <AutomationBuilderPage /> },
+      { path: '/analytics',               element: <AnalyticsRoute /> },
+      { path: '/logs',                    element: <LogsPage /> },
+    ],
+  },
+]);
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TimezoneProvider>
-        <BrowserRouter>
-          <AppShell />
-        </BrowserRouter>
+        <RouterProvider router={router} />
       </TimezoneProvider>
     </QueryClientProvider>
   );

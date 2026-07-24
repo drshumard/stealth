@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useBlocker } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -659,7 +659,12 @@ export default function AutomationBuilderPage() {
     }
   }, [isNew]);
 
-  // Browser beforeunload warning
+  // Keep a ref in sync with hasChanges so the navigation blocker always reads
+  // the freshest value (and can be flipped synchronously before navigating).
+  const hasChangesRef = useRef(false);
+  useEffect(() => { hasChangesRef.current = hasChanges; }, [hasChanges]);
+
+  // Browser beforeunload warning (tab close / refresh / external navigation)
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (hasChanges) {
@@ -672,34 +677,31 @@ export default function AutomationBuilderPage() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasChanges]);
 
-  // Store pending navigation target for dialog
-  const pendingTargetRef = useRef(null);
+  // Native route blocking (Data Router) — intercepts ALL in-app navigation,
+  // including TopNav links, back/forward buttons, and programmatic navigate().
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      hasChangesRef.current && currentLocation.pathname !== nextLocation.pathname
+  );
 
-  // Safe navigation that checks for changes
-  const safeNavigate = useCallback((path) => {
-    if (hasChanges) {
-      pendingTargetRef.current = path;
-      setShowUnsavedDialog(true);
-    } else {
-      navigate(path);
-    }
-  }, [hasChanges, navigate]);
+  // Show the unsaved-changes dialog whenever a navigation gets blocked
+  useEffect(() => {
+    if (blocker.state === 'blocked') setShowUnsavedDialog(true);
+  }, [blocker.state]);
 
   // Handle leaving after unsaved changes dialog
   const handleLeaveWithoutSaving = useCallback(() => {
     setShowUnsavedDialog(false);
     setHasChanges(false);
-    const target = pendingTargetRef.current || '/automations';
-    pendingTargetRef.current = null;
-    // Use setTimeout to ensure state updates are processed before navigation
-    setTimeout(() => navigate(target), 0);
-  }, [navigate]);
+    hasChangesRef.current = false;
+    if (blocker.state === 'blocked') blocker.proceed();
+  }, [blocker]);
 
   // Handle staying on page
   const handleStay = useCallback(() => {
     setShowUnsavedDialog(false);
-    pendingTargetRef.current = null;
-  }, []);
+    if (blocker.state === 'blocked') blocker.reset();
+  }, [blocker]);
 
   // Add a step
   const addStep = (type) => {
@@ -833,6 +835,7 @@ export default function AutomationBuilderPage() {
       if (!res.ok) throw new Error(await res.text());
 
       setHasChanges(false); // Reset changes flag before navigation
+      hasChangesRef.current = false; // Sync ref immediately so the blocker lets the redirect through
       toast.success(isNew ? 'Automation created!' : 'Automation saved!');
       qc.invalidateQueries({ queryKey: ['automations'] });
       navigate('/automations');
@@ -917,7 +920,7 @@ export default function AutomationBuilderPage() {
       {/* Header */}
       <div className="mb-8">
         <button
-          onClick={() => safeNavigate('/automations')}
+          onClick={() => navigate('/automations')}
           className="flex items-center gap-2 text-sm font-semibold mb-4 transition-colors hover:opacity-80"
           style={{ color: 'var(--brand-navy)' }}
           data-testid="back-to-automations"
@@ -1071,7 +1074,7 @@ export default function AutomationBuilderPage() {
       >
         <Button
           variant="outline"
-          onClick={() => safeNavigate('/automations')}
+          onClick={() => navigate('/automations')}
           className="h-11 px-6 text-sm font-semibold"
           style={{ borderColor: 'var(--stroke)', color: 'var(--text-muted)' }}
           data-testid="cancel-button"

@@ -281,6 +281,30 @@ class StealthTrackAPITester:
         )
         return success
 
+    def test_get_automations(self):
+        """Test GET /api/automations"""
+        success, response = self.run_test(
+            "Get Automations",
+            "GET",
+            "/automations",
+            200
+        )
+        if success:
+            automations = response.json()
+            if not isinstance(automations, list):
+                print("⚠️  Automations should return a list")
+                return False
+            print(f"   Found {len(automations)} automations")
+            # Check if each automation has required fields
+            if automations:
+                automation = automations[0]
+                required_fields = ['id', 'name', 'enabled', 'created_at']
+                for field in required_fields:
+                    if field not in automation:
+                        print(f"⚠️  Missing field '{field}' in automation object")
+                        return False
+        return success
+
 def main():
     print("🚀 Starting StealthTrack API Tests")
     print("=" * 50)

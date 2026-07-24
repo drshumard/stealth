@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
 
-function timeAgo(ts) {
+function timeAgo(ts, timezone = 'UTC') {
   if (!ts) return '';
   const s = Math.floor((Date.now() - new Date(ts)) / 1000);
   if (s < 5)  return 'just now';
@@ -35,7 +35,7 @@ function srcStyle(src) {
   return SRC[src.toLowerCase()] || { bg: '#f0f9f4', text: '#166534', border: '#bbf7d0' };
 }
 
-function LogRow({ item }) {
+function LogRow({ item, timezone }) {
   const isId = !!(item.contact_name || item.contact_email);
   const label = item.contact_name || item.contact_email || 'Anonymous';
   const ss = srcStyle(item.utm_source);
@@ -69,7 +69,7 @@ function LogRow({ item }) {
         </div>
       </div>
       <span className="text-xs font-medium shrink-0 tabular-nums mt-1" style={{ color: 'var(--text-dim)' }} title={item.timestamp}>
-        {timeAgo(item.timestamp)}
+        {timeAgo(item.timestamp, timezone)}
       </span>
     </div>
   );
@@ -97,7 +97,7 @@ export default function LogsPage() {
         <div className="relative z-10 flex items-start justify-between">
           <div>
             <h1 className="text-4xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--brand-navy)', letterSpacing: '-0.02em' }}>Activity Logs</h1>
-            {lastRefresh && <p className="text-base mt-1 font-semibold" style={{ color: 'var(--brand-navy)', opacity: 0.6 }}>Updated {timeAgo(lastRefresh)}</p>}
+            {lastRefresh && <p className="text-base mt-1 font-semibold" style={{ color: 'var(--brand-navy)', opacity: 0.6 }}>Updated {timeAgo(lastRefresh, timezone)}</p>}
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right hidden sm:block">
@@ -130,7 +130,7 @@ export default function LogsPage() {
           </div>
         ) : (
           <div data-testid="logs-feed">
-            {logs.map((item, i) => <LogRow key={`${item.contact_id}-${i}`} item={item} />)}
+            {logs.map((item, i) => <LogRow key={`${item.contact_id}-${i}`} item={item} timezone={timezone} />)}
           </div>
         )}
       </div>
