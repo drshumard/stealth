@@ -69,8 +69,12 @@ function AutomationCard({ auto, onEdit, onDelete, onToggle, onViewRuns }) {
 
         <div className="flex items-center flex-wrap gap-2 mb-5">
           <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full"
-            style={{ backgroundColor: 'rgba(3,3,82,0.08)', color: '#030352' }}>
-            <Activity size={11} /> New Lead trigger
+            style={{ backgroundColor: 'rgba(3,3,82,0.08)', color: '#030352' }}
+            data-testid={`automation-trigger-badge-${auto.id}`}>
+            <Activity size={11} />
+            {auto.trigger_audience === 'new' && 'New leads trigger'}
+            {auto.trigger_audience === 'returning' && 'Returning leads trigger'}
+            {(auto.trigger_audience === 'both' || !auto.trigger_audience) && 'New & returning trigger'}
           </span>
           {filterCount > 0 && (
             <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full"

@@ -13,6 +13,8 @@
 - **Track fbc/fbp cookies for enhanced Facebook CAPI matching**
 - **Display FB CAPI data (user_agent, fbc, fbp) in Contact Detail Modal**
 - **Support excluding null fields from webhook payloads for cleaner integrations**
+- **NEW: Attribution refresh for re-identified contacts** (latest-click-wins *only when a new click-id is detected*, with archival history)
+- **NEW: Returning-contact automation triggers** so automations can fire for new, returning, or both audiences
 - POC: Not required (CRUD + simple auth only)
 
 ## 2) Implementation Steps (Phased)
@@ -53,7 +55,7 @@ Core pages/components
 - ✅ Legacy modal (AutomationBuilder.jsx) retained but no longer used by default
 - ✅ When editing legacy automations (no steps), builder hydrates from legacy fields:
   - required_fields → wait_for step
-  - filters → filter step  
+  - filters → filter step
   - actions/webhook_url → webhook steps (with delay steps if delay_seconds > 0)
 - ✅ On save from new builder, stores steps[]; legacy fields cleared
 - ✅ Navigation and redirects working correctly
@@ -205,14 +207,75 @@ Enhanced Contact Detail Modal and webhook configuration:
 5. ✅ As a user, delayed webhooks correctly respect the exclude_nulls setting.
 6. ✅ As a user, fbc/fbp flow correctly from tracker script → backend → webhook payload.
 
-### Phase 7 — Polish & Future Enhancements (Not Started - Optional)
+### Phase 7 — Re-identification Attribution Refresh + Returning Contact Triggers (In Progress 🔧)
+**Problem:** Existing contacts who sign up again via a *new* ad keep their *old* fbclid/fbc/fbp/UTMs in the CRM because attribution is currently first-seen-wins. This breaks correct Facebook CAPI attribution and automations don’t re-fire meaningfully for returning leads.
+
+**User-confirmed approach:**
+1. **Attribution refresh**: Only overwrite click-IDs/cookies/UTMs when the incoming click-id (fbclid/gclid/ttclid) is different/new. Archive the previous attribution snapshot into `attribution_history` (cap to 20 entries).
+2. **Automation triggers**: Add per-automation `trigger_audience`: `'new' | 'returning' | 'both'` (default `'both'`). Update runtime to pass an `is_returning` flag so automations can filter firing.
+3. **Scope**: Apply to **all entry points**: `/api/track/lead`, `/api/track/registration`, `/api/stealth/webhook`.
+
+#### Phase 7A — Backend: Attribution Refresh + History (Planned)
+- Add helper `_detect_new_click(existing_attr, new_attr) -> bool`
+  - True when new `fbclid`/`gclid`/`ttclid` is present and differs from stored value.
+- Add helper `_build_attribution_refresh(existing_attr, new_attr, now_str) -> dict`
+  - Produces `$set` updates overwriting click-id + UTM fields with new values.
+  - Produces `$push` update to `attribution_history` with an entry containing:
+    - `archived_at`, `reason` (e.g. `"new_click"`), and snapshot of the prior attribution.
+  - Cap history to 20 entries (use `$push: { $each: [...], $slice: -20 }`).
+  - If new `fbclid` present but no `fbc`, synthesize `fbc = fb.1.<ms>.<fbclid>`.
+- Update `_upsert_contact()` existing-contact branch:
+  - If `_detect_new_click(...)` is true → apply refresh + history push.
+  - Else keep current fill-missing behavior (do not overwrite existing attribution).
+- Update `_do_stitch()`:
+  - When stitching and child has a different click-id than parent and child is newer, refresh parent attribution (latest-click-wins) + archive parent’s old attribution into history.
+
+#### Phase 7B — Backend: Returning-contact automation audience (Planned)
+- Add `trigger_audience` to automation models:
+  - `AutomationCreate.trigger_audience: str = 'both'`
+  - `AutomationUpdate.trigger_audience: Optional[str]`
+  - `AutomationOut.trigger_audience: str = 'both'`
+- Update automation CRUD endpoints:
+  - POST /api/automations stores `trigger_audience`
+  - PUT /api/automations/{id} updates `trigger_audience`
+- Update `_run_automations(contact_id, is_returning=False)`:
+  - Filter out automations where `trigger_audience` doesn’t match:
+    - If `is_returning=True` → allow `'returning'` or `'both'`
+    - If `is_returning=False` → allow `'new'` or `'both'`
+- Update callers to compute `is_returning`:
+  - `/track/lead` and `/track/registration`:
+    - Determine returning if contact already existed with identity OR an email stitch occurred.
+  - `/stealth/webhook`:
+    - Existing contact found by email → returning.
+    - New contact created → not returning.
+- Update `_email_auto_stitch()` to return `(final_id, merged_bool)` so call sites can treat merges as returning re-identification.
+
+#### Phase 7C — Frontend: Configure trigger audience + display (Planned)
+- AutomationBuilderPage.jsx
+  - Add `triggerAudience` state; hydrate from `automation.trigger_audience`.
+  - Add a Select control in the Trigger card:
+    - New contacts only
+    - Returning contacts only
+    - New & returning
+  - Include `trigger_audience` in save body; include in hasChanges tracking.
+- AutomationsPage.jsx
+  - Update badge/label to show configured trigger audience instead of static “New Lead trigger”.
+
+#### Phase 7D — Testing (REQUIRED)
+- Run **testing_agent** to validate:
+  - Existing contact submits again with new fbclid → attribution refreshed + history appended.
+  - Existing contact submits again with same fbclid → no refresh; no extra history entry.
+  - Automations fire correctly based on `trigger_audience` for new vs returning.
+  - Builder UI can set/save/load trigger audience.
+
+### Phase 8 — Polish & Future Enhancements (Not Started - Optional)
 - Add: duplicate step, unsaved-changes prompt, keyboard reordering (optional)
 - Improve headers editor UX (JSON textarea with validation for custom headers)
 - Visual pipeline enhancements: animation on reorder, better visual feedback
 - Add converter in UI: "Convert legacy automation to steps" (one-click)
 - Docs: quick how-to and examples for each step type
 - Add gclid/wbraid/gbraid tracking for Google Ads Enhanced Conversions
-- User Stories (Phase 7)
+- User Stories (Phase 8)
   1. As a user, I can duplicate an existing step to speed up configuration.
   2. As a user, I'm warned if I try to navigate away with unsaved changes.
   3. As a user, the step list has smooth animations when reordering.
@@ -234,10 +297,14 @@ Enhanced Contact Detail Modal and webhook configuration:
 12. ✅ ~~Add fbc/fbp/user_agent display to Contact Detail Modal~~
 13. ✅ ~~Add "Exclude null fields" option to webhook steps~~
 14. ✅ ~~Critical code review: Fix 5 bugs affecting fbc/fbp tracking in production~~
-15. (Optional) Add polish features: duplicate step, unsaved changes warning, animations
-16. (Optional) Add Google Ads tracking (gclid/wbraid/gbraid)
+15. 🔧 Implement Phase 7A: Attribution refresh + `attribution_history` (all entry points)
+16. 🔧 Implement Phase 7B: `trigger_audience` + returning-contact triggers in `_run_automations`
+17. 🔧 Implement Phase 7C: Builder Select + AutomationsPage label updates
+18. 🧪 REQUIRED: Run testing_agent to verify reported issue end-to-end
+19. (Optional) Add Google Ads tracking (gclid/wbraid/gbraid)
 
-## 4) Success Criteria (ALL ACHIEVED ✅)
+## 4) Success Criteria
+### Phases 1–6 (ALL ACHIEVED ✅)
 - ✅ Dedicated builder routes load and render without console errors
 - ✅ All four step types can be added, configured, reordered, and removed
 - ✅ Saving persists steps[] to the backend and reloads correctly
@@ -256,12 +323,23 @@ Enhanced Contact Detail Modal and webhook configuration:
 - ✅ **NEW**: fbc/fbp tracking is production-ready with all critical bugs fixed
 - ✅ **NEW**: End-to-end test verified fbc/fbp flow from tracker → backend → webhook
 
+### Phase 7 (To be achieved)
+- Returning contact with a **new** click-id updates contact attribution (fbclid/fbc/fbp/UTMs as present) and archives the previous attribution into `attribution_history`.
+- Returning contact with the **same** click-id does not overwrite attribution and does not create redundant history.
+- Automations can be configured to fire for:
+  - new only
+  - returning only
+  - both
+- `/track/lead`, `/track/registration`, and `/stealth/webhook` all correctly set the returning/new event type.
+- testing_agent report confirms the bug scenario is resolved.
+
 ## 5) Files Changed/Created
+### Already changed (Phases 1–6)
 - `/app/frontend/src/components/AutomationBuilderPage.jsx` - NEW: Full-page Zapier-style builder with validation + FB CAPI fields (user_agent, fbc, fbp) in TETHER_FIELDS + exclude_nulls checkbox
 - `/app/frontend/src/components/ContactDetailModal.jsx` - MODIFIED: Added user_agent to Overview tab, added fbc/fbp to Attribution tab "Click IDs & FB Cookies" section
 - `/app/frontend/src/App.js` - MODIFIED: Added routes for /automations/new and /automations/builder/:id
 - `/app/frontend/src/components/AutomationsPage.jsx` - MODIFIED: Updated to use navigation instead of modal
-- `/app/backend/server.py` - MODIFIED: 
+- `/app/backend/server.py` - MODIFIED:
   - Added GET /api/automations/{id} endpoint
   - Added steps field support in PUT /api/automations/{id}
   - Added `_validate_automation_steps()` function for backend validation
@@ -272,78 +350,31 @@ Enhanced Contact Detail Modal and webhook configuration:
   - Updated `_build_webhook_payload()` to include user_agent, fbc, fbp and support `exclude_nulls` parameter
   - Added `fbc` and `fbp` fields to Attribution model
   - Updated `safe_attribution()` to recognize fbc/fbp as known fields
-  - **Added `fbc`, `fbp` to `attr_signal_fields` in `_upsert_contact()` (Bug #2 fix)**
-  - **Added `exclude_nulls` parameter to `_fire_webhook_task()` (Bug #5 fix)**
+  - Added `fbc`, `fbp` to `attr_signal_fields` in `_upsert_contact()` (Bug #2 fix)
+  - Added `exclude_nulls` parameter to `_fire_webhook_task()` (Bug #5 fix)
   - Updated `shumard.js` tracker:
     - Captures `navigator.userAgent`, `_fbc`, and `_fbp` cookies
-    - **Saves updated fbc/fbp to localStorage when using cached attribution (Bug #1 fix)**
-    - **Added 2-second delayed re-capture for slow FB Pixel (Bug #3 fix)**
-    - **Refreshes fbc/fbp in sendLead/sendRegistration before sending (Bug #4 fix)**
+    - Saves updated fbc/fbp to localStorage when using cached attribution (Bug #1 fix)
+    - Added 2-second delayed re-capture for slow FB Pixel (Bug #3 fix)
+    - Refreshes fbc/fbp in sendLead/sendRegistration before sending (Bug #4 fix)
+
+### Planned changes (Phase 7)
+- `/app/backend/server.py`
+  - Add `attribution_history` support via `$push` / `$slice`
+  - Add click-id refresh detection + refresh logic
+  - Add `trigger_audience` to automation models and CRUD
+  - Update `_run_automations(contact_id, is_returning)` filtering
+  - Update `/track/lead`, `/track/registration`, `/stealth/webhook` to compute is_returning
+  - Update `_email_auto_stitch()` to return `(final_id, merged_bool)`
+- `/app/frontend/src/components/AutomationBuilderPage.jsx`
+  - Add trigger audience Select + persist/hydrate
+- `/app/frontend/src/components/AutomationsPage.jsx`
+  - Display trigger audience label/badge
 
 ## 6) Summary
-**Phases 1-6: COMPLETED** - The Zapier-style Automation Builder is PRODUCTION READY with full FB CAPI support, enhanced UX, and all critical bugs fixed:
+**Phases 1–6: COMPLETED** — Zapier-style Automation Builder is production-ready with FB CAPI support (user_agent, fbc/fbp), webhook null-exclusion, and critical bug fixes.
 
-### Core Features
-- Users can create new automations with a flexible step-based pipeline
-- Users can edit existing automations (including legacy ones that auto-convert)
-- All 4 step types working: Wait For, Filter, Delay, Webhook
-- Reordering, removal, and configuration all working
-- Testing agent verified 90%+ success rate
-
-### Backend Execution
-- `_execute_step_pipeline()` processes steps sequentially
-- wait_for: Checks required fields, aborts pipeline if missing (will retry later)
-- filter: Evaluates conditions, aborts if not matched
-- delay: Waits N seconds and refetches contact data
-- webhook: Fires webhook with optional field mapping and null exclusion
-- Full backward compatibility with legacy automations
-
-### Production Hardening (Dual-Layer Validation)
-**Frontend Validation:**
-- URL validation (http/https required) - toast error
-- Filter value validation (empty string check) - toast error
-- Wait For field validation - toast error
-- Error state UI for failed loads (404/500)
-- Clean code with proper state management
-
-**Backend Validation:**
-- `_validate_automation_steps()` validates all steps before save
-- Returns HTTP 400 with descriptive error messages:
-  - "Step X: Webhook URL must start with http:// or https://"
-  - "Step X: Filter condition on 'field' with operator 'op' requires a value"
-  - "Step X: Wait For step must have at least one required field"
-- Applied to both POST /api/automations and PUT /api/automations/{id}
-
-### Facebook Conversions API Support (Complete & Production-Ready)
-**User Agent Tracking:**
-- `user_agent` field added to all contact models
-- Tracker script captures `navigator.userAgent` automatically
-- User agent stored on first contact (first-seen wins)
-- Webhook payloads include `user_agent` for FB CAPI `client_user_agent` mapping
-- Displayed in Contact Detail Modal Overview tab with copy button
-- Available in automation builder field mapping dropdown
-
-**fbc/fbp Cookie Tracking (5 Critical Bugs Fixed):**
-- `fbc` (Facebook Click ID) and `fbp` (Facebook Browser ID) fields added to Attribution model
-- Tracker script captures `_fbc` and `_fbp` cookies from browser
-- **Bug Fix #1**: Cookies now saved to localStorage when using cached attribution
-- **Bug Fix #2**: `attr_signal_fields` now includes fbc/fbp for proper contact creation
-- **Bug Fix #3**: 2-second delayed re-capture handles slow FB Pixel loading
-- **Bug Fix #4**: sendLead/sendRegistration refresh cookies before sending
-- **Bug Fix #5**: `_fire_webhook_task` passes exclude_nulls for delayed webhooks
-- Webhook payloads include `fbc` and `fbp` for enhanced FB CAPI event matching
-- Displayed in Contact Detail Modal Attribution tab "Click IDs & FB Cookies" section
-- Available in automation builder field mapping dropdown:
-  - "Facebook Click ID (fbc)" → maps to FB CAPI `fbc`
-  - "Facebook Browser ID (fbp)" → maps to FB CAPI `fbp`
-
-### Webhook Enhancements
-**Exclude Null Fields Option:**
-- Checkbox in webhook step config: "Exclude null fields — Don't send fields that have no value"
-- Default: enabled (true) - cleaner payloads out of the box
-- Backend `_build_webhook_payload()` filters null/empty values when enabled
-- Works with both default payload and custom field mappings
-- Reduces payload clutter for integrations that don't need null fields
-
-### Ready for Production ✅
-All features implemented, tested, and critical bugs fixed. fbc/fbp tracking verified end-to-end.
+**Phase 7: IN PROGRESS** — Implement re-identification attribution refresh and returning-contact trigger audiences so:
+- Existing contacts who sign up again from new ads capture the *new* click-id/cookies/UTMs (with history retained).
+- Automations can intentionally fire on new leads, returning leads, or both.
+- Verification is done via mandatory testing_agent run before marking the issue resolved.

@@ -79,6 +79,9 @@ class Contact(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     attribution: Optional[Attribution] = None
+    attribution_history: Optional[List[Dict[str, Any]]] = None  # Archive of previous attribution snapshots
+    attribution_refreshed_at: Optional[datetime] = None         # When attribution was last refreshed
+    first_identified_at: Optional[datetime] = None              # When contact was first identified (email/phone captured)
     tags: Optional[List[str]] = None          # e.g. ["registered", "attended"]
     merged_into: Optional[str] = None
     merged_children: Optional[List[str]] = None
@@ -146,6 +149,9 @@ class ContactWithStats(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     attribution: Optional[Attribution] = None
+    attribution_history: Optional[List[Dict[str, Any]]] = None
+    attribution_refreshed_at: Optional[datetime] = None
+    first_identified_at: Optional[datetime] = None
     tags: Optional[List[str]] = None
     merged_into: Optional[str] = None
     merged_children: Optional[List[str]] = None
@@ -167,6 +173,9 @@ class ContactDetail(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     attribution: Optional[Attribution] = None
+    attribution_history: Optional[List[Dict[str, Any]]] = None
+    attribution_refreshed_at: Optional[datetime] = None
+    first_identified_at: Optional[datetime] = None
     tags: Optional[List[str]] = None
     merged_into: Optional[str] = None
     merged_children: Optional[List[str]] = None
@@ -239,6 +248,11 @@ class AutomationAction(BaseModel):
 class AutomationCreate(BaseModel):
     name:             str
     enabled:          bool = True
+    # Which contacts fire this automation:
+    #   'new'       — only contacts identified for the first time
+    #   'returning' — only contacts re-identified via a fresh ad click / re-signup
+    #   'both'      — fire for either (default)
+    trigger_audience: str = 'both'
     # ── New flexible step pipeline ─────────────────────────────────────────
     # Each step: { id, type, config }
     # types: 'wait_for' | 'filter' | 'delay' | 'webhook'
@@ -256,6 +270,7 @@ class AutomationCreate(BaseModel):
 class AutomationUpdate(BaseModel):
     name:             Optional[str] = None
     enabled:          Optional[bool] = None
+    trigger_audience: Optional[str] = None   # 'new' | 'returning' | 'both'
     steps:            Optional[List[Dict[str, Any]]] = None
     required_fields:  Optional[List[str]] = None
     actions:          Optional[List[AutomationAction]] = None
@@ -270,6 +285,7 @@ class AutomationOut(BaseModel):
     id:                 str
     name:               str
     enabled:            bool
+    trigger_audience:   str = 'both'   # 'new' | 'returning' | 'both'
     steps:              Optional[List[Dict[str, Any]]] = None   # new pipeline
     required_fields:    List[str] = ['email']
     actions:            List[AutomationAction] = []
@@ -446,6 +462,117 @@ def parse_full_name(full_name: Optional[str]) -> tuple[Optional[str], Optional[s
     return (first_name, last_name)
 
 
+# ──────────────── Attribution refresh (latest-click-wins) ────────────────
+# When a KNOWN contact comes back through a NEW ad click (different fbclid /
+# gclid / ttclid), we refresh their stored attribution with the new values so
+# CAPI events fire with the fresh click ID.  The previous attribution snapshot
+# is archived into `attribution_history` (capped at 20 entries).
+
+_CLICK_ID_FIELDS = ('fbclid', 'gclid', 'ttclid')
+
+_REFRESHABLE_ATTR_FIELDS = (
+    'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
+    'utm_id', 'campaign_id', 'adset_id', 'ad_id',
+    'fbclid', 'fbc', 'fbp', 'gclid', 'ttclid',
+    'source_link_tag', 'fb_ad_set_id', 'google_campaign_id',
+)
+
+
+def _fbc_click_part(fbc: Optional[str]) -> Optional[str]:
+    """Extract the fbclid embedded in an _fbc cookie (format: fb.1.<ts>.<fbclid>)."""
+    if not fbc or not isinstance(fbc, str):
+        return None
+    parts = fbc.split('.', 3)
+    return parts[3] if len(parts) == 4 and parts[3] else None
+
+
+def _detect_new_click(existing_attr: Optional[dict], new_attr: Optional[dict]) -> bool:
+    """
+    True when the incoming attribution carries a click ID that is DIFFERENT
+    from what's already stored on the contact.
+
+    Rules:
+    - If the contact has no stored click ID at all, this is NOT a "new click"
+      (plain fill-missing merge handles first-time attribution).
+    - If any incoming fbclid/gclid/ttclid differs from the stored value for
+      that field (including the stored value being empty while another click
+      ID exists), it's a new click.
+    - Falls back to comparing the fbclid embedded inside the _fbc cookie.
+    """
+    if not isinstance(new_attr, dict) or not new_attr:
+        return False
+    existing_attr = existing_attr if isinstance(existing_attr, dict) else {}
+
+    has_stored_click = any(existing_attr.get(f) for f in _CLICK_ID_FIELDS) or _fbc_click_part(existing_attr.get('fbc'))
+    if not has_stored_click:
+        return False
+
+    for f in _CLICK_ID_FIELDS:
+        new_v = new_attr.get(f)
+        if new_v and str(new_v) != str(existing_attr.get(f) or ''):
+            return True
+
+    # _fbc cookie fallback (covers cases where raw fbclid isn't in the payload)
+    new_part = _fbc_click_part(new_attr.get('fbc'))
+    if new_part and not new_attr.get('fbclid'):
+        old_part = existing_attr.get('fbclid') or _fbc_click_part(existing_attr.get('fbc'))
+        if old_part and new_part != str(old_part):
+            return True
+
+    return False
+
+
+def _build_attribution_refresh(existing_attr: dict, new_attr: dict, now: datetime) -> tuple[dict, dict]:
+    """
+    Build the ($set updates, history entry) for a latest-click-wins refresh.
+
+    - Overwrites click IDs, FB cookies, and UTM/campaign fields with the NEW
+      values (only fields actually present in the new attribution).
+    - If a new fbclid arrives without an _fbc cookie, synthesizes one using
+      Facebook's documented format (fb.1.<ms_timestamp>.<fbclid>) so CAPI
+      always receives a fresh fbc.
+    - Archives the full previous attribution snapshot for auditability.
+    """
+    set_updates: dict = {}
+    for f in _REFRESHABLE_ATTR_FIELDS:
+        v = new_attr.get(f)
+        if v:
+            set_updates[f'attribution.{f}'] = str(v)[:500]
+
+    # Synthesize a fresh fbc from the new fbclid when the cookie wasn't captured
+    new_fbclid = new_attr.get('fbclid')
+    if new_fbclid and not new_attr.get('fbc'):
+        ts_ms = int(now.timestamp() * 1000)
+        set_updates['attribution.fbc'] = f"fb.1.{ts_ms}.{str(new_fbclid)[:500]}"
+
+    set_updates['attribution_refreshed_at'] = dt_to_str(now)
+
+    history_entry = {
+        "archived_at": dt_to_str(now),
+        "reason":      "new_click_detected",
+        "attribution": {k: v for k, v in (existing_attr or {}).items() if v and k != 'extra'},
+    }
+    return set_updates, history_entry
+
+
+def _merge_extra_updates(existing_attr: dict, new_attr: dict) -> dict:
+    """Fill-missing merge for attribution.extra keys (never overwrites)."""
+    updates: dict = {}
+    v = new_attr.get('extra')
+    if not isinstance(v, dict):
+        return updates
+    existing_extra = (existing_attr or {}).get('extra')
+    new_extra = {ek: str(ev)[:500] for ek, ev in v.items()
+                 if ev and (not isinstance(existing_extra, dict) or not existing_extra.get(ek))}
+    if new_extra:
+        if not isinstance(existing_extra, dict):
+            updates['attribution.extra'] = new_extra
+        else:
+            for ek, ev in new_extra.items():
+                updates[f'attribution.extra.{ek}'] = ev
+    return updates
+
+
 def _tz_day_start(date_str: str, tz_name: Optional[str]) -> str:
     """UTC ISO string for 00:00:00 of date_str in tz_name. Falls back to treating date as UTC."""
     try:
@@ -508,6 +635,7 @@ async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = 
 
     if existing:
         update: dict = {"updated_at": now_str}
+        push_ops: Optional[dict] = None
         for field in ['name', 'email', 'phone', 'session_id']:
             if data.get(field):
                 update[field] = data[field]
@@ -527,6 +655,19 @@ async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = 
                 built = safe_attribution(data['attribution'])
                 if built:
                     update['attribution'] = strip_nulls(built.model_dump())
+            elif _detect_new_click(existing_attr, data['attribution']):
+                # ── Returning visitor via a NEW ad click ─────────────────────
+                # Latest-click-wins: overwrite click IDs / FB cookies / UTMs
+                # with the fresh values and archive the old snapshot.
+                refresh_updates, history_entry = _build_attribution_refresh(
+                    existing_attr, data['attribution'], now)
+                update.update(refresh_updates)
+                update.update(_merge_extra_updates(existing_attr, data['attribution']))
+                push_ops = {"attribution_history": {"$each": [history_entry], "$slice": -20}}
+                logger.info(
+                    f"Attribution refreshed for {cid[:12]} — new click detected "
+                    f"(fbclid={str(data['attribution'].get('fbclid') or '')[:16]})"
+                )
             else:
                 for k, v in data['attribution'].items():
                     if k == 'extra' and isinstance(v, dict):
@@ -541,7 +682,10 @@ async def _upsert_contact(data: dict, now: datetime, client_ip: Optional[str] = 
                                     update[f'attribution.extra.{ek}'] = ev
                     elif v and not existing_attr.get(k):
                         update[f'attribution.{k}'] = v
-        await db.contacts.update_one({"contact_id": cid}, {"$set": update})
+        ops: dict = {"$set": update}
+        if push_ops:
+            ops["$push"] = push_ops
+        await db.contacts.update_one({"contact_id": cid}, ops)
     else:
         # Only create a new contact if it has identity OR meaningful attribution.
         # Pure anonymous page loads (no UTMs, no email) are skipped -- their visits
@@ -697,13 +841,34 @@ async def _do_stitch(parent_id: str, child_id: str, now: datetime) -> dict:
                 elif v and not parent_attr.get(k):
                     parent_update[f'attribution.{k}'] = v
 
+    # ── Latest-click-wins on stitch ───────────────────────────────────────────
+    # If the child contact is NEWER and arrived via a DIFFERENT ad click than the
+    # parent (e.g. an existing lead signed up again from a new campaign on a new
+    # device), refresh the parent's click/UTM attribution from the child and
+    # archive the parent's previous snapshot into attribution_history.
+    stitch_push: Optional[dict] = None
+    if (isinstance(child_attr, dict) and child_attr
+            and isinstance(parent_attr, dict) and parent_attr):
+        child_newer = str(child.get('created_at') or '') >= str(parent.get('created_at') or '')
+        if child_newer and _detect_new_click(parent_attr, child_attr):
+            refresh_updates, history_entry = _build_attribution_refresh(parent_attr, child_attr, now)
+            parent_update.update(refresh_updates)   # refresh wins over fill-missing above
+            stitch_push = {"attribution_history": {"$each": [history_entry], "$slice": -20}}
+            logger.info(
+                f"Attribution refreshed on stitch: parent {parent_id[:12]} now carries "
+                f"child {child_id[:12]}'s newer click IDs"
+            )
+
     # Track merged children
     existing_children = parent.get('merged_children') or []
     if child_id not in existing_children:
         existing_children.append(child_id)
     parent_update['merged_children'] = existing_children
 
-    await db.contacts.update_one({"contact_id": parent_id}, {"$set": parent_update})
+    parent_ops: dict = {"$set": parent_update}
+    if stitch_push:
+        parent_ops["$push"] = stitch_push
+    await db.contacts.update_one({"contact_id": parent_id}, parent_ops)
 
     # Reassign all child visits → parent
     await db.page_visits.update_many(
@@ -848,7 +1013,7 @@ async def _ip_auto_stitch(contact_id: str, client_ip: Optional[str], now: dateti
             break
 
 
-async def _email_auto_stitch(contact_id: str, email: Optional[str], now: datetime) -> str:
+async def _email_auto_stitch(contact_id: str, email: Optional[str], now: datetime) -> tuple[str, bool]:
     """
     Auto-stitch contacts that share the same email address.
     
@@ -856,14 +1021,17 @@ async def _email_auto_stitch(contact_id: str, email: Optional[str], now: datetim
     already has that email. If found, we merge the contacts together, preserving
     the richer data (attribution, visits, etc.).
     
-    Returns the final contact_id to use (may be different if merged into existing).
+    Returns (final_contact_id, merged):
+      - final_contact_id: the contact_id to use going forward (may change after merge)
+      - merged: True when an existing contact with the same email was found and
+        merged — i.e. this event re-identified a KNOWN (returning) contact.
     """
     if not email:
-        return contact_id
+        return contact_id, False
     
     email_lower = email.lower().strip()
     if not email_lower:
-        return contact_id
+        return contact_id, False
     
     # Escape special regex characters in email for safe matching
     import re
@@ -877,15 +1045,15 @@ async def _email_auto_stitch(contact_id: str, email: Optional[str], now: datetim
     }, {"_id": 0})
     
     if not existing:
-        return contact_id
+        return contact_id, False
     
     current = await db.contacts.find_one({"contact_id": contact_id}, {"_id": 0})
     if not current or current.get('merged_into'):
-        return contact_id
+        return contact_id, False
     
     existing_cid = existing.get('contact_id')
     if not existing_cid:
-        return contact_id  # Safety check
+        return contact_id, False  # Safety check
     
     # Determine which contact should be the "parent" (richer data wins)
     def richness_score(c):
@@ -920,8 +1088,9 @@ async def _email_auto_stitch(contact_id: str, email: Optional[str], now: datetim
     
     await _do_stitch(parent_id, child_id, now)
     
-    # Return the parent contact_id (the one that remains active)
-    return parent_id
+    # Return the parent contact_id (the one that remains active) and signal
+    # that this event matched a known contact (returning re-identification).
+    return parent_id, True
 
 
 # ─────────────────────────── Automation Engine ───────────────────────────
@@ -1177,7 +1346,41 @@ async def _execute_step_pipeline(
     logger.info(f"Automation {auto_id[:8]} pipeline completed for contact {contact_id[:8]}")
 
 
-async def _run_automations(contact_id: str) -> None:
+async def _was_reidentified_by_new_click(contact_id: str) -> bool:
+    """
+    True when the contact's attribution was refreshed by a NEW ad click after
+    they were first identified. Used by the tracking endpoints to classify an
+    identification event as a 'returning' re-identification.
+
+    Comparing against first_identified_at (stamped once) means ALL submits in a
+    returning funnel session (email form, then phone form) stay classified as
+    'returning', while progressive profile completion on a first-ever visit
+    stays classified as 'new'.
+    """
+    doc = await db.contacts.find_one(
+        {"contact_id": contact_id},
+        {"_id": 0, "attribution_refreshed_at": 1, "first_identified_at": 1}
+    )
+    if not doc:
+        return False
+    refreshed = doc.get('attribution_refreshed_at')
+    if not refreshed:
+        return False
+    first_ident = doc.get('first_identified_at')
+    # Legacy contacts (identified before this feature) have no first_identified_at:
+    # any click refresh on them counts as a returning re-identification.
+    return (not first_ident) or str(refreshed) > str(first_ident)
+
+
+async def _mark_identified(contact_id: str, now: datetime) -> None:
+    """Stamp first_identified_at exactly once (first successful identification)."""
+    await db.contacts.update_one(
+        {"contact_id": contact_id, "first_identified_at": {"$exists": False}},
+        {"$set": {"first_identified_at": dt_to_str(now)}}
+    )
+
+
+async def _run_automations(contact_id: str, is_returning: bool = False) -> None:
     contact = await db.contacts.find_one({"contact_id": contact_id}, {"_id": 0})
     if not contact or not (contact.get('email') or contact.get('phone')):
         return
@@ -1187,6 +1390,17 @@ async def _run_automations(contact_id: str) -> None:
     automations = await db.automations.find({"enabled": True}, {"_id": 0}).to_list(100)
     for auto in automations:
         try:
+            # ── Trigger audience gate ────────────────────────────────────────
+            # 'new'       → only first-time identifications
+            # 'returning' → only re-identified contacts (fresh ad click / re-signup)
+            # 'both'      → fire for either (default; also legacy automations)
+            audience = (auto.get('trigger_audience') or 'both').lower()
+            if audience == 'new' and is_returning:
+                continue
+            if audience == 'returning' and not is_returning:
+                continue
+            # ─────────────────────────────────────────────────────────────────
+
             # ── New step-based pipeline ─────────────────────────────────────
             # If automation has steps[], use the new pipeline execution
             steps = auto.get('steps')
@@ -1958,6 +2172,9 @@ async def track_lead(data: LeadCreate, request: Request):
         now = datetime.now(timezone.utc)
         ip  = get_client_ip(request)
         eid = await _resolve_contact_id(data.contact_id)
+        # Was this contact already identified BEFORE this submission?
+        prior = await db.contacts.find_one({"contact_id": eid}, {"_id": 0, "email": 1, "phone": 1})
+        was_identified = bool(prior and (prior.get('email') or prior.get('phone')))
         await _upsert_contact({
             'contact_id': eid, 'session_id': data.session_id,
             'email': data.email, 'phone': data.phone, 'name': data.name,
@@ -1965,11 +2182,18 @@ async def track_lead(data: LeadCreate, request: Request):
             'attribution': data.attribution, 'user_agent': data.user_agent
         }, now, ip)
         # Auto-stitch by email FIRST (most reliable identity match)
+        merged = False
         if data.email:
-            eid = await _email_auto_stitch(eid, data.email, now)
+            eid, merged = await _email_auto_stitch(eid, data.email, now)
         await _session_auto_stitch(eid, data.session_id, now)
         await _ip_auto_stitch(eid, ip, now)
-        asyncio.create_task(_run_automations(eid))
+        # Returning = a known contact re-identified (email matched an existing
+        # contact) OR their attribution was refreshed by a NEW ad click since
+        # their last identification. Progressive profile completion (e.g. phone
+        # added minutes after email, same click) stays classified as 'new'.
+        is_returning = merged or (was_identified and await _was_reidentified_by_new_click(eid))
+        await _mark_identified(eid, now)
+        asyncio.create_task(_run_automations(eid, is_returning=is_returning))
         return {"status": "ok", "contact_id": eid}  # Return the final contact_id (may have changed after merge)
     except Exception as e:
         logger.error(f"Error tracking lead: {e}")
@@ -1982,6 +2206,9 @@ async def track_registration(data: RegistrationCreate, request: Request):
         now = datetime.now(timezone.utc)
         ip  = get_client_ip(request)
         eid = await _resolve_contact_id(data.contact_id)
+        # Was this contact already identified BEFORE this submission?
+        prior = await db.contacts.find_one({"contact_id": eid}, {"_id": 0, "email": 1, "phone": 1})
+        was_identified = bool(prior and (prior.get('email') or prior.get('phone')))
         await _upsert_contact({
             'contact_id': eid, 'session_id': data.session_id,
             'email': data.email, 'phone': data.phone, 'name': data.name,
@@ -1991,11 +2218,16 @@ async def track_registration(data: RegistrationCreate, request: Request):
         if data.current_url:
             await _log_visit(eid, data.session_id, data.current_url, data.referrer_url, data.page_title or "Registration", data.attribution, now, ip)
         # Auto-stitch by email FIRST (most reliable identity match)
+        merged = False
         if data.email:
-            eid = await _email_auto_stitch(eid, data.email, now)
+            eid, merged = await _email_auto_stitch(eid, data.email, now)
         await _session_auto_stitch(eid, data.session_id, now)
         await _ip_auto_stitch(eid, ip, now)
-        asyncio.create_task(_run_automations(eid))
+        # Returning = known contact re-identified OR attribution refreshed by a
+        # new ad click since their last identification (see /track/lead).
+        is_returning = merged or (was_identified and await _was_reidentified_by_new_click(eid))
+        await _mark_identified(eid, now)
+        asyncio.create_task(_run_automations(eid, is_returning=is_returning))
         return {"status": "ok", "contact_id": eid}  # Return the final contact_id (may have changed after merge)
     except Exception as e:
         logger.error(f"Error tracking registration: {e}")
@@ -2147,11 +2379,6 @@ class LeadsExportRequest(BaseModel):
     until:  Optional[str] = None
     tz:     Optional[str] = None
     search: Optional[str] = None
-    limit:  int = 5000
-
-
-@api_router.post("/leads/export")
-async def export_contacts(body: LeadsExportRequest):
     limit:  int = 5000
 
 
@@ -2347,17 +2574,25 @@ async def list_automations():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+_VALID_TRIGGER_AUDIENCES = {'new', 'returning', 'both'}
+
+
 @api_router.post("/automations", response_model=AutomationOut, status_code=201)
 async def create_automation(data: AutomationCreate):
     try:
         # Validate steps if provided
         _validate_automation_steps(data.steps)
+
+        audience = (data.trigger_audience or 'both').lower()
+        if audience not in _VALID_TRIGGER_AUDIENCES:
+            raise HTTPException(status_code=400, detail="trigger_audience must be one of: new, returning, both")
         
         now = datetime.now(timezone.utc)
         doc = {
             "id":              str(uuid.uuid4()),
             "name":            data.name,
             "enabled":         data.enabled,
+            "trigger_audience": audience,
             "steps":           data.steps,  # New steps format
             "required_fields": data.required_fields,
             "actions":         [a.model_dump() for a in data.actions],
@@ -2414,6 +2649,11 @@ async def update_automation(auto_id: str, data: AutomationUpdate):
         update: dict = {"updated_at": dt_to_str(now)}
         if data.name            is not None: update["name"]            = data.name
         if data.enabled         is not None: update["enabled"]         = data.enabled
+        if data.trigger_audience is not None:
+            audience = data.trigger_audience.lower()
+            if audience not in _VALID_TRIGGER_AUDIENCES:
+                raise HTTPException(status_code=400, detail="trigger_audience must be one of: new, returning, both")
+            update["trigger_audience"] = audience
         if data.steps           is not None: update["steps"]           = data.steps
         if data.required_fields is not None: update["required_fields"] = data.required_fields
         if data.actions         is not None: update["actions"]         = [a.model_dump() for a in data.actions]
@@ -3051,7 +3291,11 @@ async def stealth_webhook(request: Request, tag: Optional[str] = None):
                 {"contact_id": eid},
                 {"$addToSet": {"tags": {"$each": tags_to_add}}}
             )
-            asyncio.create_task(_run_automations(eid))
+            # Returning when their attribution was refreshed by a new ad click
+            # since they were first identified (e.g. re-registered via new ad).
+            is_returning = await _was_reidentified_by_new_click(eid)
+            await _mark_identified(eid, now)
+            asyncio.create_task(_run_automations(eid, is_returning=is_returning))
         else:
             # Brand new contact — create them with all available data
             eid = str(uuid.uuid4())
@@ -3061,7 +3305,8 @@ async def stealth_webhook(request: Request, tag: Optional[str] = None):
                 'phone':      phone,
                 'name':       name,
             }, now, ip)
-            asyncio.create_task(_run_automations(eid))
+            await _mark_identified(eid, now)
+            asyncio.create_task(_run_automations(eid, is_returning=False))
             contact_id = eid
             # Add tags to newly created contact
             await db.contacts.update_one(

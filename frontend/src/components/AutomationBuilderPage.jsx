@@ -561,6 +561,7 @@ export default function AutomationBuilderPage() {
 
   const [name, setName] = useState('');
   const [enabled, setEnabled] = useState(true);
+  const [triggerAudience, setTriggerAudience] = useState('both');
   const [steps, setSteps] = useState([]);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -585,6 +586,7 @@ export default function AutomationBuilderPage() {
     if (automation) {
       setName(automation.name || '');
       setEnabled(automation.enabled ?? true);
+      setTriggerAudience(automation.trigger_audience || 'both');
       // If automation has steps[], use them directly
       if (automation.steps?.length) {
         setSteps(automation.steps);
@@ -646,7 +648,7 @@ export default function AutomationBuilderPage() {
       return;
     }
     if (initialized || isNew) setHasChanges(true);
-  }, [name, enabled, steps, automation, initialized, isNew]);
+  }, [name, enabled, triggerAudience, steps, automation, initialized, isNew]);
 
   // Reset hasChanges for new automations after initial render
   useEffect(() => {
@@ -809,6 +811,7 @@ export default function AutomationBuilderPage() {
       const body = {
         name: name.trim(),
         enabled,
+        trigger_audience: triggerAudience,
         steps: steps,
         // Clear legacy fields when using steps
         required_fields: [],
@@ -959,15 +962,36 @@ export default function AutomationBuilderPage() {
         style={{ borderColor: '#c0c9e8', backgroundColor: 'rgba(3,3,82,0.02)' }}
       >
         <div
-          className="flex items-center gap-3 px-5 py-4"
+          className="flex items-center gap-3 px-5 py-4 flex-wrap"
           style={{ background: 'linear-gradient(135deg, rgba(3,3,82,0.08) 0%, rgba(3,3,82,0.04) 100%)' }}
         >
           <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(3,3,82,0.12)' }}>
             <Activity size={17} style={{ color: '#030352' }} />
           </div>
-          <div>
-            <div className="text-sm font-bold" style={{ color: '#030352', fontFamily: 'Space Grotesk, sans-serif' }}>Trigger: New Lead Identified</div>
-            <div className="text-xs" style={{ color: 'var(--text-dim)' }}>Fires when a contact's email or phone is first captured</div>
+          <div className="flex-1 min-w-[220px]">
+            <div className="text-sm font-bold" style={{ color: '#030352', fontFamily: 'Space Grotesk, sans-serif' }}>Trigger: Lead Identified</div>
+            <div className="text-xs" style={{ color: 'var(--text-dim)' }}>
+              {triggerAudience === 'new' && "Fires only the first time a contact's email or phone is captured"}
+              {triggerAudience === 'returning' && 'Fires when a known contact is re-identified via a new ad click or re-signup'}
+              {triggerAudience === 'both' && 'Fires for first-time contacts and known contacts returning via a new ad click'}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Fire for</span>
+            <Select value={triggerAudience} onValueChange={setTriggerAudience}>
+              <SelectTrigger
+                className="h-9 text-sm w-56 bg-white"
+                style={{ borderColor: '#c0c9e8' }}
+                data-testid="trigger-audience-select"
+              >
+                <SelectValue placeholder="Select audience" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="both" data-testid="trigger-audience-both">New &amp; returning contacts</SelectItem>
+                <SelectItem value="new" data-testid="trigger-audience-new">New contacts only</SelectItem>
+                <SelectItem value="returning" data-testid="trigger-audience-returning">Returning contacts only</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </div>

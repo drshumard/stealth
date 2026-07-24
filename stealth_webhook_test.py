@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime
 
 class StealthWebhookTester:
-    def __init__(self, base_url="https://tether-workflows.preview.emergentagent.com"):
+    def __init__(self, base_url="https://lead-tracker-312.preview.emergentagent.com"):
         self.base_url = base_url
         self.api_url = f"{base_url}/api"
         self.tests_run = 0

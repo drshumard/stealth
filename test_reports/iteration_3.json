@@ -1,0 +1,43 @@
+{
+  "summary": "Completed comprehensive testing of attribution refresh and trigger_audience features. Backend tests: 36/36 PASS (100%). Frontend: Code review confirms all UI elements present with correct data-testids. Fixed critical bug where attribution_history and attribution_refreshed_at fields were not being returned by API (Pydantic model missing fields).",
+  "backend_issues": {
+    "critical_bugs": [],
+    "fixed_bugs": [
+      {
+        "issue": "attribution_history and attribution_refreshed_at not returned by GET /api/contacts/{id}",
+        "root_cause": "ContactDetail, ContactWithStats, and Contact Pydantic models missing the new fields (attribution_history, attribution_refreshed_at, first_identified_at)",
+        "fix": "Added missing fields to all three models in server.py",
+        "verification": "MongoDB query confirmed data was being persisted correctly; API now returns all fields",
+        "fix_priority": "CRITICAL - FIXED"
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "BACKEND 1: Attribution refresh on same browser with new fbclid - fbclid updated from OLD1 to NEW1, fbc updated, utm_campaign updated, attribution_history has 1 entry with old values, attribution_refreshed_at timestamp set",
+    "BACKEND 2: Cross-device return with email stitch - Contact B stitched to Contact A, attribution refreshed with NEW2 fbclid, history archived",
+    "BACKEND 3: No false refresh when same fbclid sent - attribution unchanged, history did not grow",
+    "BACKEND 4: trigger_audience CRUD - Create with 'returning' (201), Update to 'new' (200), Invalid value 'bogus' rejected (400), GET returns field, Default is 'both'",
+    "BACKEND 5: Automation firing logic - NEW automation fired for new contact only, RETURNING automation fired for returning contact only, BOTH automation fired for both scenarios, dedup key includes fbclid",
+    "BACKEND 6: Stealth webhook regression - POST with new email creates contact (200), POST with same email returns same contact_id (no duplicate)",
+    "BACKEND 7: Regression tests - GET /api/automations (200), GET /api/contacts (200), GET /api/stats (200)",
+    "FRONTEND: Code review confirms trigger_audience Select present with data-testid='trigger-audience-select', options have correct data-testids (trigger-audience-new, trigger-audience-returning, trigger-audience-both), AutomationsPage shows trigger_audience badge"
+  ],
+  "test_report_links": [
+    "/app/attribution_test.py"
+  ],
+  "success_percentage": {
+    "backend": "100% (36/36 tests passed)",
+    "frontend": "Code review: 100% (all UI elements present with correct implementation)"
+  },
+  "updated_files": [
+    "/app/backend/server.py - Added attribution_history, attribution_refreshed_at, first_identified_at fields to Contact, ContactWithStats, and ContactDetail models"
+  ],
+  "action_item_for_main_agent": "",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_test_itself": false
+}

@@ -1,30 +1,30 @@
 [
   {
-    "content": "FIX: shumard.js not saving fbc/fbp to localStorage when using cached attribution",
+    "content": "Backend: attribution refresh helpers + attribution_history",
     "status": "completed"
   },
   {
-    "content": "FIX: attr_signal_fields missing fbc/fbp - contacts not created properly",
+    "content": "Backend: wire refresh into _upsert_contact and _do_stitch",
     "status": "completed"
   },
   {
-    "content": "FIX: Add delayed fbc/fbp re-capture (2s) for slow FB Pixel",
+    "content": "Backend: is_returning detection + _run_automations audience filtering",
     "status": "completed"
   },
   {
-    "content": "FIX: Refresh fbc/fbp in sendLead/sendRegistration before sending",
+    "content": "Backend: trigger_audience in models + create/update endpoints",
     "status": "completed"
   },
   {
-    "content": "FIX: _fire_webhook_task missing exclude_nulls param for delay+refetch",
+    "content": "Frontend: trigger audience Select in builder + save/hydrate + list badge",
     "status": "completed"
   },
   {
-    "content": "Review: Legacy automation support for fbc/fbp",
+    "content": "Lint + local smoke checks",
     "status": "completed"
   },
   {
-    "content": "Test: End-to-end fbc/fbp tracking flow",
-    "status": "completed"
+    "content": "Run testing_agent to verify the reported bug fix (mandatory)",
+    "status": "in_progress"
   }
 ]
