@@ -2,8 +2,8 @@
 
 ## 1) Objectives
 - Ship a full-page, flexible Automation Builder at routes:
-  - /automations/new (create)
-  - /automations/builder/:id (edit)
+  - `/automations/new` (create)
+  - `/automations/builder/:id` (edit)
 - Model: persist flexible steps array on automations: `steps = [{ id, type, config }]`
   - Supported step types: `wait_for`, `filter`, `delay`, `webhook` (delay implies refetch before firing)
 - Simple step reordering via Up/Down buttons (no drag-and-drop)
@@ -17,10 +17,10 @@
   - Support excluding null fields from webhook payloads
 - Re-identification attribution:
   - Refresh attribution on new click IDs only (fbclid/gclid/ttclid differs)
-  - Archive old attribution to `attribution_history`
+  - Archive old attribution to `attribution_history` (cap 20)
 - Automation triggering:
   - Support firing for new contacts, returning contacts, or both via `trigger_audience`
-- **Tech debt: migrate React Router to Data Router** for native navigation blocking (`useBlocker`) and robust unsaved-changes protection on *all* in-app navigations
+- ✅ **Tech debt completed:** migrate React Router to Data Router for native navigation blocking (`useBlocker`) so unsaved-changes protection applies to *all* in-app navigation (TopNav + back button)
 
 ## 2) Implementation Steps (Phased)
 
@@ -113,60 +113,49 @@ Core pages/components
 - ✅ testing_agent iteration_3: 36/36 backend PASS, frontend verified
 
 ### Phase 8 — Polish & Future Enhancements (Not Started - Optional)
-- P1: Google Ads click-id tracking (gclid/wbraid/gbraid) for Enhanced Conversions attribution
+- **P1:** Google Ads click-id tracking (gclid/wbraid/gbraid) for Enhanced Conversions attribution
 - Improve headers editor UX
 - Docs and examples
 
 ---
 
-## Phase 9 — React Router Data Router Refactor (IN PROGRESS 🔧)
-**Motivation:** current unsaved-changes warning uses a custom `safeNavigate` workaround and cannot intercept *all* in-app navigation (notably TopNav/sidebar links). Data Router unlocks native blocking via `useBlocker`.
+## Phase 9 — React Router Data Router Refactor (COMPLETED ✅)
+**Motivation (resolved):** the unsaved-changes warning previously used a custom `safeNavigate` workaround and could not intercept all in-app navigation (notably TopNav/sidebar links and certain history navigations). Data Router enables native blocking via `useBlocker`.
 
-### Phase 9A — Migrate App Router Setup (Planned)
+### Phase 9A — Migrate App Router Setup (COMPLETED ✅)
 **File:** `/app/frontend/src/App.js`
-- Migrate from:
-  - `<BrowserRouter><Routes><Route .../></Routes></BrowserRouter>`
-  - to Data Router:
-    - `createBrowserRouter([...])` + `<RouterProvider router={router} />`
-- Convert `AppShell` into a layout route that renders:
+- ✅ Migrated from `<BrowserRouter><Routes>...` to `createBrowserRouter([...])` + `<RouterProvider router={router} />`
+- ✅ Converted `AppShell` into a layout route rendering:
   - existing frame UI (`TopNav`, `ContactDetailModal`, etc.)
   - `<Outlet context={shared} />`
-- Add thin wrapper route components (e.g., `LeadsRoute`, `VisitorsRoute`, etc.) that:
-  - call `useOutletContext()`
-  - spread props into existing page components
-  - so existing page components remain unchanged
-- Preserve auth behavior:
-  - `if (!authToken) return <LoginPage onLogin={handleLogin} />;` stays in `AppShell`
+- ✅ Added thin wrapper routes (`LeadsRoute`, `StealthRoute`, `SalesRoute`, `VisitorsRoute`, `AnalyticsRoute`) that read `useOutletContext()` so page components remained unchanged
+- ✅ Preserved auth early-return:
+  - `if (!authToken) return <LoginPage onLogin={handleLogin} />;`
 
-### Phase 9B — Replace Custom Navigation Guard With `useBlocker` (Planned)
+### Phase 9B — Replace Custom Navigation Guard With `useBlocker` (COMPLETED ✅)
 **File:** `/app/frontend/src/components/AutomationBuilderPage.jsx`
-- Remove/replace:
-  - `safeNavigate` + `pendingTargetRef` workaround
-- Use native Data Router blocking:
-  - `useBlocker(() => hasChangesRef.current)`
-  - Keep a `hasChangesRef` synced with `hasChanges`
-  - In `handleSave`, set `hasChangesRef.current = false` (and state) before navigating to avoid stale-closure blocking
-- Dialog behavior:
+- ✅ Removed `safeNavigate` + `pendingTargetRef` workaround
+- ✅ Added native `useBlocker` guard:
+  - Predicate reads `hasChangesRef` (synced via effect)
+  - `handleSave` flips the ref synchronously before navigating to avoid stale blocking
+- ✅ Dialog wired to blocker control:
   - “Stay” → `blocker.reset()`
   - “Leave without saving” → `blocker.proceed()`
-- Keep `beforeunload` for refresh/close-tab warnings
-- Replace `safeNavigate('/automations')` call sites with plain `navigate('/automations')`
+- ✅ Kept `beforeunload` warning for refresh/close-tab
+- ✅ Result: unsaved-changes protection now intercepts **TopNav navigation + browser back button** (previously uncovered edge cases)
 
-### Phase 9C — Testing (Required)
-- Build/compile check (esbuild)
-- Screenshot/UX verification:
-  - unsaved-changes dialog triggers when clicking TopNav links from the builder
-  - Save flow does *not* show dialog
-- Run `testing_agent` regression:
-  - routing across all pages
-  - builder unsaved-changes blocking
-  - create/edit/save automations still work
+### Phase 9C — Testing (COMPLETED ✅)
+- ✅ Compile check
+- ✅ Screenshot/UX verification: TopNav navigation is blocked when unsaved changes exist; save flow is not blocked
+- ✅ testing_agent iteration_4: **100% pass** (7 frontend scenarios + 3 backend endpoint checks)
+- ✅ testing agent also fixed a **pre-existing** critical crash on `/logs`:
+  - `LogsPage.jsx` `timeAgo()` referenced `timezone` out of scope causing a white-screen error
+  - Fix: `timeAgo(ts, timezone)` now accepts timezone as a parameter; all call sites updated
 
 ## 3) Next Actions (Immediate)
-1. 🔧 Phase 9A: Convert to Data Router (`createBrowserRouter` + `RouterProvider`)
-2. 🔧 Phase 9B: Replace builder navigation guard with `useBlocker`
-3. 🧪 Phase 9C: Run testing_agent regression suite (required)
-4. 🔥 Next P1: Google Ads click-id tracking (gclid/wbraid/gbraid)
+1. 🔥 **P1:** Add Google Ads click-id tracking (gclid/wbraid/gbraid) for Enhanced Conversions
+2. (Optional) Improve webhook headers editor UX
+3. (Optional) Documentation/examples for automation steps and triggers
 
 ## 4) Success Criteria
 ### Phases 1–7 (ACHIEVED ✅)
@@ -177,14 +166,14 @@ Core pages/components
 - ✅ Automations support trigger audience gating
 - ✅ testing_agent verified returning attribution fix end-to-end
 
-### Phase 9 (To achieve)
-- Data Router migration does not break routing, auth, modals, or query wiring
-- Builder unsaved-changes warning blocks:
-  - Back button
-  - Sidebar/TopNav navigation
-  - in-app links
-- Save flow does not trigger a blocker
-- testing_agent regression passes
+### Phase 9 (ACHIEVED ✅)
+- ✅ Data Router migration did not break routing, auth, modals, or query wiring
+- ✅ Builder unsaved-changes warning blocks:
+  - TopNav navigation
+  - browser back button
+  - in-app programmatic navigations
+- ✅ Save flow does not trigger a blocker
+- ✅ testing_agent regression passed (iteration_4)
 
 ## 5) Files Changed/Created
 ### Already changed (Phases 1–7)
@@ -195,11 +184,15 @@ Core pages/components
 - `/app/backend/server.py`
 - `/app/test_reports/iteration_3.json`
 
-### Planned changes (Phase 9)
-- `/app/frontend/src/App.js` (migrate to Data Router)
-- `/app/frontend/src/components/AutomationBuilderPage.jsx` (useBlocker-based navigation guard)
+### Phase 9 changes
+- `/app/frontend/src/App.js` (migrated to Data Router)
+- `/app/frontend/src/components/AutomationBuilderPage.jsx` (native `useBlocker` unsaved-changes guard)
+- `/app/frontend/src/components/LogsPage.jsx` (timezone scope crash fix)
+- `/app/test_reports/iteration_4.json`
 
 ## 6) Summary
 Phases 1–7 are complete and production-ready, including returning-lead attribution refresh and returning/new automation trigger audiences.
 
-**Phase 9 is in progress:** migrate the frontend to React Router Data Router to replace the custom unsaved-changes workaround with native `useBlocker`, ensuring the warning triggers on *all* in-app navigation (including TopNav/sidebar links).
+**Phase 9 is now complete:** the frontend uses React Router Data Router and the automation builder now uses native `useBlocker`, so unsaved-changes protection applies to *all* in-app navigation (TopNav + back button). A pre-existing `/logs` crash was also fixed and verified.
+
+**Next priority:** Google Ads click-id tracking (gclid/wbraid/gbraid) for Enhanced Conversions attribution (P1).

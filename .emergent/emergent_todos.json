@@ -1,18 +1,18 @@
 [
   {
     "content": "Refactor App.js to createBrowserRouter + RouterProvider with layout route + Outlet context",
-    "status": "in_progress"
+    "status": "completed"
   },
   {
     "content": "Replace safeNavigate workaround with native useBlocker in AutomationBuilderPage",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "Compile check + screenshot verification (TopNav navigation now blocked)",
-    "status": "pending"
+    "status": "completed"
   },
   {
     "content": "testing_agent regression run (routing + unsaved-changes flows)",
-    "status": "pending"
+    "status": "completed"
   }
 ]
