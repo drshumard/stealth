@@ -13,8 +13,8 @@
 - **Track fbc/fbp cookies for enhanced Facebook CAPI matching**
 - **Display FB CAPI data (user_agent, fbc, fbp) in Contact Detail Modal**
 - **Support excluding null fields from webhook payloads for cleaner integrations**
-- **NEW: Attribution refresh for re-identified contacts** (latest-click-wins *only when a new click-id is detected*, with archival history)
-- **NEW: Returning-contact automation triggers** so automations can fire for new, returning, or both audiences
+- **Attribution refresh for re-identified contacts** (latest-click-wins only when a *new* click-id is detected, with archival history)
+- **Returning-contact automation triggers** so automations can fire for new, returning, or both audiences
 - POC: Not required (CRUD + simple auth only)
 
 ## 2) Implementation Steps (Phased)
@@ -205,68 +205,56 @@ Enhanced Contact Detail Modal and webhook configuration:
 3. ✅ As a user, fbc/fbp cookies set by slow-loading FB Pixel are captured within 2 seconds of page load.
 4. ✅ As a user, form submissions include the latest fbc/fbp values even if cookies were set after page load.
 5. ✅ As a user, delayed webhooks correctly respect the exclude_nulls setting.
-6. ✅ As a user, fbc/fbp flow correctly from tracker script → backend → webhook payload.
+6. ✅ As a user, fbc/fbp flow correctly from tracker → backend → webhook payload.
 
-### Phase 7 — Re-identification Attribution Refresh + Returning Contact Triggers (In Progress 🔧)
-**Problem:** Existing contacts who sign up again via a *new* ad keep their *old* fbclid/fbc/fbp/UTMs in the CRM because attribution is currently first-seen-wins. This breaks correct Facebook CAPI attribution and automations don’t re-fire meaningfully for returning leads.
+### Phase 7 — Re-identification Attribution Refresh + Returning Contact Triggers (COMPLETED ✅)
+**Problem (resolved):** Existing contacts who sign up again via a *new* ad were keeping their *old* fbclid/fbc/fbp/UTMs in the CRM due to first-seen-wins attribution. This broke correct Facebook CAPI attribution and prevented intentional automation triggering for returning leads.
 
-**User-confirmed approach:**
+**User-confirmed approach (implemented):**
 1. **Attribution refresh**: Only overwrite click-IDs/cookies/UTMs when the incoming click-id (fbclid/gclid/ttclid) is different/new. Archive the previous attribution snapshot into `attribution_history` (cap to 20 entries).
-2. **Automation triggers**: Add per-automation `trigger_audience`: `'new' | 'returning' | 'both'` (default `'both'`). Update runtime to pass an `is_returning` flag so automations can filter firing.
-3. **Scope**: Apply to **all entry points**: `/api/track/lead`, `/api/track/registration`, `/api/stealth/webhook`.
+2. **Automation triggers**: Added per-automation `trigger_audience`: `'new' | 'returning' | 'both'` (default `'both'`). Runtime passes an `is_returning` flag so automations can be filtered appropriately.
+3. **Scope**: Applied to all entry points: `/api/track/lead`, `/api/track/registration`, `/api/stealth/webhook`.
 
-#### Phase 7A — Backend: Attribution Refresh + History (Planned)
-- Add helper `_detect_new_click(existing_attr, new_attr) -> bool`
-  - True when new `fbclid`/`gclid`/`ttclid` is present and differs from stored value.
-- Add helper `_build_attribution_refresh(existing_attr, new_attr, now_str) -> dict`
-  - Produces `$set` updates overwriting click-id + UTM fields with new values.
-  - Produces `$push` update to `attribution_history` with an entry containing:
-    - `archived_at`, `reason` (e.g. `"new_click"`), and snapshot of the prior attribution.
-  - Cap history to 20 entries (use `$push: { $each: [...], $slice: -20 }`).
-  - If new `fbclid` present but no `fbc`, synthesize `fbc = fb.1.<ms>.<fbclid>`.
-- Update `_upsert_contact()` existing-contact branch:
-  - If `_detect_new_click(...)` is true → apply refresh + history push.
-  - Else keep current fill-missing behavior (do not overwrite existing attribution).
-- Update `_do_stitch()`:
-  - When stitching and child has a different click-id than parent and child is newer, refresh parent attribution (latest-click-wins) + archive parent’s old attribution into history.
+#### Phase 7A — Backend: Attribution Refresh + History (COMPLETED ✅)
+- ✅ Added helpers:
+  - `_detect_new_click(existing_attr, new_attr)`
+  - `_build_attribution_refresh(existing_attr, new_attr, now)`
+  - `_merge_extra_updates(existing_attr, new_attr)`
+- ✅ `_upsert_contact()` now:
+  - Refreshes attribution when a *new click id* is detected (fbclid/gclid/ttclid differs)
+  - Archives prior attribution to `attribution_history` using `$push` with `$slice: -20`
+  - Sets `attribution_refreshed_at`
+  - Synthesizes `fbc = fb.1.<ms>.<fbclid>` when a new fbclid arrives but fbc cookie is absent
+- ✅ `_do_stitch()` now refreshes the parent’s attribution from the **newer** child when the child carries a different click id, and archives the parent’s old attribution
 
-#### Phase 7B — Backend: Returning-contact automation audience (Planned)
-- Add `trigger_audience` to automation models:
-  - `AutomationCreate.trigger_audience: str = 'both'`
-  - `AutomationUpdate.trigger_audience: Optional[str]`
-  - `AutomationOut.trigger_audience: str = 'both'`
-- Update automation CRUD endpoints:
-  - POST /api/automations stores `trigger_audience`
-  - PUT /api/automations/{id} updates `trigger_audience`
-- Update `_run_automations(contact_id, is_returning=False)`:
-  - Filter out automations where `trigger_audience` doesn’t match:
-    - If `is_returning=True` → allow `'returning'` or `'both'`
-    - If `is_returning=False` → allow `'new'` or `'both'`
-- Update callers to compute `is_returning`:
-  - `/track/lead` and `/track/registration`:
-    - Determine returning if contact already existed with identity OR an email stitch occurred.
-  - `/stealth/webhook`:
-    - Existing contact found by email → returning.
-    - New contact created → not returning.
-- Update `_email_auto_stitch()` to return `(final_id, merged_bool)` so call sites can treat merges as returning re-identification.
+#### Phase 7B — Backend: Returning-contact automation audience (COMPLETED ✅)
+- ✅ Added `trigger_audience` to automation models (default `'both'`) and validated values (`new|returning|both`; invalid returns 400)
+- ✅ Updated `_run_automations(contact_id, is_returning)` to apply audience gating
+- ✅ Updated `_email_auto_stitch()` to return `(final_contact_id, merged_bool)`
+- ✅ Updated entry points to compute returning correctly:
+  - `/track/lead`, `/track/registration`: returning = email-stitch merge OR (was_identified AND `attribution_refreshed_at > first_identified_at`)
+  - `/stealth/webhook`: returning derived from click-refresh timing
+- ✅ Added `first_identified_at` stamping once (`_mark_identified`) for stable classification across multi-step funnels
+- ✅ Dedup behavior preserved: dedup key already includes fbclid, so a refreshed click-id naturally re-fires automation runs with fresh fbc (core CAPI fix)
+- ✅ Testing-agent-driven fix: added missing response fields (`attribution_history`, `attribution_refreshed_at`, `first_identified_at`) to Contact / ContactWithStats / ContactDetail response models so the API returns the new data
 
-#### Phase 7C — Frontend: Configure trigger audience + display (Planned)
-- AutomationBuilderPage.jsx
-  - Add `triggerAudience` state; hydrate from `automation.trigger_audience`.
-  - Add a Select control in the Trigger card:
-    - New contacts only
-    - Returning contacts only
-    - New & returning
-  - Include `trigger_audience` in save body; include in hasChanges tracking.
-- AutomationsPage.jsx
-  - Update badge/label to show configured trigger audience instead of static “New Lead trigger”.
+#### Phase 7C — Frontend: Configure trigger audience + display (COMPLETED ✅)
+- ✅ Builder trigger card now includes “Fire for” Select:
+  - data-testid: `trigger-audience-select`
+  - options data-testids: `trigger-audience-both`, `trigger-audience-new`, `trigger-audience-returning`
+  - Dynamic description text updates based on selection
+  - Persisted as `trigger_audience` on save; hydrated on edit
+- ✅ Automations list badge now displays the configured audience (New / Returning / Both)
 
-#### Phase 7D — Testing (REQUIRED)
-- Run **testing_agent** to validate:
-  - Existing contact submits again with new fbclid → attribution refreshed + history appended.
-  - Existing contact submits again with same fbclid → no refresh; no extra history entry.
-  - Automations fire correctly based on `trigger_audience` for new vs returning.
-  - Builder UI can set/save/load trigger audience.
+#### Phase 7D — Testing (COMPLETED ✅)
+- ✅ testing_agent iteration_3: **36/36 backend tests PASS**, frontend verified
+- ✅ Verified scenarios:
+  - Returning contact with new fbclid refreshes attribution and appends history
+  - Same fbclid does not refresh or grow history
+  - Cross-device re-signup stitches by email and refreshes parent attribution
+  - Audience gating fires automations correctly for new vs returning vs both
+  - Stealth webhook does not duplicate contacts and does not crash
+- ✅ Additional cleanup: removed a broken duplicate `/api/leads/export` stub route that blocked lint
 
 ### Phase 8 — Polish & Future Enhancements (Not Started - Optional)
 - Add: duplicate step, unsaved-changes prompt, keyboard reordering (optional)
@@ -274,7 +262,8 @@ Enhanced Contact Detail Modal and webhook configuration:
 - Visual pipeline enhancements: animation on reorder, better visual feedback
 - Add converter in UI: "Convert legacy automation to steps" (one-click)
 - Docs: quick how-to and examples for each step type
-- Add gclid/wbraid/gbraid tracking for Google Ads Enhanced Conversions
+- **P1: Add Google Ads click-id tracking (gclid/wbraid/gbraid) for Enhanced Conversions attribution**
+- Tech debt: React Router refactor (BrowserRouter → createBrowserRouter) for native `useBlocker` support
 - User Stories (Phase 8)
   1. As a user, I can duplicate an existing step to speed up configuration.
   2. As a user, I'm warned if I try to navigate away with unsaved changes.
@@ -297,11 +286,12 @@ Enhanced Contact Detail Modal and webhook configuration:
 12. ✅ ~~Add fbc/fbp/user_agent display to Contact Detail Modal~~
 13. ✅ ~~Add "Exclude null fields" option to webhook steps~~
 14. ✅ ~~Critical code review: Fix 5 bugs affecting fbc/fbp tracking in production~~
-15. 🔧 Implement Phase 7A: Attribution refresh + `attribution_history` (all entry points)
-16. 🔧 Implement Phase 7B: `trigger_audience` + returning-contact triggers in `_run_automations`
-17. 🔧 Implement Phase 7C: Builder Select + AutomationsPage label updates
-18. 🧪 REQUIRED: Run testing_agent to verify reported issue end-to-end
-19. (Optional) Add Google Ads tracking (gclid/wbraid/gbraid)
+15. ✅ ~~Implement Phase 7A: Attribution refresh + `attribution_history` (all entry points)~~
+16. ✅ ~~Implement Phase 7B: `trigger_audience` + returning-contact triggers in `_run_automations`~~
+17. ✅ ~~Implement Phase 7C: Builder Select + AutomationsPage label updates~~
+18. ✅ ~~REQUIRED: Run testing_agent to verify reported issue end-to-end~~
+19. 🔥 P1 Next: Add Google Ads tracking (gclid/wbraid/gbraid) for Enhanced Conversions
+20. 🧹 Tech debt: React Router refactor (createBrowserRouter) for native navigation blocking
 
 ## 4) Success Criteria
 ### Phases 1–6 (ALL ACHIEVED ✅)
@@ -320,61 +310,48 @@ Enhanced Contact Detail Modal and webhook configuration:
 - ✅ fbc/fbp cookies captured, stored in attribution, and available for FB CAPI matching
 - ✅ Contact Detail Modal displays user_agent, fbc, and fbp with copy functionality
 - ✅ Webhook steps support "Exclude null fields" option for cleaner payloads
-- ✅ **NEW**: fbc/fbp tracking is production-ready with all critical bugs fixed
-- ✅ **NEW**: End-to-end test verified fbc/fbp flow from tracker → backend → webhook
+- ✅ fbc/fbp tracking is production-ready with all critical bugs fixed
+- ✅ End-to-end test verified fbc/fbp flow from tracker → backend → webhook
 
-### Phase 7 (To be achieved)
-- Returning contact with a **new** click-id updates contact attribution (fbclid/fbc/fbp/UTMs as present) and archives the previous attribution into `attribution_history`.
-- Returning contact with the **same** click-id does not overwrite attribution and does not create redundant history.
-- Automations can be configured to fire for:
+### Phase 7 (ACHIEVED ✅)
+- ✅ Returning contact with a **new** click-id updates contact attribution (fbclid/fbc/fbp/UTMs as present) and archives the previous attribution into `attribution_history`.
+- ✅ Returning contact with the **same** click-id does not overwrite attribution and does not create redundant history.
+- ✅ Automations can be configured to fire for:
   - new only
   - returning only
   - both
-- `/track/lead`, `/track/registration`, and `/stealth/webhook` all correctly set the returning/new event type.
-- testing_agent report confirms the bug scenario is resolved.
+- ✅ `/track/lead`, `/track/registration`, and `/stealth/webhook` correctly classify events and pass returning/new into automation execution.
+- ✅ testing_agent report confirms the bug scenario is resolved (iteration_3: 36/36 backend PASS).
 
 ## 5) Files Changed/Created
 ### Already changed (Phases 1–6)
-- `/app/frontend/src/components/AutomationBuilderPage.jsx` - NEW: Full-page Zapier-style builder with validation + FB CAPI fields (user_agent, fbc, fbp) in TETHER_FIELDS + exclude_nulls checkbox
-- `/app/frontend/src/components/ContactDetailModal.jsx` - MODIFIED: Added user_agent to Overview tab, added fbc/fbp to Attribution tab "Click IDs & FB Cookies" section
-- `/app/frontend/src/App.js` - MODIFIED: Added routes for /automations/new and /automations/builder/:id
-- `/app/frontend/src/components/AutomationsPage.jsx` - MODIFIED: Updated to use navigation instead of modal
-- `/app/backend/server.py` - MODIFIED:
-  - Added GET /api/automations/{id} endpoint
-  - Added steps field support in PUT /api/automations/{id}
-  - Added `_validate_automation_steps()` function for backend validation
-  - Added `_execute_step_pipeline()` function for step-based execution
-  - Updated `_run_automations()` to detect and route to step pipeline
-  - Added `user_agent` field to Contact, ContactWithStats, ContactDetail, PageViewCreate, LeadCreate, RegistrationCreate models
-  - Updated `_upsert_contact()` to store user_agent (first-seen wins, truncated to 1000 chars)
-  - Updated `_build_webhook_payload()` to include user_agent, fbc, fbp and support `exclude_nulls` parameter
-  - Added `fbc` and `fbp` fields to Attribution model
-  - Updated `safe_attribution()` to recognize fbc/fbp as known fields
-  - Added `fbc`, `fbp` to `attr_signal_fields` in `_upsert_contact()` (Bug #2 fix)
-  - Added `exclude_nulls` parameter to `_fire_webhook_task()` (Bug #5 fix)
-  - Updated `shumard.js` tracker:
-    - Captures `navigator.userAgent`, `_fbc`, and `_fbp` cookies
-    - Saves updated fbc/fbp to localStorage when using cached attribution (Bug #1 fix)
-    - Added 2-second delayed re-capture for slow FB Pixel (Bug #3 fix)
-    - Refreshes fbc/fbp in sendLead/sendRegistration before sending (Bug #4 fix)
+- `/app/frontend/src/components/AutomationBuilderPage.jsx` - Full-page Zapier-style builder with validation + FB CAPI fields (user_agent, fbc, fbp) in TETHER_FIELDS + exclude_nulls checkbox
+- `/app/frontend/src/components/ContactDetailModal.jsx` - Added user_agent to Overview tab, added fbc/fbp to Attribution tab "Click IDs & FB Cookies" section
+- `/app/frontend/src/App.js` - Added routes for /automations/new and /automations/builder/:id
+- `/app/frontend/src/components/AutomationsPage.jsx` - Updated to use navigation instead of modal
+- `/app/backend/server.py` - Added steps execution pipeline, validation, CAPI fields (user_agent, fbc/fbp), webhook payload improvements, and critical fbc/fbp bug fixes
 
-### Planned changes (Phase 7)
+### Added/Modified in Phase 7
 - `/app/backend/server.py`
-  - Add `attribution_history` support via `$push` / `$slice`
-  - Add click-id refresh detection + refresh logic
-  - Add `trigger_audience` to automation models and CRUD
-  - Update `_run_automations(contact_id, is_returning)` filtering
-  - Update `/track/lead`, `/track/registration`, `/stealth/webhook` to compute is_returning
-  - Update `_email_auto_stitch()` to return `(final_id, merged_bool)`
+  - Implemented attribution refresh + `attribution_history` archival (capped at 20)
+  - Added `attribution_refreshed_at` and `first_identified_at` to support stable returning detection
+  - Updated stitch logic to refresh parent from newer child when click-id differs
+  - Added `trigger_audience` to automation models + CRUD validation
+  - Added `_run_automations(contact_id, is_returning)` audience gating
+  - Updated `/track/lead`, `/track/registration`, `/stealth/webhook` returning classification
+  - Updated `_email_auto_stitch()` signature to `(final_id, merged_bool)`
+  - Fixed API response models to include new attribution fields
+  - Removed broken duplicate `/api/leads/export` stub route (lint blocker)
 - `/app/frontend/src/components/AutomationBuilderPage.jsx`
-  - Add trigger audience Select + persist/hydrate
+  - Added trigger audience Select + persist/hydrate + updated trigger card copy
 - `/app/frontend/src/components/AutomationsPage.jsx`
-  - Display trigger audience label/badge
+  - Trigger badge now reflects configured `trigger_audience`
+- Test artifact:
+  - `/app/test_reports/iteration_3.json` (testing_agent verification)
 
 ## 6) Summary
 **Phases 1–6: COMPLETED** — Zapier-style Automation Builder is production-ready with FB CAPI support (user_agent, fbc/fbp), webhook null-exclusion, and critical bug fixes.
 
-**Phase 7: IN PROGRESS** — Implement re-identification attribution refresh and returning-contact trigger audiences so:
-- Existing contacts who sign up again from new ads capture the *new* click-id/cookies/UTMs (with history retained).
-- Automations can intentionally fire on new leads, returning leads, or both.
-- Verification is done via mandatory testing_agent run before marking the issue resolved.
+**Phase 7: COMPLETED** — Re-identification now refreshes attribution on new click IDs (with history retained), and automations support configurable triggering for new vs returning leads. Testing agent iteration_3 verified the bug scenario end-to-end.
+
+**Next up:** Google Ads click-id tracking (gclid/wbraid/gbraid) for Enhanced Conversions attribution (P1), and optional React Router tech-debt refactor.
