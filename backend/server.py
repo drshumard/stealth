@@ -2361,6 +2361,21 @@ async def delete_contact(contact_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# The Overview's heavier counts scan every contact (~400k); /stats is polled every 15s per open tab, so they're
+# reused for a minute.
+_slow_stats_cache = {}
+
+
+async def _cached(key: str, compute, ttl: int = 60):
+    hit = _slow_stats_cache.get(key)
+    now = datetime.now(timezone.utc).timestamp()
+    if hit and now - hit[0] < ttl:
+        return hit[1]
+    value = await compute()
+    _slow_stats_cache[key] = (now, value)
+    return value
+
+
 @api_router.get("/stats")
 async def get_stats():
     try:
@@ -2368,7 +2383,59 @@ async def get_stats():
         total_visits   = await db.page_visits.count_documents({})
         today_start    = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         today_visits   = await db.page_visits.count_documents({"timestamp": {"$gte": dt_to_str(today_start)}})
-        return {"total_contacts": total_contacts, "total_visits": total_visits, "today_visits": today_visits}
+        # Overview totals: /stealth and /sales list only the newest 1,000 / 500, so their lengths aren't totals.
+        # "Identified" = has an email, phone or name — the same test the pages use, over every contact.
+        known = {"$nin": [None, ""]}
+        total_identified = await _cached("identified", lambda: db.contacts.count_documents(
+            {"merged_into": None, "$or": [{"email": known}, {"phone": known}, {"name": known}]}))
+        total_registrations = await db.stealth_registrations.count_documents({})
+        total_sales         = await db.sales.count_documents({})
+        revenue = await db.sales.aggregate([{"$group": {"_id": None, "sum": {"$sum": "$amount"}}}]).to_list(1)
+        return {"total_contacts": total_contacts, "total_visits": total_visits, "today_visits": today_visits,
+                "total_identified": total_identified,
+                "total_registrations": total_registrations, "total_sales": total_sales,
+                "total_revenue": (revenue[0]["sum"] if revenue else 0) or 0}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/stats/sources")
+async def get_source_stats(limit: int = 8):
+    """Contacts per UTM source, over every contact (/contacts lists only the newest 10,000)."""
+    try:
+        rows = await _cached(f"sources:{limit}", lambda: db.contacts.aggregate([
+            {"$match": {"merged_into": None, "attribution.utm_source": {"$nin": [None, ""]}}},
+            {"$group": {"_id": "$attribution.utm_source", "contacts": {"$sum": 1}}},
+            {"$sort": {"contacts": -1}}, {"$limit": limit},
+        ]).to_list(limit))
+        return [{"source": r["_id"], "contacts": r["contacts"]} for r in rows]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/stats/daily")
+async def get_daily_stats(days: int = 7, tz: str = "UTC"):
+    """Page visits per day for the last `days` days (today included), with days in the `tz` timezone."""
+    from zoneinfo import ZoneInfo
+    try:
+        zone = ZoneInfo(tz)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Unknown timezone")
+    days = max(1, min(days, 31))
+
+    async def compute():
+        today = datetime.now(zone).replace(hour=0, minute=0, second=0, microsecond=0)
+        out = []
+        for i in range(days - 1, -1, -1):
+            start = today - timedelta(days=i)
+            end = start + timedelta(days=1)
+            visits = await db.page_visits.count_documents({"timestamp": {
+                "$gte": dt_to_str(start.astimezone(timezone.utc)), "$lt": dt_to_str(end.astimezone(timezone.utc))}})
+            out.append({"date": start.date().isoformat(), "visits": visits})
+        return out
+
+    try:
+        return await _cached(f"daily:{days}:{tz}", compute, ttl=300)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -3422,6 +3489,9 @@ async def create_indexes():
         logger.warning(f"Index creation warning: {e}")
 
 
+from analytics import Pending as AnalyticsPending, build_router as build_analytics_router, pending_handler  # noqa: E402
+api_router.include_router(build_analytics_router(db))
+app.add_exception_handler(AnalyticsPending, pending_handler)
 app.include_router(api_router)
 app.add_middleware(
     CORSMiddleware,

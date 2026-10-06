@@ -211,3 +211,6 @@ frontend/node_modules/.cache/default-development/5.pack
 credentials.json
 *.key
 .credentials
+
+# Local-only design prototype (kept out of git)
+/frontend/src/prototype/

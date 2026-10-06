@@ -1,16 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Zap, Plus, Pencil, Trash2, CheckCircle, XCircle, Activity, History } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Activity, ArrowRight, Check, History, Pencil, Plus, Trash2, Workflow } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { AutomationRuns } from '@/components/AutomationRuns';
+import { Metric, PageIntro, Status, SurfaceHead, count } from '@/workspace/ui';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
 const API = `${BACKEND_URL}/api`;
@@ -24,6 +22,8 @@ function timeAgo(ts) {
   return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+const AUDIENCE = { new: 'New leads trigger', returning: 'Returning leads trigger', both: 'New & returning trigger' };
+
 function AutomationCard({ auto, onEdit, onDelete, onToggle, onViewRuns }) {
   const filterCount = auto.filters?.length || 0;
   // Support both new actions[] and legacy field_map
@@ -34,166 +34,62 @@ function AutomationCard({ auto, onEdit, onDelete, onToggle, onViewRuns }) {
   const displayUrl  = auto.actions?.[0]?.webhook_url || auto.webhook_url || '';
 
   return (
-    <div className="rounded-2xl border transition-all duration-150 overflow-hidden"
-      style={{
-        borderColor: auto.enabled ? '#c0c9e8' : 'var(--stroke)',
-        backgroundColor: auto.enabled ? 'rgba(3,3,82,0.018)' : '#fafaf8',
-        boxShadow: auto.enabled ? '0 2px 12px rgba(3,3,82,0.08)' : 'none',
-      }}
-    >
-      {auto.enabled && <div className="h-1 w-full" style={{ background: 'linear-gradient(90deg, #030352, #3a3d7c)' }} />}
-
-      <div className="p-6">
-        <div className="flex items-start justify-between gap-4 mb-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
-              style={{ backgroundColor: auto.enabled ? 'rgba(3,3,82,0.10)' : '#f0ede8' }}>
-              <Zap size={18} style={{ color: auto.enabled ? '#030352' : '#9898aa' }} />
-            </div>
-            <div>
-              <h3 className="text-base font-bold" style={{ color: 'var(--brand-navy)', fontFamily: 'Space Grotesk, sans-serif' }}>
-                {auto.name}
-              </h3>
-              <p className="text-xs font-mono mt-0.5 max-w-xs truncate" style={{ color: 'var(--text-dim)', fontFamily: 'IBM Plex Mono, monospace' }}>
-                {displayUrl}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs font-semibold" style={{ color: auto.enabled ? '#030352' : 'var(--text-dim)' }}>
-              {auto.enabled ? 'Active' : 'Paused'}
-            </span>
-            <Switch checked={auto.enabled} onCheckedChange={v => onToggle(auto.id, v)} />
-          </div>
-        </div>
-
-        <div className="flex items-center flex-wrap gap-2 mb-5">
-          <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full"
-            style={{ backgroundColor: 'rgba(3,3,82,0.08)', color: '#030352' }}
-            data-testid={`automation-trigger-badge-${auto.id}`}>
-            <Activity size={11} />
-            {auto.trigger_audience === 'new' && 'New leads trigger'}
-            {auto.trigger_audience === 'returning' && 'Returning leads trigger'}
-            {(auto.trigger_audience === 'both' || !auto.trigger_audience) && 'New & returning trigger'}
-          </span>
-          {filterCount > 0 && (
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full"
-              style={{ backgroundColor: 'rgba(163,24,0,0.08)', color: '#A31800' }}>
-              {filterCount} filter{filterCount !== 1 ? 's' : ''}
-            </span>
-          )}
-          {actionCount > 1 && (
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full"
-              style={{ backgroundColor: 'rgba(5,150,105,0.08)', color: '#059669' }}>
-              {actionCount} webhook steps
-            </span>
-          )}
-          {totalMapped > 0 && (
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full"
-              style={{ backgroundColor: 'rgba(3,3,82,0.05)', color: '#4a5568' }}>
-              {totalMapped} field{totalMapped !== 1 ? 's' : ''} mapped
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between py-3 px-4 rounded-xl mb-4" style={{ backgroundColor: 'rgba(0,0,0,0.03)' }}>
-          <div className="text-center">
-            <div className="text-lg font-bold tabular-nums" style={{ color: 'var(--brand-navy)', fontFamily: 'Space Grotesk, sans-serif' }}>
-              {auto.trigger_count || 0}
-            </div>
-            <div className="text-xs font-medium" style={{ color: 'var(--text-dim)' }}>triggers</div>
-          </div>
-          <div className="w-px h-8" style={{ backgroundColor: 'var(--stroke)' }} />
-          <div className="text-center">
-            {auto.last_triggered_at ? (
-              <>
-                <div className="text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>{timeAgo(auto.last_triggered_at)}</div>
-                <div className="text-xs font-medium" style={{ color: 'var(--text-dim)' }}>last fired</div>
-              </>
-            ) : (
-              <div className="text-xs font-medium" style={{ color: 'var(--text-dim)' }}>never fired</div>
-            )}
-          </div>
-          <div className="w-px h-8" style={{ backgroundColor: 'var(--stroke)' }} />
-          <div className="text-center">
-            <div className="inline-flex items-center gap-1 text-xs font-semibold"
-              style={{ color: auto.enabled ? '#059669' : 'var(--text-dim)' }}>
-              {auto.enabled ? <><CheckCircle size={13} /> Ready</> : <><XCircle size={13} /> Paused</>}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => onViewRuns(auto)}
-            className="gap-1.5 h-9 px-3 text-sm font-semibold"
-            style={{ borderColor: '#d2d8ef', color: '#030352' }}>
-            <History size={13} />
-            Runs
-            {auto.trigger_count > 0 && (
-              <span className="text-xs font-bold px-1.5 py-0.5 rounded-full ml-0.5"
-                style={{ backgroundColor: 'rgba(3,3,82,0.1)', color: '#030352' }}>
-                {auto.trigger_count}
-              </span>
-            )}
-          </Button>
-
-          <Button size="sm" variant="outline" onClick={() => onEdit(auto)}
-            className="flex-1 h-9 gap-2 text-sm font-semibold"
-            style={{ borderColor: 'var(--brand-navy)', color: 'var(--brand-navy)' }}>
-            <Pencil size={13} /> Edit
-          </Button>
-
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button size="sm" variant="outline" className="h-9 w-9 p-0"
-                style={{ borderColor: '#fecdc7', color: 'var(--brand-red)' }}>
-                <Trash2 size={14} />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent style={{ backgroundColor: '#fff', borderColor: 'var(--stroke)' }}>
-              <AlertDialogHeader>
-                <AlertDialogTitle style={{ color: 'var(--brand-navy)' }}>Delete Automation?</AlertDialogTitle>
-                <AlertDialogDescription style={{ color: 'var(--text-muted)' }}>
-                  "{auto.name}" will be permanently deleted.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel style={{ borderColor: 'var(--stroke)' }}>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={() => onDelete(auto.id)}
-                  style={{ backgroundColor: 'var(--brand-red)', color: '#fff', border: 'none' }}>
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+    <article className="sp-automation">
+      <span className="sp-automation-icon"><Workflow size={20} /></span>
+      <div className="sp-automation-main">
+        <div className="sp-automation-title"><h3>{auto.name}</h3><Status tone={auto.enabled ? 'green' : 'quiet'}>{auto.enabled ? 'Active' : 'Paused'}</Status></div>
+        <p data-testid={`automation-trigger-badge-${auto.id}`}>
+          {AUDIENCE[auto.trigger_audience] || AUDIENCE.both} <ArrowRight size={13} /> <span className="sp-automation-url">{displayUrl || 'No webhook yet'}</span>
+        </p>
+        <div className="sp-automation-meta">
+          {filterCount > 0 && <span>{filterCount} filter{filterCount !== 1 ? 's' : ''}</span>}
+          {actionCount > 1 && <span>{actionCount} webhook steps</span>}
+          {totalMapped > 0 && <span>{totalMapped} field{totalMapped !== 1 ? 's' : ''} mapped</span>}
+          <span>{count(auto.trigger_count || 0)} runs</span>
+          <span>{auto.last_triggered_at ? `Last fired ${timeAgo(auto.last_triggered_at)}` : 'Never fired'}</span>
         </div>
       </div>
-    </div>
+      <div className="sp-automation-actions">
+        <button type="button" className="sp-secondary-button" onClick={() => onViewRuns(auto)}>
+          <History size={14} /> Runs{auto.trigger_count > 0 && <span className="sp-button-count">{count(auto.trigger_count)}</span>}
+        </button>
+        <button type="button" className="sp-secondary-button" onClick={() => onEdit(auto)}><Pencil size={14} /> Edit</button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <button type="button" className="sp-icon-button sp-danger-button" aria-label={`Delete ${auto.name}`}><Trash2 size={15} /></button>
+          </AlertDialogTrigger>
+          <AlertDialogContent className="sp-dialog">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Automation?</AlertDialogTitle>
+              <AlertDialogDescription>"{auto.name}" will be permanently deleted.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="sp-secondary-button">Cancel</AlertDialogCancel>
+              <AlertDialogAction className="sp-danger-solid" onClick={() => onDelete(auto.id)}>Delete</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        <label className="sp-switch">
+          <input type="checkbox" checked={!!auto.enabled} onChange={e => onToggle(auto.id, e.target.checked)}
+            aria-label={`${auto.enabled ? 'Pause' : 'Activate'} ${auto.name}`} /><span />
+        </label>
+      </div>
+    </article>
   );
 }
 
 function EmptyState({ onNew }) {
   return (
-    <div className="rounded-2xl border-2 border-dashed flex flex-col items-center justify-center py-20 px-8 text-center"
-      style={{ borderColor: '#d2d8ef', backgroundColor: 'rgba(3,3,82,0.02)' }}>
-      <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5"
-        style={{ background: 'linear-gradient(135deg, #e8ebf5, #f2f3f9)' }}>
-        <Zap size={28} style={{ color: '#030352' }} />
-      </div>
-      <h3 className="text-xl font-bold mb-2" style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--brand-navy)' }}>
-        No automations yet
-      </h3>
-      <p className="text-sm font-medium max-w-sm mb-6" style={{ color: 'var(--text-muted)' }}>
-        Automatically send lead data to your CRM, email platform, or any webhook when a contact is identified.
-      </p>
-      <Button onClick={onNew} className="gap-2 h-10 px-6 text-sm font-semibold text-white"
-        style={{ backgroundColor: 'var(--brand-red)' }}>
-        <Plus size={15} /> Create your first automation
-      </Button>
+    <div className="sp-empty sp-empty-state">
+      <span className="sp-empty-icon"><Workflow size={22} /></span>
+      <strong>No automations yet</strong>
+      <span>Automatically send lead data to your CRM, email platform, or any webhook when a contact is identified.</span>
+      <button type="button" className="sp-primary-button" onClick={onNew}><Plus size={15} /> Create your first automation</button>
     </div>
   );
 }
 
+// Automations — design: the prototype's Automations page (workflow library), on the live automations API.
 export default function AutomationsPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -233,62 +129,26 @@ export default function AutomationsPage() {
   const handleNewAutomation = () => navigate('/automations/new');
   const handleEditAutomation = (auto) => navigate(`/automations/builder/${auto.id}`);
 
-  return (
-    <div className="p-8 md:p-10">
-      <div className="rounded-2xl px-8 py-7 mb-8 relative overflow-hidden"
-        style={{ background: 'linear-gradient(135deg, #e8ebf5 0%, #f2f3f9 50%, #f9f8f5 100%)', border: '1.5px solid #d2d8ef' }}>
-        <Zap size={140} className="absolute -right-6 -bottom-6 opacity-[0.05] pointer-events-none" color="#030352" aria-hidden />
-        <div className="relative z-10 flex items-start justify-between">
-          <div>
-            <h1 className="text-4xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--brand-navy)', letterSpacing: '-0.02em' }}>Automations</h1>
-            <p className="text-base mt-1 font-semibold" style={{ color: 'var(--brand-navy)', opacity: 0.6 }}>
-              {activeCount} active · {automations.length} total
-            </p>
-          </div>
-          <Button onClick={handleNewAutomation}
-            className="gap-2 h-10 px-6 text-sm font-semibold text-white mt-1"
-            style={{ backgroundColor: 'var(--brand-red)' }}
-            data-testid="new-automation-button">
-            <Plus size={15} /> New Automation
-          </Button>
-        </div>
-      </div>
+  const totalRuns = automations.reduce((s, a) => s + (a.trigger_count || 0), 0);
 
-      <div className="rounded-2xl px-6 py-4 mb-8 flex items-center gap-6 overflow-x-auto"
-        style={{ background: 'linear-gradient(135deg, #f2f3f9, #fdf2f0)', border: '1.5px solid #d2d8ef' }}>
-        {[
-          { icon: Activity,     label: 'Trigger',     desc: 'Lead identified',   color: '#030352' },
-          { label: '→', color: '#9898aa' },
-          { icon: Zap,          label: 'Filter',      desc: 'Apply conditions', color: '#A31800' },
-          { label: '→', color: '#9898aa' },
-          { icon: CheckCircle,  label: 'Map Fields',  desc: 'Transform data',   color: '#030352' },
-          { label: '→', color: '#9898aa' },
-          { icon: CheckCircle,  label: 'Webhook POST',desc: 'Send to your URL', color: '#059669' },
-        ].map((step, i) =>
-          step.icon ? (
-            <div key={i} className="flex items-center gap-2 shrink-0">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${step.color}18` }}>
-                <step.icon size={15} style={{ color: step.color }} />
-              </div>
-              <div>
-                <div className="text-xs font-bold" style={{ color: step.color }}>{step.label}</div>
-                <div className="text-xs" style={{ color: 'var(--text-dim)' }}>{step.desc}</div>
-              </div>
-            </div>
-          ) : (
-            <span key={i} className="shrink-0 text-sm" style={{ color: step.color }}>{step.label}</span>
-          )
-        )}
-      </div>
-
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {[1,2,3].map(i => <Skeleton key={i} className="h-64 rounded-2xl" style={{ backgroundColor: '#f0ede8' }} />)}
-        </div>
-      ) : automations.length === 0 ? (
-        <EmptyState onNew={handleNewAutomation} />
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+  return <>
+    <PageIntro eyebrow="Operations / Workflows" title="Automations"
+      description="A simple view of what triggers, where data goes, and whether each workflow is working."
+      actions={<button type="button" className="sp-primary-button" onClick={handleNewAutomation} data-testid="new-automation-button"><Plus size={17} /> New automation</button>} />
+    <div className="sp-metrics sp-metrics-three">
+      <Metric icon={Workflow} label="Active workflows" value={count(activeCount)} detail={`Of ${count(automations.length)} total`} />
+      <Metric icon={Activity} label="Total runs" value={count(totalRuns)} detail="Across all workflows" tone="aqua" />
+      <Metric icon={Check} label="Ready to send" value={count(activeCount)} detail="Switched on and listening" tone="green" />
+    </div>
+    <div className="sp-flow">
+      <div><span>01</span><strong>Trigger</strong><small>A lead takes an action</small></div><ArrowRight size={17} />
+      <div><span>02</span><strong>Conditions</strong><small>Check who qualifies</small></div><ArrowRight size={17} />
+      <div><span>03</span><strong>Action</strong><small>Send or update data</small></div>
+    </div>
+    <section className="sp-surface">
+      <SurfaceHead eyebrow="Workflow library" title="Your automations"><span className="sp-count">{count(automations.length)} workflows</span></SurfaceHead>
+      {loading ? <div className="sp-empty">Loading automations…</div> : automations.length === 0 ? <EmptyState onNew={handleNewAutomation} /> : (
+        <div className="sp-automation-list">
           {automations.map(auto => (
             <AutomationCard key={auto.id} auto={auto}
               onEdit={handleEditAutomation}
@@ -299,12 +159,7 @@ export default function AutomationsPage() {
           ))}
         </div>
       )}
-
-      <AutomationRuns
-        open={!!runsAuto}
-        automation={runsAuto}
-        onClose={() => setRunsAuto(null)}
-      />
-    </div>
-  );
+    </section>
+    <AutomationRuns open={!!runsAuto} automation={runsAuto} onClose={() => setRunsAuto(null)} />
+  </>;
 }

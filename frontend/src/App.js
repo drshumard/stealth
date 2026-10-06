@@ -8,8 +8,9 @@ import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tan
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 import { TimezoneProvider } from '@/components/TimezoneContext';
-import { TopNav } from '@/components/TopNav';
-import AnalyticsPage from '@/components/AnalyticsPage';
+import WorkspaceShell from '@/workspace/WorkspaceShell';
+import OverviewPage from '@/workspace/OverviewPage';
+import AnalyticsPage from '@/analytics/AnalyticsPage';
 import LeadsPage from '@/components/LeadsPage';
 import VisitorsPage from '@/components/VisitorsPage';
 import LogsPage from '@/components/LogsPage';
@@ -120,24 +121,24 @@ function AppShell() {
   };
 
   return (
-    <div className="app-canvas">
+    <>
       <Toaster
         position="top-right"
         toastOptions={{
           style: {
             backgroundColor: '#ffffff',
-            border: '1px solid #e5e7eb',
-            color: '#111827',
-            fontFamily: 'Work Sans, sans-serif',
-            boxShadow: '0 4px 12px rgba(17,24,39,0.1)',
+            border: '1px solid #dfe5ee',
+            borderRadius: '4px',
+            color: '#243047',
+            fontFamily: "'Stealth Inter', Inter, 'Helvetica Neue', Arial, sans-serif",
+            boxShadow: '0 12px 30px rgba(19,36,68,0.12)',
           },
         }}
       />
-      <div className="main-card">
-        <TopNav stats={stats} onLogout={handleLogout} />
+      <WorkspaceShell onLogout={handleLogout}>
         {/* Child routes render here and receive the shared context */}
         <Outlet context={shared} />
-      </div>
+      </WorkspaceShell>
 
       <ContactDetailModal
         contactId={selectedContactId}
@@ -146,7 +147,7 @@ function AppShell() {
         onClose={handleCloseModal}
         onDelete={handleDeleteContact}
       />
-    </div>
+    </>
   );
 }
 
@@ -155,19 +156,24 @@ function AppShell() {
 // spread it into the existing page components, so page components
 // stay completely unchanged by the Data Router migration.
 
+function OverviewRoute() {
+  const { stats, onSelectContact } = useOutletContext();
+  return <OverviewPage stats={stats} onSelectContact={onSelectContact} />;
+}
+
 function LeadsRoute() {
   const shared = useOutletContext();
   return <LeadsPage {...shared} />;
 }
 
 function StealthRoute() {
-  const { onSelectContact } = useOutletContext();
-  return <StealthPage onSelectContact={onSelectContact} />;
+  const { onSelectContact, stats } = useOutletContext();
+  return <StealthPage onSelectContact={onSelectContact} totalRegistrations={stats.total_registrations} />;
 }
 
 function SalesRoute() {
-  const { onSelectContact } = useOutletContext();
-  return <SalesPage onSelectContact={(id) => onSelectContact(id, 'sales')} />;
+  const { onSelectContact, stats } = useOutletContext();
+  return <SalesPage onSelectContact={(id) => onSelectContact(id, 'sales')} stats={stats} />;
 }
 
 function VisitorsRoute() {
@@ -175,9 +181,14 @@ function VisitorsRoute() {
   return <VisitorsPage {...shared} />;
 }
 
+function LogsRoute() {
+  const { onSelectContact } = useOutletContext();
+  return <LogsPage onSelectContact={onSelectContact} />;
+}
+
 function AnalyticsRoute() {
-  const { stats, contacts } = useOutletContext();
-  return <AnalyticsPage stats={stats} contacts={contacts} />;
+  const { onSelectContact } = useOutletContext();
+  return <AnalyticsPage onSelectContact={onSelectContact} />;
 }
 
 // ── Data Router ───────────────────────────────────────────────
@@ -186,10 +197,12 @@ function AnalyticsRoute() {
 // navigating away with unsaved changes).
 
 const router = createBrowserRouter([
+  // Isolated, fictional-data design preview; the live routes and API remain unchanged.
   {
     element: <AppShell />,
     children: [
-      { path: '/',                        element: <LeadsRoute /> },
+      { path: '/',                        element: <OverviewRoute /> },
+      { path: '/leads',                   element: <LeadsRoute /> },
       { path: '/stealth',                 element: <StealthRoute /> },
       { path: '/sales',                   element: <SalesRoute /> },
       { path: '/visitors',                element: <VisitorsRoute /> },
@@ -197,7 +210,7 @@ const router = createBrowserRouter([
       { path: '/automations/new',         element: <AutomationBuilderPage /> },
       { path: '/automations/builder/:id', element: <AutomationBuilderPage /> },
       { path: '/analytics',               element: <AnalyticsRoute /> },
-      { path: '/logs',                    element: <LogsPage /> },
+      { path: '/logs',                    element: <LogsRoute /> },
     ],
   },
 ]);

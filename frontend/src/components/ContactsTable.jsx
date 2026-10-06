@@ -3,55 +3,23 @@ import {
   Search, Users, Copy, GitMerge, ArrowUpDown, ArrowUp, ArrowDown,
   ChevronLeft, ChevronRight, Trash2, ChevronsLeft, ChevronsRight,
 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
+import { DateStamp, Status } from '@/workspace/ui';
 
-/* ── Source badge colours (light tints) ── */
-const SOURCE_PALETTE = {
-  facebook:  { bg: '#fff0e6', text: '#c2410c', border: '#fed7aa' },
-  instagram: { bg: '#fdf4ff', text: '#7e22ce', border: '#e9d5ff' },
-  google:    { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
-  linkedin:  { bg: '#eef2ff', text: '#3730a3', border: '#c7d2fe' },
-  twitter:   { bg: '#ecfeff', text: '#0e7490', border: '#a5f3fc' },
-  youtube:   { bg: '#fef2f2', text: '#b91c1c', border: '#fecaca' },
-  referral:  { bg: '#ecfdf5', text: '#065f46', border: '#a7f3d0' },
-};
-function srcStyle(src) {
-  if (!src) return { bg: '#f8fafc', text: '#475569', border: '#e2e8f0' };
-  const key = src.toLowerCase();
-  return SOURCE_PALETTE[key] || { bg: '#f0fdf4', text: '#166534', border: '#bbf7d0' };
-}
-
-function formatDate(dt) {
-  if (!dt) return '—';
-  const d = new Date(dt);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-function formatTime(dt) {
-  if (!dt) return '';
-  return new Date(dt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-}
+// Contacts table (Leads, Visitors) — the prototype's record table, plus this table's own search, sorting, paging and
+// bulk delete. Dates follow the display timezone.
 
 /* ── Sort icon ── */
 const SortIcon = ({ col, sort }) => {
-  if (sort.col !== col) return <ArrowUpDown size={12} className="opacity-30 ml-1 shrink-0" />;
-  return sort.dir === 'asc'
-    ? <ArrowUp size={12} className="ml-1 shrink-0" style={{ color: 'var(--brand-navy)' }} />
-    : <ArrowDown size={12} className="ml-1 shrink-0" style={{ color: 'var(--brand-navy)' }} />;
+  if (sort.col !== col) return <ArrowUpDown size={12} className="sp-sort-idle" />;
+  return sort.dir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />;
 };
+
+const COLS = '40px minmax(0,2fr) minmax(0,1.5fr) minmax(0,1fr) minmax(0,.9fr) 70px';
 
 const PAGE_SIZES = [8, 10, 20, 50];
 
@@ -152,96 +120,43 @@ export const ContactsTable = ({
     return [1, '...', safePage - 1, safePage, safePage + 1, '...', totalPages];
   }, [totalPages, safePage]);
 
-  // Derive flex-justification from the className so the sort icon
-  // and label always sit on the same side as the cell content.
-  const Col = ({ label, col: colKey, className = '' }) => {
-    const justify = className.includes('text-right')  ? 'justify-end'
-                  : className.includes('text-center') ? 'justify-center'
-                  : 'justify-start';
-    return (
-      <TableHead
-        className={`text-xs uppercase tracking-wide cursor-pointer select-none h-11 ${className}`}
-        style={{ color: '#030352', opacity: 0.65, fontFamily: 'Work Sans, sans-serif', fontWeight: 700 }}
-        onClick={() => toggleSort(colKey)}
-      >
-        <div className={`flex items-center gap-0.5 ${justify}`}>
-          {label}<SortIcon col={colKey} sort={sort} />
-        </div>
-      </TableHead>
-    );
-  };
+  const Col = ({ label, col: colKey }) => (
+    <div role="columnheader" aria-sort={sort.col === colKey ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+      <button type="button" className="sp-sort" onClick={() => toggleSort(colKey)}>{label}<SortIcon col={colKey} sort={sort} /></button>
+    </div>
+  );
 
   const showSkeletons = loading && initialLoad;
 
   return (
-    <div>
-      {/* Search bar — only when not provided by parent */}
+    <div className="sp-contacts">
       {!hideSearch && (
-        <div className="flex items-center gap-3 mb-4">
-          <div className="relative flex-1 max-w-sm">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-dim)' }} />
-            <Input
-              data-testid="contacts-table-search-input"
-              placeholder="Search by name, email or phone…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-9 h-9 text-sm"
-              style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff', color: 'var(--text)' }}
-            />
-          </div>
-          <span className="text-sm" style={{ color: 'var(--text-dim)' }}>
-            {filtered.length} contact{filtered.length !== 1 ? 's' : ''}
-          </span>
+        <div className="sp-toolbar">
+          <label className="sp-search"><Search size={17} aria-hidden="true" /><span className="sr-only">Search contacts</span>
+            <input data-testid="contacts-table-search-input" placeholder="Search by name, email or phone…"
+              value={search} onChange={e => setSearch(e.target.value)} /></label>
+          <span className="sp-count">{filtered.length.toLocaleString('en-US')} {search ? 'matching' : 'newest loaded'}</span>
         </div>
       )}
 
-      {/* Bulk action bar */}
       {selectedCount > 0 && (
-        <div
-          data-testid="bulk-action-bar"
-          className="flex items-center justify-between gap-3 mb-3 px-4 py-2.5 rounded-xl border"
-          style={{ backgroundColor: '#fff0ee', borderColor: '#fecdc7' }}
-        >
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold" style={{ color: 'var(--brand-navy)' }}>
-              {selectedCount} selected
-            </span>
-            <button
-              onClick={() => setSelected(new Set())}
-              className="text-xs px-2 py-0.5 rounded-full border transition-colors"
-              style={{ color: 'var(--text-muted)', borderColor: 'var(--stroke)' }}
-            >
-              Clear
-            </button>
-          </div>
-
+        <div data-testid="bulk-action-bar" className="sp-bulk">
+          <span><strong>{selectedCount} selected</strong>
+            <button type="button" className="sp-clear" onClick={() => setSelected(new Set())}>Clear</button></span>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button
-                data-testid="leads-bulk-delete-button"
-                size="sm" variant="outline"
-                className="h-7 gap-1.5 text-xs"
-                style={{ borderColor: '#fecdc7', color: 'var(--brand-red)', backgroundColor: '#fff0ee' }}
-              >
-                <Trash2 size={12} /> Delete {selectedCount}
-              </Button>
+              <button type="button" data-testid="leads-bulk-delete-button" className="sp-secondary-button sp-danger-button">
+                <Trash2 size={14} /> Delete {selectedCount}
+              </button>
             </AlertDialogTrigger>
-            <AlertDialogContent style={{ backgroundColor: '#fff', borderColor: 'var(--stroke)' }}>
+            <AlertDialogContent className="sp-dialog">
               <AlertDialogHeader>
-                <AlertDialogTitle style={{ color: 'var(--text)' }}>
-                  Delete {selectedCount} contact{selectedCount !== 1 ? 's' : ''}?
-                </AlertDialogTitle>
-                <AlertDialogDescription style={{ color: 'var(--text-muted)' }}>
-                  This permanently removes them and all their visit history.
-                </AlertDialogDescription>
+                <AlertDialogTitle>Delete {selectedCount} contact{selectedCount !== 1 ? 's' : ''}?</AlertDialogTitle>
+                <AlertDialogDescription>This permanently removes them and all their visit history.</AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel style={{ borderColor: 'var(--stroke)', color: 'var(--text)' }}>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  data-testid="bulk-delete-confirm-button"
-                  onClick={handleBulkDelete}
-                  style={{ backgroundColor: 'var(--brand-red)', color: '#fff', border: 'none' }}
-                >
+                <AlertDialogCancel className="sp-secondary-button">Cancel</AlertDialogCancel>
+                <AlertDialogAction data-testid="bulk-delete-confirm-button" onClick={handleBulkDelete} className="sp-danger-solid">
                   Delete {selectedCount}
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -250,287 +165,103 @@ export const ContactsTable = ({
         </div>
       )}
 
-      {/* Table */}
-      <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--stroke)' }}>
-        <Table data-testid="contacts-table" style={{ tableLayout: 'fixed', width: '100%' }}>
-          <colgroup>
-            <col style={{ width: '40px' }} />          {/* Checkbox */}
-            <col style={{ width: '28%' }} />            {/* Name + tags */}
-            <col style={{ width: '29%' }} />            {/* Email */}
-            <col style={{ width: '17%' }} />            {/* Created (md+) */}
-            <col style={{ width: '15%' }} />            {/* Source (sm+) */}
-            <col style={{ width: '11%' }} />            {/* Visits */}
-          </colgroup>
-          <TableHeader>
-            <TableRow
-              className="hover:bg-transparent"
-              style={{
-                background: 'linear-gradient(to bottom, #eef0f8, #f4f5fb)',
-                borderColor: '#d2d8ef',
-              }}
-            >
-              {/* Checkbox — centered */}
-              <TableHead className="pl-4 pr-0 text-center">
-                <div className="flex justify-center">
-                  <Checkbox
-                    data-testid="contacts-select-all-checkbox"
-                    checked={allSelected}
-                    ref={el => { if (el) el.indeterminate = someSelected && !allSelected; }}
-                    onCheckedChange={toggleAll}
-                    onClick={e => e.stopPropagation()}
-                    aria-label="Select all"
-                  />
-                </div>
-              </TableHead>
-              <Col label="Name"    col="name"                   className="pl-3" />
-              <Col label="Email"   col="email"                  className="" />
-              <Col label="Created" col="updated_at"             className="hidden md:table-cell" />
-              <Col label="Source"  col="attribution.utm_source" className="hidden sm:table-cell text-center" />
-              <Col label="Visits"  col="visit_count"            className="text-right pr-6" />
-            </TableRow>
-          </TableHeader>
+      <div role="table" aria-label="Contacts" data-testid="contacts-table" className="sp-table">
+        <div role="row" className="sp-table-head" style={{ gridTemplateColumns: COLS }}>
+          <div role="columnheader" className="sp-check">
+            <Checkbox data-testid="contacts-select-all-checkbox" checked={allSelected}
+              ref={el => { if (el) el.indeterminate = someSelected && !allSelected; }}
+              onCheckedChange={toggleAll} onClick={e => e.stopPropagation()} aria-label="Select all" />
+          </div>
+          <Col label="Name" col="name" />
+          <Col label="Email" col="email" />
+          <Col label="Created" col="updated_at" />
+          <Col label="Source" col="attribution.utm_source" />
+          <Col label="Visits" col="visit_count" />
+        </div>
 
-          <TableBody>
-            {showSkeletons ? (
-              Array.from({ length: pageSize }).map((_, i) => (
-                <TableRow key={i} style={{ borderColor: 'var(--stroke)' }}>
-                  <TableCell className="pl-4 pr-0"><Skeleton className="h-4 w-4" /></TableCell>
-                  <TableCell className="pl-3"><Skeleton className="h-4 w-4/5" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-4/5" /></TableCell>
-                  <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-3/4" /></TableCell>
-                  <TableCell className="hidden sm:table-cell"><Skeleton className="h-5 w-3/4 rounded-full" /></TableCell>
-                  <TableCell className="text-right pr-6"><Skeleton className="h-4 w-6 ml-auto" /></TableCell>
-                </TableRow>
-              ))
-            ) : sliced.length === 0 ? (
-              <TableRow style={{ borderColor: 'transparent' }}>
-                <TableCell colSpan={7}>
-                  <div data-testid="contacts-empty-state" className="flex flex-col items-center justify-center py-16 gap-4">
-                    <div
-                      className="w-14 h-14 rounded-full flex items-center justify-center border-2"
-                      style={{ borderColor: 'var(--stroke)', backgroundColor: '#fafaf8' }}
-                    >
-                      <Users size={24} style={{ color: 'var(--text-dim)' }} />
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-muted)' }}>
-                        {search ? 'No contacts match your search' : 'No contacts yet'}
-                      </p>
-                      <p className="text-xs max-w-xs" style={{ color: 'var(--text-dim)' }}>
-                        {search ? 'Try a different search term.' : 'Add the tracking script to your page to start capturing leads.'}
-                      </p>
-                    </div>
-                    {!search && onCopyScript && (
-                      <Button
-                        data-testid="contacts-empty-state-copy-script"
-                        size="sm" onClick={onCopyScript}
-                        className="gap-1.5 text-xs text-white"
-                        style={{ backgroundColor: 'var(--brand-navy)' }}
-                      >
-                        <Copy size={12} /> Copy Script
-                      </Button>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : (
-              sliced.map(contact => {
-                const src = contact?.attribution?.utm_source;
-                const ss = srcStyle(src);
-                const isSelected = selected.has(contact.contact_id);
-                return (
-                  <TableRow
-                    data-testid="contacts-table-row"
-                    key={contact.contact_id}
-                    className={`contact-row border-b ${isSelected ? 'selected-row' : ''}`}
-                    style={{
-                      borderColor: 'var(--stroke)',
-                      cursor: 'pointer',
-                      backgroundColor: isSelected ? '#fdf0ee' : 'transparent',
-                      borderLeft: isSelected ? '3px solid var(--brand-red)' : '3px solid transparent',
-                      transition: 'all 120ms ease',
-                    }}
-                    onClick={() => onSelectContact(contact.contact_id)}
-                    tabIndex={0}
-                    role="button"
-                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectContact(contact.contact_id); } }}
-                    aria-label={`View ${contact.name || contact.email || 'Anonymous'}`}
-                  >
-                    {/* Checkbox — centered */}
-                    <TableCell className="pl-4 pr-0 text-center" onClick={e => toggleOne(contact.contact_id, e)}>
-                      <div className="flex justify-center">
-                        <Checkbox
-                          data-testid={`contact-checkbox-${contact.contact_id}`}
-                          checked={isSelected}
-                          onCheckedChange={() => {}}
-                          onClick={e => toggleOne(contact.contact_id, e)}
-                          aria-label={`Select ${contact.name || contact.email || 'contact'}`}
-                        />
-                      </div>
-                    </TableCell>
-
-                    <TableCell className="py-4 pl-3 overflow-hidden">
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span
-                            className="text-sm font-semibold truncate max-w-[180px]"
-                            style={{ color: contact.name ? 'var(--text)' : 'var(--text-dim)', fontStyle: contact.name ? 'normal' : 'italic' }}
-                          >
-                            {contact.name || 'Anonymous'}
-                          </span>
-                          {contact.tags?.map(tag => (
-                            <span
-                              key={tag}
-                              className="inline-flex items-center text-xs font-bold px-2 py-0.5 rounded-full"
-                              style={{ backgroundColor: 'rgba(3,3,82,0.08)', color: '#030352', border: '1px solid rgba(3,3,82,0.15)' }}
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                        <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-dim)', fontFamily: 'IBM Plex Mono, monospace' }}>
-                          {contact.contact_id.substring(0, 8)}…
-                        </div>
-                      </div>
-                    </TableCell>
-
-                    <TableCell className="py-4 overflow-hidden">
-                      <span className="text-sm truncate block" style={{ color: contact.email ? 'var(--text-muted)' : 'var(--text-dim)', fontStyle: contact.email ? 'normal' : 'italic' }}>
-                        {contact.email || '—'}
-                      </span>
-                    </TableCell>
-
-                    <TableCell className="py-3 hidden md:table-cell">
-                      <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                        {formatDate(contact.updated_at)}
-                        <span className="block" style={{ color: 'var(--text-dim)' }}>{formatTime(contact.updated_at)}</span>
-                      </div>
-                    </TableCell>
-
-                    {/* Source — centered to match header */}
-                    <TableCell className="py-3 hidden sm:table-cell text-center">
-                      {src ? (
-                        <span
-                          className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full font-medium border"
-                          style={{ backgroundColor: ss.bg, color: ss.text, borderColor: ss.border }}
-                        >
-                          {src}
-                        </span>
-                      ) : (
-                        <span className="text-xs" style={{ color: 'var(--text-dim)' }}>—</span>
-                      )}
-                    </TableCell>
-
-                    <TableCell className="py-4 pr-6 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {contact.merged_children?.length > 0 && (
-                          <span className="hidden sm:inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full border"
-                            style={{ backgroundColor: '#ecfdf5', color: '#047857', borderColor: '#a7f3d0' }}
-                          >
-                            <GitMerge size={9} />{contact.merged_children.length}
-                          </span>
-                        )}
-                        <span
-                          className="text-xs font-mono font-semibold tabular-nums"
-                          style={{ color: contact.visit_count > 0 ? 'var(--brand-navy)' : 'var(--text-dim)' }}
-                        >
-                          {contact.visit_count}
-                        </span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
+        {showSkeletons ? (
+          Array.from({ length: pageSize }).map((_, i) => (
+            <div key={i} role="row" className="sp-table-row sp-skeleton-row" style={{ gridTemplateColumns: COLS }}>
+              {Array.from({ length: 6 }).map((__, j) => <div key={j} role="cell"><span className="sp-skeleton" /></div>)}
+            </div>
+          ))
+        ) : sliced.length === 0 ? (
+          <div data-testid="contacts-empty-state" className="sp-empty sp-empty-state">
+            <span className="sp-empty-icon"><Users size={22} /></span>
+            <strong>{search ? 'No contacts match your search' : 'No contacts yet'}</strong>
+            <span>{search ? 'Try a different search term.' : 'Add the tracking script to your page to start capturing leads.'}</span>
+            {!search && onCopyScript && (
+              <button type="button" data-testid="contacts-empty-state-copy-script" className="sp-primary-button" onClick={onCopyScript}>
+                <Copy size={14} /> Copy script
+              </button>
             )}
-          </TableBody>
-        </Table>
+          </div>
+        ) : (
+          sliced.map(contact => {
+            const src = contact?.attribution?.utm_source;
+            const isSelected = selected.has(contact.contact_id);
+            const label = contact.name || contact.email || 'Anonymous';
+            return (
+              <div role="row" data-testid="contacts-table-row" key={contact.contact_id} tabIndex={0}
+                className="sp-table-row" data-selected={isSelected || undefined} style={{ gridTemplateColumns: COLS }}
+                onClick={() => onSelectContact(contact.contact_id)}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectContact(contact.contact_id); } }}
+                aria-label={`View ${label}`}>
+                <div role="cell" className="sp-check" onClick={e => toggleOne(contact.contact_id, e)}>
+                  <Checkbox data-testid={`contact-checkbox-${contact.contact_id}`} checked={isSelected}
+                    onCheckedChange={() => {}} onClick={e => toggleOne(contact.contact_id, e)} aria-label={`Select ${label}`} />
+                </div>
+                <div role="cell" className="sp-table-cell sp-primary" data-label="Name">
+                  <span className="sp-name-line"><strong>{contact.name || 'Anonymous'}</strong>
+                    {contact.tags?.map(tag => <Status key={tag} tone="blue">{tag}</Status>)}</span>
+                  <span>{contact.contact_id.substring(0, 8)}…</span>
+                </div>
+                <div role="cell" className="sp-table-cell" data-label="Email">{contact.email || '—'}</div>
+                <div role="cell" className="sp-table-cell" data-label="Created"><DateStamp value={contact.updated_at} /></div>
+                <div role="cell" className="sp-table-cell" data-label="Source">{src ? <Status tone="blue">{src}</Status> : '—'}</div>
+                <div role="cell" className="sp-table-cell" data-label="Visits">
+                  <span className="sp-visits">
+                    {contact.merged_children?.length > 0 && (
+                      <span className="sp-merged" title={`${contact.merged_children.length} merged contact${contact.merged_children.length !== 1 ? 's' : ''}`}>
+                        <GitMerge size={10} />{contact.merged_children.length}
+                      </span>
+                    )}
+                    <strong className="sp-number">{contact.visit_count}</strong>
+                  </span>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
-      {/* Pagination */}
       {!showSkeletons && sorted.length > 0 && (
-        <div className="flex items-center justify-between mt-4 flex-wrap gap-3">
-          {/* Showing X of Y */}
-          <div className="flex items-center gap-3">
-            <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              Showing <strong style={{ color: 'var(--text)' }}>{(safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, sorted.length)}</strong> of{' '}
-              <strong style={{ color: 'var(--text)' }}>{sorted.length}</strong>
-            </span>
-            <Select value={String(pageSize)} onValueChange={v => { setPageSize(Number(v)); setPage(1); }}>
-              <SelectTrigger
-                data-testid="leads-filter-rows-per-page"
-                className="h-7 text-xs w-28"
-                style={{ borderColor: 'var(--stroke)', color: 'var(--text-muted)' }}
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PAGE_SIZES.map(n => (
-                  <SelectItem key={n} value={String(n)} className="text-xs">Show {n} rows</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Page numbers */}
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setPage(1)} disabled={safePage === 1}
-              className="w-7 h-7 rounded-lg border flex items-center justify-center text-xs transition-colors disabled:opacity-30"
-              style={{ borderColor: 'var(--stroke)', color: 'var(--text-muted)' }}
-            ><ChevronsLeft size={13} /></button>
-            <button
-              onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1}
-              className="w-7 h-7 rounded-lg border flex items-center justify-center text-xs transition-colors disabled:opacity-30"
-              style={{ borderColor: 'var(--stroke)', color: 'var(--text-muted)' }}
-            ><ChevronLeft size={13} /></button>
-
-            {pagesArr.map((p, i) =>
-              p === '...'
-                ? <span key={`ellipsis-${i}`} className="w-7 h-7 flex items-center justify-center text-xs" style={{ color: 'var(--text-dim)' }}>…</span>
-                : (
-                  <button
-                    key={p}
-                    onClick={() => setPage(p)}
-                    className="w-7 h-7 rounded-lg border text-xs font-medium transition-colors"
-                    style={{
-                      backgroundColor: safePage === p ? 'var(--brand-navy)' : '#ffffff',
-                      color: safePage === p ? '#ffffff' : 'var(--text)',
-                      borderColor: safePage === p ? 'var(--brand-navy)' : 'var(--stroke)',
-                    }}
-                  >{p}</button>
-                )
-            )}
-
-            <button
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}
-              className="w-7 h-7 rounded-lg border flex items-center justify-center text-xs transition-colors disabled:opacity-30"
-              style={{ borderColor: 'var(--stroke)', color: 'var(--text-muted)' }}
-            ><ChevronRight size={13} /></button>
-            <button
-              onClick={() => setPage(totalPages)} disabled={safePage === totalPages}
-              className="w-7 h-7 rounded-lg border flex items-center justify-center text-xs transition-colors disabled:opacity-30"
-              style={{ borderColor: 'var(--stroke)', color: 'var(--text-muted)' }}
-            ><ChevronsRight size={13} /></button>
-          </div>
-
-          {/* Go to page */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Go to page</span>
-            <input
-              type="number" min={1} max={totalPages}
-              value={goInput}
+        <div className="sp-table-foot sp-pager">
+          <span className="sp-pager-info">
+            Showing <strong>{((safePage - 1) * pageSize + 1).toLocaleString('en-US')}–{Math.min(safePage * pageSize, sorted.length).toLocaleString('en-US')}</strong> of <strong>{sorted.length.toLocaleString('en-US')}</strong>
+            <label className="sp-select-wrap sp-select-small"><span className="sr-only">Rows per page</span>
+              <select data-testid="leads-filter-rows-per-page" value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}>
+                {PAGE_SIZES.map(n => <option key={n} value={n}>Show {n} rows</option>)}
+              </select></label>
+          </span>
+          <span className="sp-pages">
+            <button type="button" onClick={() => setPage(1)} disabled={safePage === 1} aria-label="First page"><ChevronsLeft size={14} /></button>
+            <button type="button" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1} aria-label="Previous page"><ChevronLeft size={14} /></button>
+            {pagesArr.map((p, i) => (p === '...'
+              ? <span key={`ellipsis-${i}`} className="sp-ellipsis">…</span>
+              : <button type="button" key={p} onClick={() => setPage(p)} aria-current={safePage === p ? 'page' : undefined}>{p}</button>))}
+            <button type="button" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} aria-label="Next page"><ChevronRight size={14} /></button>
+            <button type="button" onClick={() => setPage(totalPages)} disabled={safePage === totalPages} aria-label="Last page"><ChevronsRight size={14} /></button>
+          </span>
+          <label className="sp-goto">Go to page
+            <input type="number" min={1} max={totalPages} value={goInput} placeholder="1"
               onChange={e => setGoInput(e.target.value)}
               onKeyDown={e => {
                 if (e.key === 'Enter') {
                   const n = parseInt(goInput);
                   if (n >= 1 && n <= totalPages) { setPage(n); setGoInput(''); }
                 }
-              }}
-              className="w-12 h-7 text-center text-xs border rounded-lg outline-none"
-              style={{ borderColor: 'var(--stroke)', color: 'var(--text)', backgroundColor: '#fff' }}
-              placeholder="1"
-            />
-          </div>
+              }} /></label>
         </div>
       )}
     </div>

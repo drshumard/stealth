@@ -1,13 +1,6 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
-import { X, Copy, Check, ExternalLink, Clock, Globe, User, Mail, Phone, Hash, Calendar, Tag, TrendingUp, AlertCircle, Wifi, GitMerge, Layers, Trash2, ShoppingCart, DollarSign, CheckCircle2, XCircle } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { AlertCircle, ExternalLink, Globe, ShoppingCart, Tag, Trash2, TrendingUp } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,25 +12,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
-import { toast } from 'sonner';
+import { useTimezone } from '@/components/TimezoneContext';
+import { CopyButton, Drawer, DrawerTabs, Field, Status, initialsOf, money } from '@/workspace/ui';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
 
-import { useTimezone } from '@/components/TimezoneContext';
-
-function formatDateTime(dt) {
-  if (!dt) return '—';
-  const d = new Date(dt);
-  return d.toLocaleString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', second: '2-digit'
-  });
-}
+const SALE_TONE = { completed: 'green', paid: 'green', refunded: 'red', failed: 'red' };
 
 function parseUrlParams(url) {
   try {
@@ -50,237 +30,41 @@ function parseUrlParams(url) {
   }
 }
 
-const CopyButton = ({ text, label }) => {
-  const [copied, setCopied] = useState(false);
-  const handleCopy = () => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    toast.success('Copied!', { duration: 1500 });
-    setTimeout(() => setCopied(false), 2000);
-  };
-  return (
-    <Button
-      variant="ghost" size="sm"
-      onClick={handleCopy}
-      className="h-6 w-6 p-0 shrink-0"
-      style={{ color: copied ? 'var(--mint-success)' : 'var(--text-dim)' }}
-      aria-label={label || 'Copy'}
-    >
-      {copied ? <Check size={11} /> : <Copy size={11} />}
-    </Button>
-  );
-};
+const ATTRIBUTION_GROUPS = [
+  { title: 'UTM Parameters', fields: [['utm_source'], ['utm_medium'], ['utm_campaign'], ['utm_term'], ['utm_content'], ['utm_id']] },
+  { title: 'Ad Platform IDs', fields: [['campaign_id'], ['adset_id'], ['ad_id'], ['fb_ad_set_id'], ['google_campaign_id']] },
+  { title: 'Click IDs & FB Cookies', fields: [['fbclid'], ['fbc', 'fbc (FB Click)'], ['fbp', 'fbp (FB Browser)'], ['gclid'], ['ttclid'], ['source_link_tag']] },
+];
 
-const InfoRow = ({ icon: Icon, label, value, mono, copyable, accent }) => (
-  <div
-    className="grid items-center border-b last:border-0"
-    style={{ gridTemplateColumns: '148px 1fr auto', borderColor: 'var(--stroke)' }}
-  >
-    {/* Label */}
-    <div className="flex items-center gap-2 px-4 py-3 shrink-0" style={{ backgroundColor: '#fafaf8' }}>
-      <Icon size={13} style={{ color: accent || 'var(--text-dim)', flexShrink: 0 }} />
-      <span className="text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--text-dim)' }}>{label}</span>
-    </div>
-    {/* Value */}
-    <div
-      className={`px-4 py-3 text-sm font-medium overflow-hidden ${mono ? 'break-all' : 'truncate'}`}
-      style={{
-        color:       value ? 'var(--text)' : 'var(--text-dim)',
-        fontFamily:  mono ? 'IBM Plex Mono, monospace' : undefined,
-        fontStyle:   !value ? 'italic' : undefined,
-        fontSize:    mono ? '0.72rem' : undefined,
-      }}
-      title={value || undefined}
-    >
-      {value || 'Not provided'}
-    </div>
-    {/* Copy */}
-    <div className="px-3 py-3">
-      {copyable && value && <CopyButton text={value} label={`Copy ${label}`} />}
-    </div>
-  </div>
-);
-
-const AttrRow = ({ label, value }) => {
-  if (!value) return null;
-  return (
-    <div className="flex items-start gap-3 py-2 px-4 min-w-0">
-      <div className="text-xs w-36 shrink-0" style={{ color: 'var(--text-dim)' }}>{label}</div>
-      <div
-        className="text-xs font-mono flex-1 min-w-0"
-        style={{
-          color: 'var(--amber-warn)',
-          fontFamily: 'IBM Plex Mono, monospace',
-          wordBreak: 'break-all',
-          overflowWrap: 'anywhere',
-        }}
-      >
-        {value}
-      </div>
-      <CopyButton text={value} label={`Copy ${label}`} />
-    </div>
-  );
-};
-
-const UrlVisitItem = ({ visit, index }) => {
+function UrlVisitItem({ visit, fmt }) {
   const { base, params } = parseUrlParams(visit.current_url || '');
   const { base: refBase, params: refParams } = parseUrlParams(visit.referrer_url || '');
-
+  const visitAttribution = visit.attribution
+    ? Object.entries(visit.attribution).filter(([k, v]) => v && k !== 'extra' && typeof v === 'string') : [];
   return (
-    <div data-testid="contact-url-row" className="relative pl-6 pb-5 min-w-0">
-      {/* Timeline dot */}
-      <div
-        className="absolute left-0 top-2 w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center"
-        style={{
-          backgroundColor: '#ffffff',
-          borderColor: index === 0 ? 'var(--primary-cyan)' : 'var(--stroke)',
-        }}
-      >
-        <div className="w-1.5 h-1.5 rounded-full"
-          style={{ backgroundColor: index === 0 ? 'var(--primary-cyan)' : 'var(--text-dim)' }}
-        />
-      </div>
-
-      <div className="rounded-lg p-3 border min-w-0 overflow-hidden" style={{ backgroundColor: '#ffffff', borderColor: 'var(--stroke)' }}>
-        {/* Timestamp + title */}
-        <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Clock size={11} style={{ color: 'var(--text-dim)' }} />
-            <span className="text-xs" style={{ color: 'var(--text-dim)' }}>{formatDateTime(visit.timestamp)}</span>
-          </div>
-          {visit.page_title && (
-            <Badge variant="secondary" className="text-xs px-2 py-0 max-w-[160px] truncate shrink-0"
-              style={{ backgroundColor: 'rgba(21,184,200,0.08)', color: 'var(--primary-cyan)', border: '1px solid rgba(21,184,200,0.15)' }}
-            >
-              {visit.page_title}
-            </Badge>
-          )}
-        </div>
-
-        {/* Current URL */}
-        <div className="mb-2 min-w-0">
-          <div className="flex items-center gap-1.5 mb-1">
-            <Globe size={11} className="shrink-0" style={{ color: 'var(--primary-cyan)' }} />
-            <span className="text-xs font-medium shrink-0" style={{ color: 'var(--text-muted)' }}>Current URL</span>
-            <CopyButton text={visit.current_url} label="Copy URL" />
-          </div>
-          <div
-            className="text-xs font-mono"
-            style={{
-              color: 'var(--text)',
-              fontFamily: 'IBM Plex Mono, monospace',
-              wordBreak: 'break-all',
-              overflowWrap: 'anywhere',
-            }}
-          >
-            {base}
-          </div>
-          {params.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1.5">
-              {params.map(({ key, val }) => (
-                <Badge key={key} variant="secondary" className="text-xs font-mono px-1.5 py-0 max-w-full"
-                  style={{
-                    backgroundColor: 'rgba(245,158,11,0.1)',
-                    color: 'var(--amber-warn)',
-                    border: '1px solid rgba(245,158,11,0.2)',
-                    fontFamily: 'IBM Plex Mono, monospace',
-                    wordBreak: 'break-all',
-                    overflowWrap: 'anywhere',
-                    whiteSpace: 'normal',
-                  }}
-                >
-                  {key}={val}
-                </Badge>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Referrer */}
-        {visit.referrer_url && (
-          <div className="min-w-0">
-            <Separator className="my-2" style={{ backgroundColor: 'var(--stroke)' }} />
-            <div className="flex items-center gap-1.5 mb-1">
-              <ExternalLink size={11} className="shrink-0" style={{ color: 'var(--text-dim)' }} />
-              <span className="text-xs shrink-0" style={{ color: 'var(--text-dim)' }}>Referrer</span>
-            </div>
-            <div
-              className="text-xs font-mono"
-              style={{
-                color: 'var(--text-muted)',
-                fontFamily: 'IBM Plex Mono, monospace',
-                wordBreak: 'break-all',
-                overflowWrap: 'anywhere',
-              }}
-            >
-              {refBase}
-            </div>
-            {refParams.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-1.5">
-                {refParams.map(({ key, val }) => (
-                  <Badge key={key} variant="secondary" className="text-xs font-mono px-1.5 py-0 max-w-full"
-                    style={{
-                      backgroundColor: 'rgba(255,255,255,0.05)',
-                      color: 'var(--text-muted)',
-                      border: '1px solid var(--stroke)',
-                      fontFamily: 'IBM Plex Mono, monospace',
-                      wordBreak: 'break-all',
-                      overflowWrap: 'anywhere',
-                      whiteSpace: 'normal',
-                    }}
-                  >
-                    {key}={val}
-                  </Badge>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Visit-level attribution */}
-        {visit.attribution && Object.values(visit.attribution).some(v => v && typeof v !== 'object') && (
-          <div className="mt-2 min-w-0">
-            <Separator className="my-2" style={{ backgroundColor: 'var(--stroke)' }} />
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <Tag size={11} className="shrink-0" style={{ color: 'var(--mint-success)' }} />
-              <span className="text-xs" style={{ color: 'var(--text-dim)' }}>Attribution (this visit)</span>
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {Object.entries(visit.attribution)
-                .filter(([k, v]) => v && k !== 'extra' && typeof v === 'string')
-                .map(([k, v]) => (
-                  <Badge key={k} variant="secondary" className="text-xs font-mono px-1.5 py-0 max-w-full"
-                    style={{
-                      backgroundColor: 'rgba(69,209,156,0.08)',
-                      color: 'var(--mint-success)',
-                      border: '1px solid rgba(69,209,156,0.15)',
-                      fontFamily: 'IBM Plex Mono, monospace',
-                      wordBreak: 'break-all',
-                      overflowWrap: 'anywhere',
-                      whiteSpace: 'normal',
-                    }}
-                  >
-                    {k}={v}
-                  </Badge>
-                ))
-              }
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+    <li className="sp-visit" data-testid="contact-url-row">
+      <div className="sp-visit-head"><time dateTime={visit.timestamp}>{fmt(visit.timestamp)}</time>{visit.page_title && <Status tone="blue">{visit.page_title}</Status>}</div>
+      <div className="sp-visit-label"><Globe size={12} /> Current URL <CopyButton text={visit.current_url} label="Copy URL" /></div>
+      <p className="sp-break">{base}</p>
+      {params.length > 0 && <div className="sp-chips">{params.map(({ key, val }) => <span key={key} className="sp-chip">{key}={val}</span>)}</div>}
+      {visit.referrer_url && <>
+        <div className="sp-visit-label"><ExternalLink size={12} /> Referrer</div>
+        <p className="sp-break sp-muted">{refBase}</p>
+        {refParams.length > 0 && <div className="sp-chips">{refParams.map(({ key, val }) => <span key={key} className="sp-chip" data-tone="quiet">{key}={val}</span>)}</div>}
+      </>}
+      {visitAttribution.length > 0 && <>
+        <div className="sp-visit-label"><Tag size={12} /> Attribution (this visit)</div>
+        <div className="sp-chips">{visitAttribution.map(([k, v]) => <span key={k} className="sp-chip" data-tone="green">{k}={v}</span>)}</div>
+      </>}
+    </li>
   );
-};
+}
 
-// ── ModalInner — keyed per contact ───────────────────────────────────────────
-// Owns all state, fetch, and UI. The key={contactId} on this component means it
-// remounts on every contact switch. The outer Dialog shell (and its overlay)
-// stays mounted, so the overlay never flashes.
-const ModalInner = ({ contactId, defaultTab, onClose, onDelete }) => {
+// ── Inner — keyed per contact ─────────────────────────────────────────────────
+// Owns state and fetch; key={contactId} remounts it on every contact switch while the drawer shell stays mounted.
+const ContactInner = ({ contactId, defaultTab, onClose, onDelete }) => {
   const [activeTab, setActiveTab] = useState(defaultTab || 'overview');
-  const { formatDateTime: tzFmt } = useTimezone();
-  // Override the module-level helper with the timezone-aware one
-  const fmt = (dt) => tzFmt(dt) || formatDateTime(dt);
+  const { formatDateTime: fmt } = useTimezone();
 
   useEffect(() => { setActiveTab(defaultTab || 'overview'); }, [defaultTab]);
 
@@ -291,404 +75,127 @@ const ModalInner = ({ contactId, defaultTab, onClose, onDelete }) => {
     enabled: !!contactId,
   });
 
-  const hasAttribution = contact?.attribution && (
-    Object.entries(contact.attribution).some(([k, v]) => {
-      if (k === 'extra') return v && typeof v === 'object' && Object.keys(v).length > 0;
-      return v && typeof v !== 'object';
-    })
+  const attr = contact?.attribution || {};
+  const hasAttribution = Object.entries(attr).some(([k, v]) => {
+    if (k === 'extra') return v && typeof v === 'object' && Object.keys(v).length > 0;
+    return v && typeof v !== 'object';
+  });
+  const title = contact?.name || contact?.email || 'Anonymous Contact';
+
+  const tabs = [
+    { id: 'overview',    label: 'Overview',    testId: 'contact-overview-tab' },
+    { id: 'attribution', label: 'Attribution', testId: 'contact-attribution-tab', badge: hasAttribution ? '●' : null, tone: 'green' },
+    { id: 'urls',        label: 'URL History', testId: 'contact-urls-tab', badge: contact?.visits?.length || null },
+    { id: 'sales',       label: 'Sales',       testId: 'contact-sales-tab', badge: contact?.sales?.length || null, tone: 'green' },
+  ];
+
+  const saleCard = sale => (
+    <div key={sale.id} className="sp-sale-card">
+      <span className="sp-metric-icon" data-tone="green"><ShoppingCart size={16} /></span>
+      <div><strong>{sale.product || 'Purchase'}</strong><small>{[sale.source && `via ${sale.source}`, fmt(sale.created_at)].filter(Boolean).join(' · ')}</small></div>
+      <div className="sp-sale-card-end"><strong className="sp-amount">{sale.amount != null ? money(sale.amount, sale.currency) : '—'}</strong>
+        <Status tone={SALE_TONE[sale.status?.toLowerCase()] || 'amber'}>{sale.status || 'completed'}</Status></div>
+    </div>
   );
 
+  const tabContent = () => {
+    if (isLoading) return <div className="sp-drawer-loading">{[...Array(5)].map((_, i) => <span key={i} className="sp-skeleton" />)}</div>;
+    if (!contact) return null;
+
+    if (activeTab === 'overview') return <>
+      <h3>Record information</h3>
+      <dl>
+        <Field label="Full Name" value={contact.name} />
+        <Field label="Email" value={contact.email} copyable />
+        <Field label="Phone" value={contact.phone} />
+        <Field label="Contact ID" value={contact.contact_id} copyable />
+        <Field label="IP Address" value={contact.client_ip} />
+        <Field label="User Agent" value={contact.user_agent} copyable wrap />
+        <Field label="Session ID" value={contact.session_id} copyable />
+        <Field label="First Seen" value={contact.created_at && fmt(contact.created_at)} />
+        <Field label="Last Updated" value={contact.updated_at && fmt(contact.updated_at)} />
+        {contact.merged_children?.length > 0 && (
+          <div><dt>Stitched</dt><dd data-wrap>{contact.merged_children.map(cid => <span key={cid} className="sp-chip" data-tone="quiet">{cid}</span>)}</dd></div>
+        )}
+      </dl>
+      {contact.tags?.length > 0 && <div className="sp-drawer-tags">{contact.tags.map(tag => <Status key={tag} tone="blue">{tag}</Status>)}</div>}
+      {contact.sales?.length > 0 && <><h3 className="sp-drawer-section">Purchases</h3>{contact.sales.map(saleCard)}</>}
+    </>;
+
+    if (activeTab === 'attribution') {
+      if (!hasAttribution) return <div className="sp-drawer-empty"><TrendingUp size={28} /><p>No attribution data for this contact.</p></div>;
+      const groups = [...ATTRIBUTION_GROUPS];
+      if (attr.extra && Object.keys(attr.extra).length > 0) groups.push({ title: 'Other Parameters', fields: Object.keys(attr.extra).map(k => [k]), extra: true });
+      return groups.map(g => {
+        const rows = g.fields.map(([key, label]) => [label || key, g.extra ? attr.extra[key] : attr[key]]).filter(([, v]) => v);
+        if (!rows.length) return null;
+        return <div key={g.title} className="sp-drawer-group"><h3>{g.title}</h3><dl>
+          {rows.map(([label, value]) => <Field key={label} label={label} value={String(value)} copyable wrap />)}
+        </dl></div>;
+      });
+    }
+
+    if (activeTab === 'urls') return contact.visits?.length > 0
+      ? <ol className="sp-visits-list">{contact.visits.map(visit => <UrlVisitItem key={visit.id} visit={visit} fmt={fmt} />)}</ol>
+      : <div className="sp-drawer-empty"><Globe size={28} /><p>No URL visits recorded yet.</p></div>;
+
+    if (activeTab === 'sales') return contact.sales?.length > 0
+      ? contact.sales.map(saleCard)
+      : <div className="sp-drawer-empty"><ShoppingCart size={28} /><p>No purchases recorded yet.</p></div>;
+
+    return null;
+  };
+
   return (
-    <>
-        <DialogHeader className="px-8 pt-6 pb-0 shrink-0" style={{ background: 'linear-gradient(135deg, #e8ebf5 0%, #f2f3f9 60%, #f9f8f5 100%)', borderBottom: '1.5px solid #d2d8ef', paddingBottom: '20px' }}>
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0 flex-1">
-              <DialogTitle
-                className="text-xl font-bold mb-0.5"
-                style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--brand-navy)', letterSpacing: '-0.02em' }}
-              >
-                {isLoading ? (
-                  <Skeleton className="h-6 w-44" style={{ backgroundColor: 'rgba(3,3,82,0.12)' }} />
-                ) : (
-                  contact?.name || contact?.email || 'Anonymous Contact'
-                )}
-              </DialogTitle>
-              {isLoading ? (
-                <Skeleton className="h-3 w-72 mt-1.5" style={{ backgroundColor: 'rgba(3,3,82,0.08)' }} />
-              ) : contact ? (
-                <p className="text-xs font-mono" style={{ color: 'var(--text-dim)', fontFamily: 'IBM Plex Mono, monospace' }}>
-                  ID: {contact.contact_id}
-                </p>
-              ) : null}
-            </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              {contact && onDelete && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <button
-                      data-testid="contact-detail-delete-button"
-                      className="rounded-md p-1 hover:bg-red-500/10 transition-colors duration-150"
-                      aria-label="Delete contact"
-                      title="Delete contact"
-                      style={{ color: 'var(--red-error, #ef4444)' }}
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent
-                    style={{ backgroundColor: '#ffffff', borderColor: 'var(--stroke)', color: 'var(--text)' }}
-                  >
-                    <AlertDialogHeader>
-                      <AlertDialogTitle style={{ color: 'var(--text)' }}>Delete Contact</AlertDialogTitle>
-                      <AlertDialogDescription style={{ color: 'var(--text-muted)' }}>
-                        Are you sure you want to delete <strong style={{ color: 'var(--text)' }}>{contact.name || contact.email || 'this contact'}</strong>?
-                        This will permanently remove the contact and all their visit history.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel style={{ backgroundColor: '#ffffff', borderColor: 'var(--stroke)', color: 'var(--text)' }}>
-                        Cancel
-                      </AlertDialogCancel>
-                      <AlertDialogAction
-                        data-testid="contact-detail-confirm-delete-button"
-                        onClick={() => { onDelete(contact.contact_id); onClose(); }}
-                        style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none' }}
-                      >
-                        Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
-              <button
-                data-testid="contact-detail-modal-close-button"
-                onClick={onClose}
-                className="shrink-0 rounded-md p-1 hover:bg-white/5 transition-colors duration-150"
-                aria-label="Close"
-                style={{ color: 'var(--text-dim)' }}
-              >
-                <X size={16} />
+    <div className="sp-drawer-body">
+      <div className="sp-drawer-title">
+        <span className="sp-drawer-avatar">{isLoading ? '' : initialsOf(contact?.name || contact?.email, 'A')}</span>
+        {contact && onDelete && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <button type="button" className="sp-secondary-button sp-danger-button" data-testid="contact-detail-delete-button" aria-label="Delete contact" title="Delete contact">
+                <Trash2 size={14} /> Delete
               </button>
-            </div>
-          </div>
-        </DialogHeader>
-
-        {/* flex-1 min-h-0 = fills remaining height without ever growing the modal */}
-        <div className="flex-1 min-h-0 flex flex-col px-8 pb-8 mt-5 overflow-hidden">
-          {error ? (
-            <div className="flex items-center gap-2 py-4" style={{ color: 'var(--red-error)' }}>
-              <AlertCircle size={16} />
-              <span className="text-sm">{error.message || 'Failed to load contact data.'}</span>
-            </div>
-          ) : (() => {
-            const tabs = [
-              { id: 'overview',    label: 'Overview' },
-              { id: 'attribution', label: 'Attribution', badge: hasAttribution ? '●' : null, badgeGreen: true },
-              { id: 'urls',        label: 'URL History', badge: contact?.visits?.length || null },
-              { id: 'sales',       label: 'Sales',       badge: contact?.sales?.length  || null, badgeRed: true },
-            ];
-
-            const tabContent = () => {
-              if (isLoading) return (
-                <div className="space-y-3 pt-2">
-                  {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-xl" style={{ backgroundColor: 'var(--stroke)' }} />)}
-                </div>
-              );
-              if (!contact) return null;
-
-              if (activeTab === 'overview') return (
-                <div className="space-y-4">
-                  {/* Compact grid info table */}
-                  <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff' }}>
-                    <InfoRow icon={User}     label="Full Name"    value={contact.name}  />
-                    <InfoRow icon={Mail}     label="Email"        value={contact.email} copyable />
-                    <InfoRow icon={Phone}    label="Phone"        value={contact.phone} />
-                    <InfoRow icon={Hash}     label="Contact ID"   value={contact.contact_id} mono copyable />
-                    <InfoRow icon={Wifi}     label="IP Address"   value={contact.client_ip} mono />
-                    <InfoRow icon={Globe}    label="User Agent"   value={contact.user_agent} mono copyable />
-                    <InfoRow icon={Layers}   label="Session ID"   value={contact.session_id} mono copyable />
-                    <InfoRow icon={Calendar} label="First Seen"   value={fmt(contact.created_at)} />
-                    <InfoRow icon={Calendar} label="Last Updated" value={fmt(contact.updated_at)} />
-                    {contact.tags?.length > 0 && (
-                      <div className="grid items-start border-t" style={{ gridTemplateColumns: '148px 1fr auto', borderColor: 'var(--stroke)' }}>
-                        <div className="flex items-center gap-2 px-4 py-3" style={{ backgroundColor: '#fafaf8' }}>
-                          <Tag size={13} style={{ color: 'var(--brand-navy)' }} />
-                          <span className="text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--text-dim)' }}>Tags</span>
-                        </div>
-                        <div className="px-4 py-3 flex flex-wrap gap-1.5">
-                          {contact.tags.map(tag => (
-                            <span key={tag} className="inline-flex items-center text-xs font-bold px-2.5 py-1 rounded-full"
-                              style={{ backgroundColor: 'rgba(3,3,82,0.08)', color: '#030352', border: '1.5px solid rgba(3,3,82,0.18)' }}>
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                        <div />
-                      </div>
-                    )}
-                    {contact.merged_children?.length > 0 && (
-                      <div className="grid items-start border-t" style={{ gridTemplateColumns: '148px 1fr auto', borderColor: 'var(--stroke)' }}>
-                        <div className="flex items-center gap-2 px-4 py-3" style={{ backgroundColor: '#fafaf8' }}>
-                          <GitMerge size={13} style={{ color: 'var(--mint-success)' }} />
-                          <span className="text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--text-dim)' }}>Stitched</span>
-                        </div>
-                        <div className="px-4 py-3 flex flex-col gap-1">
-                          {contact.merged_children.map(cid => (
-                            <span key={cid} className="text-xs font-mono break-all" style={{ color: 'var(--mint-success)', fontFamily: 'IBM Plex Mono, monospace' }}>{cid}</span>
-                          ))}
-                        </div>
-                        <div />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Sale flashcard — green highlight with $ icon */}
-                  {contact.sales?.length > 0 && (
-                    <div className="space-y-2">
-                      {contact.sales.map(sale => {
-                        const fmtAmt = sale.amount != null
-                          ? new Intl.NumberFormat('en-US', { style: 'currency', currency: sale.currency || 'USD', minimumFractionDigits: 0 }).format(sale.amount)
-                          : null;
-                        return (
-                          <div key={sale.id} className="relative rounded-2xl overflow-hidden border px-5 py-4"
-                            style={{ backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' }}>
-                            <div className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center"
-                              style={{ backgroundColor: 'rgba(5,150,105,0.15)' }}>
-                              <DollarSign size={16} style={{ color: '#059669' }} />
-                            </div>
-                            {fmtAmt && (
-                              <div className="text-2xl font-bold tabular-nums mb-0.5 pr-12"
-                                style={{ color: '#065f46', fontFamily: 'Space Grotesk, sans-serif', letterSpacing: '-0.03em' }}>
-                                {fmtAmt}
-                              </div>
-                            )}
-                            <div className="text-sm font-semibold pr-12" style={{ color: '#065f46' }}>{sale.product || 'Purchase'}</div>
-                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                              <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full"
-                                style={{ backgroundColor: 'rgba(5,150,105,0.15)', color: '#065f46' }}>
-                                <CheckCircle2 size={10} />{sale.status || 'completed'}
-                              </span>
-                              {sale.source && <span className="text-xs font-medium" style={{ color: '#059669', opacity: 0.75 }}>via {sale.source}</span>}
-                              <span className="text-xs" style={{ color: '#059669', opacity: 0.6 }}>
-                                {new Date(sale.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-
-              if (activeTab === 'attribution') return (
-                <div className="space-y-4">
-                  {hasAttribution ? (<>
-                    {(contact.attribution?.utm_source || contact.attribution?.utm_medium || contact.attribution?.utm_campaign || contact.attribution?.utm_term || contact.attribution?.utm_content || contact.attribution?.utm_id) && (
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-widest mb-2 px-1" style={{ color: 'var(--text-dim)' }}>UTM Parameters</p>
-                        <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff' }}>
-                          <AttrRow label="utm_source" value={contact.attribution?.utm_source} />
-                          <AttrRow label="utm_medium" value={contact.attribution?.utm_medium} />
-                          <AttrRow label="utm_campaign" value={contact.attribution?.utm_campaign} />
-                          <AttrRow label="utm_term" value={contact.attribution?.utm_term} />
-                          <AttrRow label="utm_content" value={contact.attribution?.utm_content} />
-                          <AttrRow label="utm_id" value={contact.attribution?.utm_id} />
-                        </div>
-                      </div>
-                    )}
-                    {(contact.attribution?.campaign_id || contact.attribution?.adset_id || contact.attribution?.ad_id || contact.attribution?.fb_ad_set_id || contact.attribution?.google_campaign_id) && (
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-widest mb-2 px-1" style={{ color: 'var(--text-dim)' }}>Ad Platform IDs</p>
-                        <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff' }}>
-                          <AttrRow label="campaign_id" value={contact.attribution?.campaign_id} />
-                          <AttrRow label="adset_id" value={contact.attribution?.adset_id} />
-                          <AttrRow label="ad_id" value={contact.attribution?.ad_id} />
-                          <AttrRow label="fb_ad_set_id" value={contact.attribution?.fb_ad_set_id} />
-                          <AttrRow label="google_campaign_id" value={contact.attribution?.google_campaign_id} />
-                        </div>
-                      </div>
-                    )}
-                    {(contact.attribution?.fbclid || contact.attribution?.fbc || contact.attribution?.fbp || contact.attribution?.gclid || contact.attribution?.ttclid || contact.attribution?.source_link_tag) && (
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-widest mb-2 px-1" style={{ color: 'var(--text-dim)' }}>Click IDs & FB Cookies</p>
-                        <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff' }}>
-                          <AttrRow label="fbclid" value={contact.attribution?.fbclid} />
-                          <AttrRow label="fbc (FB Click)" value={contact.attribution?.fbc} />
-                          <AttrRow label="fbp (FB Browser)" value={contact.attribution?.fbp} />
-                          <AttrRow label="gclid" value={contact.attribution?.gclid} />
-                          <AttrRow label="ttclid" value={contact.attribution?.ttclid} />
-                          <AttrRow label="source_link_tag" value={contact.attribution?.source_link_tag} />
-                        </div>
-                      </div>
-                    )}
-                    {contact.attribution?.extra && Object.keys(contact.attribution.extra).length > 0 && (
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-widest mb-2 px-1" style={{ color: 'var(--text-dim)' }}>Other Parameters</p>
-                        <div className="rounded-xl border divide-y" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff' }}>
-                          {Object.entries(contact.attribution.extra).map(([k, v]) => <AttrRow key={k} label={k} value={v} />)}
-                        </div>
-                      </div>
-                    )}
-                  </>) : (
-                    <div className="flex flex-col items-center justify-center py-12 gap-2" style={{ color: 'var(--text-dim)' }}>
-                      <TrendingUp size={32} /><p className="text-sm">No attribution data for this contact.</p>
-                    </div>
-                  )}
-                </div>
-              );
-
-              if (activeTab === 'urls') return contact.visits?.length > 0 ? (
-                <ScrollArea className="h-[400px]">
-                  <div className="url-timeline-rail pr-4">
-                    {contact.visits.map((visit, i) => <UrlVisitItem key={visit.id} visit={visit} index={i} />)}
-                  </div>
-                </ScrollArea>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12 gap-2" style={{ color: 'var(--text-dim)' }}>
-                  <Globe size={32} /><p className="text-sm">No URL visits recorded yet.</p>
-                </div>
-              );
-
-              if (activeTab === 'sales') return contact.sales?.length > 0 ? (
-                <div className="space-y-3">
-                  {contact.sales.map(sale => {
-                    const scMap = {
-                      completed: { bg: '#ecfdf5', text: '#065f46', border: '#a7f3d0', icon: CheckCircle2 },
-                      paid:      { bg: '#ecfdf5', text: '#065f46', border: '#a7f3d0', icon: CheckCircle2 },
-                      refunded:  { bg: '#fef2f2', text: '#991b1b', border: '#fecaca', icon: XCircle },
-                      failed:    { bg: '#fef2f2', text: '#991b1b', border: '#fecaca', icon: XCircle },
-                    };
-                    const sc = scMap[sale.status?.toLowerCase()] || { bg: '#fffbeb', text: '#92400e', border: '#fcd34d', icon: Clock };
-                    const SI = sc.icon;
-                    return (
-                      <div key={sale.id} className="rounded-2xl border overflow-hidden" style={{ borderColor: sc.border, backgroundColor: sc.bg }}>
-                        <div className="flex items-start justify-between gap-4 px-5 py-4">
-                          <div className="flex items-start gap-3">
-                            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: 'rgba(3,3,82,0.10)' }}>
-                              <ShoppingCart size={17} style={{ color: '#030352' }} />
-                            </div>
-                            <div>
-                              <p className="text-sm font-bold" style={{ color: '#030352', fontFamily: 'Space Grotesk, sans-serif' }}>{sale.product || 'Purchase'}</p>
-                              {sale.source && <p className="text-xs font-medium mt-0.5" style={{ color: 'var(--text-dim)' }}>via {sale.source}</p>}
-                            </div>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className="text-xl font-bold tabular-nums" style={{ color: '#030352', fontFamily: 'Space Grotesk, sans-serif', letterSpacing: '-0.02em' }}>
-                              {sale.amount != null ? new Intl.NumberFormat('en-US', { style: 'currency', currency: sale.currency || 'USD', minimumFractionDigits: 0 }).format(sale.amount) : '—'}
-                            </p>
-                            <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full mt-1" style={{ backgroundColor: 'rgba(3,3,82,0.08)', color: sc.text }}>
-                              <SI size={10} />{sale.status || 'completed'}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="px-5 pb-3">
-                          <p className="text-xs font-medium" style={{ color: sc.text, opacity: 0.7 }}>
-                            {new Date(sale.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12 gap-2" style={{ color: 'var(--text-dim)' }}>
-                  <ShoppingCart size={32} /><p className="text-sm">No purchases recorded yet.</p>
-                </div>
-              );
-
-              return null;
-            };
-
-            return (
-              <>
-                {/* Spring pill tab bar — shrink-0 so it never flexes */}
-                <div className="flex items-center gap-0.5 p-1 rounded-xl mb-5 relative shrink-0"
-                  style={{ backgroundColor: '#f0f1f8', border: '1px solid var(--stroke)', width: 'fit-content' }}>
-                  {tabs.map(tab => (
-                    <button
-                      key={tab.id}
-                      data-testid={`contact-${tab.id}-tab`}
-                      onClick={() => setActiveTab(tab.id)}
-                      className="relative px-4 py-1.5 text-sm font-medium rounded-lg z-10 flex items-center gap-1.5"
-                      style={{ color: activeTab === tab.id ? '#ffffff' : 'var(--text-muted)' }}
-                    >
-                      {activeTab === tab.id && (
-                        <motion.div
-                          layoutId="modal-tab-pill"
-                          className="absolute inset-0 rounded-lg"
-                          style={{ backgroundColor: 'var(--brand-navy)' }}
-                          transition={{ type: 'spring', stiffness: 500, damping: 40 }}
-                        />
-                      )}
-                      <span className="relative z-10">{tab.label}</span>
-                      {tab.badge && (
-                        <span className="relative z-10 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-xs font-bold rounded-full"
-                          style={{
-                            backgroundColor: activeTab === tab.id
-                              ? (tab.badgeRed ? '#A31800' : 'rgba(255,255,255,0.25)')
-                              : (tab.badgeGreen ? 'rgba(5,150,105,0.15)' : tab.badgeRed ? 'rgba(163,24,0,0.12)' : 'rgba(3,3,82,0.12)'),
-                            color: activeTab === tab.id ? '#fff'
-                              : (tab.badgeGreen ? '#059669' : tab.badgeRed ? '#A31800' : '#030352'),
-                          }}>
-                          {tab.badge === '●' ? '●' : tab.badge}
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Fixed-height animated content — flex-1 min-h-0 fills remaining space, overflow-y-auto scrolls */}
-                <div className="flex-1 min-h-0 overflow-y-auto relative">
-                  <AnimatePresence mode="wait" initial={false}>
-                    <motion.div
-                      key={activeTab}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.15, ease: 'easeInOut' }}
-                      className="h-full"
-                    >
-                      {tabContent()}
-                    </motion.div>
-                  </AnimatePresence>
-                </div>
-              </>
-            );
-          })()}
-        </div>
-    </>
+            </AlertDialogTrigger>
+            <AlertDialogContent className="sp-dialog">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Contact</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete <strong>{contact.name || contact.email || 'this contact'}</strong>?
+                  This will permanently remove the contact and all their visit history.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel className="sp-secondary-button">Cancel</AlertDialogCancel>
+                <AlertDialogAction data-testid="contact-detail-confirm-delete-button" className="sp-danger-solid"
+                  onClick={() => { onDelete(contact.contact_id); onClose(); }}>
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+      </div>
+      {isLoading ? <span className="sp-skeleton sp-skeleton-title" /> : <h2>{title}</h2>}
+      {contact?.email && contact?.name && <p>{contact.email}</p>}
+      {contact && <p className="sp-drawer-id">ID: {contact.contact_id}</p>}
+      {error ? (
+        <div className="sp-drawer-note sp-drawer-error"><AlertCircle size={17} /><span>{error.message || 'Failed to load contact data.'}</span></div>
+      ) : <>
+        <DrawerTabs tabs={tabs} active={activeTab} onChange={setActiveTab} />
+        <div className="sp-drawer-panel">{tabContent()}</div>
+      </>}
+    </div>
   );
 };
 
-
-// ── ContactDetailModal — stable Dialog shell ──────────────────────────────────
-// Dialog + DialogContent stay mounted for the entire open → close lifecycle.
-// Only ModalInner remounts when contactId changes, keeping the overlay stable.
+// ── ContactDetailModal — the prototype's detail drawer ───────────────────────
+// The drawer stays mounted for the open → close lifecycle; only the inner part remounts when contactId changes.
 export const ContactDetailModal = ({ contactId, defaultTab = 'overview', open, onClose, onDelete }) => (
-  <Dialog open={open} onOpenChange={onClose}>
-    <DialogContent
-      hideClose
-      data-testid="contact-detail-modal"
-      className="max-w-4xl p-0 border flex flex-col overflow-hidden"
-      style={{
-        backgroundColor: '#ffffff',
-        borderColor: 'var(--stroke)',
-        color: 'var(--text)',
-        height: '680px',
-        maxHeight: '92vh',
-        boxShadow: 'var(--shadow)',
-      }}
-    >
-      {open && contactId ? (
-        <ModalInner
-          key={contactId}
-          contactId={contactId}
-          defaultTab={defaultTab}
-          onClose={onClose}
-          onDelete={onDelete}
-        />
-      ) : null}
-    </DialogContent>
-  </Dialog>
+  <Drawer open={open} onClose={onClose} eyebrow="Contact / details" label="Contact details"
+    testId="contact-detail-modal" closeTestId="contact-detail-modal-close-button">
+    {open && contactId ? (
+      <ContactInner key={contactId} contactId={contactId} defaultTab={defaultTab} onClose={onClose} onDelete={onDelete} />
+    ) : null}
+  </Drawer>
 );

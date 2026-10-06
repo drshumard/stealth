@@ -1,14 +1,12 @@
 import { useState, useMemo } from 'react';
-import { RefreshCw, Copy, Filter, X, CalendarDays, Loader2, FileText } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RefreshCw, Copy, X, CalendarDays, Loader2, FileText, Search, ChevronDown } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
 import { ContactsTable } from '@/components/ContactsTable';
 import { useTimezone } from '@/components/TimezoneContext';
 import { exportLeadsToPdf } from '@/utils/pdfExport';
+import { PageIntro, SurfaceHead, count } from '@/workspace/ui';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
 
@@ -120,182 +118,77 @@ export default function LeadsPage({ contacts, loading, initialLoad, stats, onRef
     }
   };
 
-  return (
-    <div className="p-8 md:p-10">
-      {/* Page header */}
-      <div className="rounded-2xl px-8 py-7 mb-8 relative overflow-hidden"
-        style={{ background: 'linear-gradient(135deg, #e8ebf5 0%, #f2f3f9 50%, #f9f8f5 100%)', border: '1.5px solid #d2d8ef' }}>
-        <div className="absolute -right-6 -bottom-6 opacity-[0.05] pointer-events-none text-[140px] font-bold select-none"
-          style={{ color: '#030352', fontFamily: 'Space Grotesk, sans-serif' }} aria-hidden>✉</div>
-        <div className="relative z-10 flex items-start justify-between">
-          <div>
-            <h1 className="text-4xl font-bold" style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--brand-navy)', letterSpacing: '-0.02em' }}>Leads</h1>
-            <p className="text-base mt-1 font-semibold" style={{ color: 'var(--brand-navy)', opacity: 0.6 }}>
-              {identified.length} identified contact{identified.length !== 1 ? 's' : ''}
-            </p>
-          </div>
-          <div className="flex items-center gap-2 mt-1">
-            <Button
-              variant="outline" size="sm"
-              className="gap-2 h-10 px-4 text-sm font-semibold"
-              style={{ borderColor: 'var(--brand-navy)', color: 'var(--brand-navy)', backgroundColor: 'rgba(255,255,255,0.7)' }}
-              onClick={handleExportPdf}
-              disabled={exporting || filtered.length === 0}
-            >
-              {exporting ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
-              Export PDF
-              {(selectedIds.size > 0 ? selectedIds.size : filtered.length) > 0 && (
-                <span className="text-xs font-bold px-1.5 py-0.5 rounded-full ml-0.5"
-                  style={{ backgroundColor: 'rgba(3,3,82,0.10)', color: '#030352' }}>
-                  {selectedIds.size > 0 ? selectedIds.size : filtered.length}
-                  {selectedIds.size > 0 ? ' selected' : ''}
-                </span>
-              )}
-            </Button>
-            <Button
-              data-testid="leads-copy-script-button" size="sm"
-              className="gap-2 h-10 px-5 text-sm font-semibold text-white"
-              style={{ backgroundColor: 'var(--brand-red)' }}
-              onClick={handleCopyScript}
-            >
-              <Copy size={14} /> Copy Script
-            </Button>
-          </div>
-        </div>
-      </div>
+  const exportCount = selectedIds.size > 0 ? selectedIds.size : filtered.length;
 
-      {/* Table card */}
-      <div className="rounded-2xl border" style={{ borderColor: 'var(--stroke)', backgroundColor: '#ffffff', boxShadow: '0 4px 20px rgba(3,3,82,0.06)' }}>
-        {/* Toolbar */}
-        <div className="flex items-center gap-3 px-6 py-5 border-b flex-wrap"
-          style={{ borderColor: 'var(--stroke)', background: 'linear-gradient(to bottom, #f7f6f2, #ffffff)' }}>
-          {/* Filter icon */}
-          <div className="flex items-center gap-1.5 shrink-0" style={{ color: 'var(--text-dim)' }}>
-            <Filter size={14} />
-            <span className="text-xs font-semibold">Filter</span>
-            {activeFilters > 0 && (
-              <span className="inline-flex items-center justify-center w-4 h-4 text-xs font-bold rounded-full"
-                style={{ backgroundColor: 'rgba(3,3,82,0.12)', color: '#030352' }}>
-                {activeFilters}
-              </span>
-            )}
-          </div>
-
-          {/* Search */}
-          <div className="relative flex-1 min-w-[200px] max-w-xs">
-            <Filter size={13} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-dim)' }} />
-            <Input
-              data-testid="leads-filter-search-input"
-              placeholder="Search name, email, phone…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-10 h-9 text-sm font-medium bg-white"
-              style={{ borderColor: 'var(--stroke)', color: 'var(--text)' }}
-            />
-          </div>
-
-          {/* Source */}
-          <Select value={srcFilter} onValueChange={setSrc}>
-            <SelectTrigger data-testid="leads-filter-source-select" className="h-9 text-sm w-36 font-medium bg-white" style={{ borderColor: 'var(--stroke)' }}>
-              <SelectValue placeholder="All sources" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all" className="text-sm">All sources</SelectItem>
-              {sources.map(s => <SelectItem key={s} value={s} className="text-sm">{s}</SelectItem>)}
-            </SelectContent>
-          </Select>
-
-          {/* Date range select */}
-          <Select value={dateRange} onValueChange={handleDateRangeChange}>
-            <SelectTrigger data-testid="leads-filter-date-range" className="h-9 text-sm w-40 font-medium bg-white" style={{ borderColor: 'var(--stroke)' }}>
-              <SelectValue>
-                {dateRange === 'custom' ? dateLabel('custom', customRange) || 'Custom range…'
-                  : DATE_OPTIONS.find(o => o.value === dateRange)?.label}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {DATE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value} className="text-sm">{o.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
-
-          {/* Calendar picker */}
-          <Popover open={calOpen} onOpenChange={setCalOpen}>
-            <PopoverTrigger asChild>
-              <button
-                className="h-9 px-3 text-sm font-medium rounded-lg border flex items-center gap-1.5 transition-colors bg-white"
-                style={{
-                  borderColor: dateRange === 'custom' && customRange ? 'var(--brand-navy)' : 'var(--stroke)',
-                  color:       dateRange === 'custom' && customRange ? 'var(--brand-navy)' : 'var(--text-dim)',
-                }}
-                onClick={() => { setDateRange('custom'); setCalOpen(true); }}
-              >
-                <CalendarDays size={14} />
-                {dateRange === 'custom' && customRange ? dateLabel('custom', customRange) : 'Pick dates'}
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start"
-              style={{ backgroundColor: '#ffffff', border: '1.5px solid var(--stroke)', borderRadius: '16px', boxShadow: 'var(--shadow)' }}>
-              <Calendar
-                mode="range"
-                selected={customRange}
-                onSelect={range => {
-                  setCustomRange(range);
-                  if (range?.from) {
-                    setDateRange('custom');
-                    if (range.to) setCalOpen(false);
-                  }
-                }}
-                numberOfMonths={2}
-                initialFocus
-              />
-              <div className="px-4 pb-3 flex items-center justify-between">
-                <span className="text-xs" style={{ color: 'var(--text-dim)' }}>
-                  {customRange?.from
-                    ? `${customRange.from.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}${customRange.to ? ' → ' + customRange.to.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ' → pick end'}`
-                    : 'Select start date'}
-                </span>
-                {customRange && (
-                  <button className="text-xs font-semibold" style={{ color: 'var(--brand-red)' }}
-                    onClick={() => { setCustomRange(null); setDateRange('all'); setCalOpen(false); }}>
-                    Clear
-                  </button>
-                )}
-              </div>
-            </PopoverContent>
-          </Popover>
-
-          {(activeFilters > 0 || search) && (
-            <button onClick={() => { setSrc('all'); setDateRange('all'); setCustomRange(null); setSearch(''); }}
-              className="flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg border transition-colors bg-white"
-              style={{ color: 'var(--text-muted)', borderColor: 'var(--stroke)' }}>
-              <X size={13} /> Clear
+  // Leads — design: the prototype's Leads directory. Identified contacts (an email, phone or name) from the newest
+  // 10,000 the API returns, with the live page's filters, PDF export and tracking script.
+  return <>
+    <PageIntro eyebrow="Acquisition / People" title="Leads"
+      description="A focused view of identified contacts and the next step in their journey."
+      actions={<span className="sp-actions">
+        <button type="button" className="sp-secondary-button" onClick={handleExportPdf} disabled={exporting || filtered.length === 0}>
+          {exporting ? <Loader2 size={15} className="sp-spin" /> : <FileText size={15} />} Export PDF
+          {exportCount > 0 && <span className="sp-button-count">{count(exportCount)}{selectedIds.size > 0 ? ' selected' : ''}</span>}
+        </button>
+        <button type="button" data-testid="leads-copy-script-button" className="sp-primary-button" onClick={handleCopyScript}><Copy size={15} /> Copy script</button>
+      </span>} />
+    <section className="sp-surface" aria-label="Leads list">
+      <SurfaceHead eyebrow="Directory" title="All leads"><span className="sp-count">{count(identified.length)} identified</span></SurfaceHead>
+      <div className="sp-toolbar">
+        <label className="sp-search"><Search size={17} aria-hidden="true" /><span className="sr-only">Search leads</span>
+          <input data-testid="leads-filter-search-input" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, email, phone…" /></label>
+        <label className="sp-select-wrap"><span className="sr-only">Filter by source</span>
+          <select data-testid="leads-filter-source-select" value={srcFilter} onChange={e => setSrc(e.target.value)}>
+            <option value="all">All sources</option>{sources.map(s => <option key={s} value={s}>{s}</option>)}
+          </select><ChevronDown size={15} aria-hidden="true" /></label>
+        <label className="sp-select-wrap"><span className="sr-only">Date range</span>
+          <select data-testid="leads-filter-date-range" value={dateRange} onChange={e => handleDateRangeChange(e.target.value)}>
+            {DATE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.value === 'custom' && dateRange === 'custom' && customRange ? dateLabel('custom', customRange) : o.label}</option>)}
+          </select><ChevronDown size={15} aria-hidden="true" /></label>
+        <Popover open={calOpen} onOpenChange={setCalOpen}>
+          <PopoverTrigger asChild>
+            <button type="button" className="sp-secondary-button" data-active={(dateRange === 'custom' && !!customRange) || undefined}
+              onClick={() => { setDateRange('custom'); setCalOpen(true); }}>
+              <CalendarDays size={15} /> {dateRange === 'custom' && customRange ? dateLabel('custom', customRange) : 'Pick dates'}
             </button>
-          )}
-
-          <div className="ml-auto flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={onRefresh} className="h-9 w-9 p-0 rounded-lg" style={{ color: 'var(--text-dim)' }}>
-              <RefreshCw size={14} />
-            </Button>
-            <span className="text-sm font-bold tabular-nums" style={{ color: 'var(--brand-navy)' }}>
-              {filtered.length} results
-            </span>
-          </div>
-        </div>
-
-        {/* Table */}
-        <div className="px-6 py-5">
-          <ContactsTable
-            contacts={filtered}
-            loading={loading}
-            initialLoad={initialLoad}
-            onSelectContact={onSelectContact}
-            onCopyScript={handleCopyScript}
-            onBulkDelete={onBulkDelete}
-            hideSearch
-            onSelectionChange={setSelectedIds}
-          />
-        </div>
+          </PopoverTrigger>
+          <PopoverContent className="sp-popover w-auto p-0" align="start">
+            <Calendar mode="range" selected={customRange} numberOfMonths={2} initialFocus
+              onSelect={range => {
+                setCustomRange(range);
+                if (range?.from) {
+                  setDateRange('custom');
+                  if (range.to) setCalOpen(false);
+                }
+              }} />
+            <div className="sp-popover-foot">
+              <span>{customRange?.from
+                ? `${customRange.from.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}${customRange.to ? ' → ' + customRange.to.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}`
+                : 'Select start date'}</span>
+              {customRange && <button type="button" className="sp-clear" onClick={() => { setCustomRange(null); setDateRange('all'); setCalOpen(false); }}>Clear</button>}
+            </div>
+          </PopoverContent>
+        </Popover>
+        {(activeFilters > 0 || search) && (
+          <button type="button" className="sp-clear" onClick={() => { setSrc('all'); setDateRange('all'); setCustomRange(null); setSearch(''); }}>
+            <X size={13} /> Clear filters
+          </button>
+        )}
+        <span className="sp-toolbar-end">
+          <button type="button" className="sp-icon-button" onClick={onRefresh} aria-label="Refresh leads"><RefreshCw size={15} /></button>
+          <span className="sp-count">{count(filtered.length)} results</span>
+        </span>
       </div>
-    </div>
-  );
+      <ContactsTable
+        contacts={filtered}
+        loading={loading}
+        initialLoad={initialLoad}
+        onSelectContact={onSelectContact}
+        onCopyScript={handleCopyScript}
+        onBulkDelete={onBulkDelete}
+        hideSearch
+        onSelectionChange={setSelectedIds}
+      />
+    </section>
+  </>;
 }
