@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { Download, Loader2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTimezone } from '@/components/TimezoneContext';
-import { API, PALETTE, downloadCsv, fmtHours, fmtNum, fmtPct, getAnalytics, qs, useA } from '../lib';
+import { API, PALETTE, SHOW_SALES, downloadCsv, fmtHours, fmtNum, fmtPct, getAnalytics, qs, useA, withoutSales } from '../lib';
 import { BarList, DataTable, Funnel, Histogram, Legend, Panel, Select, StackedChart } from '../charts';
-import { useSeries } from './Overview';
+import { funnelSteps, useSeries } from './Overview';
 
 const DIMS = [
   { value: 'source', label: 'Source' }, { value: 'campaign', label: 'Campaign' }, { value: 'content', label: 'Ad' },
@@ -37,13 +37,13 @@ export default function Leads({ state, update, onSelectContact }) {
       <div data-tone="bad"><span>Abandon rate</span><strong>{fmtPct(a?.abandon_rate)}</strong></div>
       <div><span>Median time to identify</span><strong>{fmtHours(t?.to_identify?.median_hours)}</strong></div>
       <div><span>Median time to register</span><strong>{fmtHours(t?.to_register?.median_hours)}</strong></div>
-      <div><span>Median time to purchase</span><strong>{fmtHours(t?.to_purchase?.median_hours)}</strong></div>
+      {SHOW_SALES && <div><span>Median time to purchase</span><strong>{fmtHours(t?.to_purchase?.median_hours)}</strong></div>}
     </div>
     <p className="an-note an-note-top">Abandoned = gave an email or phone but has no <code>stealth</code> or <code>registered</code> tag — they never completed registration.</p>
 
     <div className="an-grid an-grid-2">
       <Panel help="journey" title="Funnel" eyebrow="People first seen in this period" query={funnel} empty={!funnel.data?.steps?.[0]?.count}>
-        {funnel.data && <Funnel steps={funnel.data.steps} />}
+        {funnel.data && <Funnel steps={funnelSteps(funnel.data.steps)} />}
       </Panel>
       <Panel help="abandoned" title="Registered vs abandoned" eyebrow="Leads by the day they were identified" query={ts} empty={!series.length}
         footer={<Legend items={[{ label: 'Registered', color: PALETTE[1] }, { label: 'Abandoned', color: PALETTE[4] }]} />}>
@@ -56,7 +56,7 @@ export default function Leads({ state, update, onSelectContact }) {
       <DataTable rows={dimRows} rowKey={r => String(r.raw)} defaultSort={{ key: 'abandoned', dir: 'desc' }} maxRows={15}
         exportName={`abandonment-by-${dim}-${state.since}-${state.until}`}
         onRowClick={['weekday', 'hour', 'device', 'browser', 'os'].includes(dim) ? undefined : r => update({ [dim]: String(r.raw), tab: 'leads' })}
-        columns={[
+        columns={withoutSales([
           { key: 'key', label: DIMS.find(d => d.value === dim)?.label, render: r => <strong className="an-key" title={r.key}>{r.key}</strong>, sortValue: r => String(r.key) },
           { key: 'contacts', label: 'People', fmt: 'num' },
           { key: 'identified', label: 'Identified', fmt: 'num' },
@@ -65,7 +65,7 @@ export default function Leads({ state, update, onSelectContact }) {
           { key: 'abandon_rate', label: 'Abandon rate', fmt: 'pct', render: r => <span className="an-rate" data-tone={r.abandon_rate > 0.3 ? 'bad' : r.abandon_rate > 0.15 ? 'mid' : 'good'}>{fmtPct(r.abandon_rate)}</span> },
           { key: 'buyers', label: 'Buyers', fmt: 'num' },
           { key: 'revenue', label: 'Revenue', fmt: 'money' },
-        ]} />
+        ])} />
     </Panel>
 
     <div className="an-grid an-grid-2">
@@ -85,12 +85,14 @@ export default function Leads({ state, update, onSelectContact }) {
       <Panel help="timing" title="Time to register" eyebrow={`First visit → webinar registration · ${fmtNum(t?.to_register?.n)} people`} query={timing} empty={!t?.to_register?.n}>
         {t && <Histogram rows={t.to_register.histogram} label="people" color={PALETTE[1]} />}
       </Panel>
+      {SHOW_SALES && <>
       <Panel help="timing" title="Time to purchase" eyebrow={`First visit → first sale · ${fmtNum(t?.to_purchase?.n)} buyers`} query={timing} empty={!t?.to_purchase?.n}>
         {t && <Histogram rows={t.to_purchase.histogram} label="buyers" color={PALETTE[2]} />}
       </Panel>
       <Panel help="timing" title="Visits before buying" eyebrow={`Page views up to the first sale · median ${fmtNum(t?.visits_before_purchase?.median)}`} query={timing} empty={!t?.visits_before_purchase?.n}>
         {t && <Histogram rows={t.visits_before_purchase.histogram} label="buyers" color={PALETTE[3]} />}
       </Panel>
+      </>}
     </div>
 
     <Panel help="abandoned" title="Abandoned leads" eyebrow={`${fmtNum(a?.matching)} people · identified in this period, never registered`} query={people}

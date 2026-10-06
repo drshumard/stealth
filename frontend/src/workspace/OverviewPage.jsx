@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowDownRight, ArrowRight, ArrowUpRight, Check, DollarSign, Globe2, ShieldCheck, Users } from 'lucide-react';
 import { useTimezone } from '@/components/TimezoneContext';
+import { SHOW_SALES } from '@/analytics/lib';
 import { Metric, SurfaceHead, count, money } from './ui';
 
 const API = `${process.env.REACT_APP_BACKEND_URL || ''}/api`;
@@ -52,12 +53,12 @@ export default function OverviewPage({ stats, onSelectContact }) {
         <div><span>04</span><strong>Sale connected</strong><ArrowUpRight size={17} /></div>
       </div>
     </div>
-    <div className="sp-metrics">
+    <div className={`sp-metrics${SHOW_SALES ? '' : ' sp-metrics-three'}`}>
       <Metric icon={Globe2} label="Tracked visits" value={count(stats.total_visits)} detail="Across connected pages" />
       <Metric icon={Users} label="Identified leads" value={count(stats.total_identified)} detail="Known people" tone="aqua" />
       <Metric icon={ShieldCheck} label="Registrations" value={count(stats.total_registrations)} detail="StealthWebinar" tone="amber" />
-      <Metric icon={DollarSign} label="Connected sales" value={stats.total_revenue == null ? '—' : money(stats.total_revenue)}
-        detail={stats.total_sales == null ? 'Revenue' : `${count(stats.total_sales)} sales`} tone="green" />
+      {SHOW_SALES && <Metric icon={DollarSign} label="Connected sales" value={stats.total_revenue == null ? '—' : money(stats.total_revenue)}
+        detail={stats.total_sales == null ? 'Revenue' : `${count(stats.total_sales)} sales`} tone="green" />}
     </div>
     <div className="sp-overview-grid">
       <section className="sp-surface">

@@ -1,9 +1,14 @@
 import { useMemo } from 'react';
-import { METRICS, PALETTE, fmtNum, fmtPct, useA } from '../lib';
+import { METRICS, PALETTE, SALES_KEYS, SHOW_SALES, fmtNum, fmtPct, useA } from '../lib';
 import { BarList, Donut, Funnel, Heatmap, Kpi, Legend, Panel, Segmented, Select, StackedChart, TrendChart } from '../charts';
 
 const KPIS = ['visitors', 'new_visitors', 'returning_visitors', 'visits', 'identified', 'abandoned', 'registrations', 'sales',
-  'revenue', 'identification_rate', 'registration_rate', 'bounce_rate', 'pages_per_session', 'avg_session_seconds'];
+  'revenue', 'identification_rate', 'registration_rate', 'bounce_rate', 'pages_per_session', 'avg_session_seconds']
+  .filter(k => SHOW_SALES || !SALES_KEYS.includes(k));
+export const HEAT_METRICS = [{ value: 'visits', label: 'Page views' }, { value: 'identified', label: 'Identifications' },
+  { value: 'registrations', label: 'Registrations' }, ...(SHOW_SALES ? [{ value: 'sales', label: 'Sales' }] : [])];
+// The funnel without its "Purchased" step while sales are hidden.
+export const funnelSteps = steps => (SHOW_SALES ? steps : steps.filter(s => s.step !== 'Purchased'));
 
 // Rates per bucket, so they can be charted like counts.
 export function enrich(series = []) {
@@ -23,16 +28,16 @@ export function useSeries(state, extra = {}) {
 }
 
 export default function Overview({ state, update, drill }) {
-  const ov = useA('/overview', state);
+  const ov = useA('/overview', state, { compare: state.compare ? 1 : '' });
   const { ts, gran, series, prevSeries } = useSeries(state);
   const funnel = useA('/funnel', state);
-  const heatMetric = state.params.get('hm') || 'visits';
+  const heatMetric = HEAT_METRICS.some(h => h.value === state.params.get('hm')) ? state.params.get('hm') : 'visits';
   const heat = useA('/heatmap', state, { metric: heatMetric });
   const sources = useA('/breakdown', state, { dimension: 'source', base: 'contacts', limit: 12 });
   const devices = useA('/breakdown', state, { dimension: 'device', base: 'contacts' });
   const pages = useA('/breakdown', state, { dimension: 'page', base: 'visits', limit: 8, sort: 'visitors' });
 
-  const selected = (state.params.get('m') || 'visitors,identified').split(',').filter(m => METRICS[m]).slice(0, 3);
+  const selected = (state.params.get('m') || 'visitors,identified').split(',').filter(m => METRICS[m] && KPIS.includes(m)).slice(0, 3);
   const kind = state.params.get('ck') || 'area';
   const toggle = m => {
     const next = selected.includes(m) ? selected.filter(x => x !== m) : [...selected, m].slice(-3);
@@ -43,7 +48,7 @@ export default function Overview({ state, update, drill }) {
   const sparkMetric = m => (series[0] && m in series[0] ? m : null);
 
   return <>
-    <div className="an-kpis">
+    <div className="an-kpis" style={{ '--kpi-cols': Math.ceil(KPIS.length / 2) }}>
       {KPIS.map(m => (
         <Kpi key={m} metric={m} cur={cur[m]} prev={prv[m]} compare={state.compare && !!ov.data} active={selected.includes(m)}
           onClick={() => toggle(m)} series={sparkMetric(m) ? series : null} />
@@ -67,8 +72,8 @@ export default function Overview({ state, update, drill }) {
           keys={['New', 'Returning']} gran={gran} kind="bar" colors={[PALETTE[0], PALETTE[2]]} />
       </Panel>
       <Panel help="journey" title="Journey" eyebrow="People first seen in this period" query={funnel} empty={!funnel.data?.steps?.[0]?.count}
-        footer={funnel.data && <small>{fmtNum(funnel.data.abandoned)} identified but never registered · ${fmtNum(funnel.data.revenue)} lifetime revenue from this group</small>}>
-        {funnel.data && <Funnel steps={funnel.data.steps} />}
+        footer={funnel.data && <small>{fmtNum(funnel.data.abandoned)} identified but never registered{SHOW_SALES && <> · ${fmtNum(funnel.data.revenue)} lifetime revenue from this group</>}</small>}>
+        {funnel.data && <Funnel steps={funnelSteps(funnel.data.steps)} />}
       </Panel>
     </div>
 
@@ -81,8 +86,7 @@ export default function Overview({ state, update, drill }) {
       </Panel>
       <Panel help="heatmap" title="When it happens" eyebrow="Weekday × hour" query={heat}
         actions={<Select label="Heatmap metric" value={heatMetric} onChange={v => update({ hm: v === 'visits' ? null : v })}
-          options={[{ value: 'visits', label: 'Page views' }, { value: 'identified', label: 'Identifications' },
-            { value: 'registrations', label: 'Registrations' }, { value: 'sales', label: 'Sales' }]} />}>
+          options={HEAT_METRICS} />}>
         {heat.data && <Heatmap days={heat.data.days} grid={heat.data.grid} label={{ visits: 'page views', identified: 'identifications', registrations: 'registrations', sales: 'sales' }[heatMetric]} />}
       </Panel>
     </div>

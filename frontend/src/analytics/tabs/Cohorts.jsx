@@ -1,5 +1,5 @@
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { PALETTE, bucketLabel, fmtCompact, fmtNum, fmtPct, useA } from '../lib';
+import { PALETTE, SHOW_SALES, bucketLabel, fmtCompact, fmtNum, fmtPct, useA } from '../lib';
 import { CohortMatrix, Legend, Panel, Segmented, Select } from '../charts';
 
 // Cohorts ignore the period picker: they are the last N weeks / months of people, by when they were first seen.
@@ -36,7 +36,7 @@ export default function Cohorts({ state, update }) {
     </Panel>
     <Panel help="cohorts" title="Retention" eyebrow={`Share of each cohort that visited again in later ${period}s`} query={q} empty={!rows.length}>
       <CohortMatrix rows={rows} period={period} />
-      <p className="an-note">Darker = more of the cohort came back. Identified / registered / bought are what the cohort has done so far.</p>
+      <p className="an-note">Darker = more of the cohort came back. Identified / registered{SHOW_SALES ? ' / bought' : ''} are what the cohort has done so far.</p>
     </Panel>
   </>;
 }

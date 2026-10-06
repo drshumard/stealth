@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BookOpen, Search } from 'lucide-react';
-import { GUIDE } from '../guide';
+import { GUIDE as ALL } from '../guide';
+import { SHOW_SALES } from '../lib';
+
+const GUIDE = ALL.map(s => ({ ...s, entries: s.entries.filter(e => (SHOW_SALES ? !e.hiddenWithSales : !e.sales)) }));
 
 // Guide — plain-language definitions of every number in Analytics, and how each is calculated.
 export default function Guide({ state, update }) {

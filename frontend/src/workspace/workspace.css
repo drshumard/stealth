@@ -970,3 +970,7 @@ body, body *, body *::before, body *::after { font-family: 'Stealth Inter', Inte
   .sp-app .an-guide-nav nav { display: none; }
   .sp-app .an-guide-entry { grid-template-columns: minmax(0, 1fr); gap: 6px; }
 }
+/* KPI grid: two full rows on desktop whatever the number of cards (12 with sales hidden, 14 with). */
+.sp-app .an-kpis { grid-template-columns: repeat(var(--kpi-cols, 7), minmax(0, 1fr)); }
+@media (max-width: 1400px) { .sp-app .an-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .sp-app .an-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

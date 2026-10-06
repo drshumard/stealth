@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { ArrowLeft, ExternalLink, Filter } from 'lucide-react';
-import { PALETTE, fmtCompact, fmtDuration, fmtNum, fmtPct, useA } from '../lib';
+import { PALETTE, SHOW_SALES, fmtCompact, fmtDuration, fmtNum, fmtPct, useA, withoutSales } from '../lib';
 import { BarList, DataTable, Legend, Panel, TrendChart } from '../charts';
 import { useSeries } from './Overview';
 
@@ -14,7 +14,7 @@ export default function Pages({ state, update }) {
   const rows = useMemo(() => q.data?.rows || [], [q.data]);
   const maxViews = Math.max(1, ...rows.map(r => r.views));
 
-  const columns = [
+  const columns = withoutSales([
     { key: 'raw', label: 'Page', render: pageCell, sortValue: r => r.raw, csv: r => r.raw },
     { key: 'views', label: 'Views', fmt: 'num', bar: maxViews },
     { key: 'visitors', label: 'Visitors', fmt: 'num' },
@@ -27,7 +27,7 @@ export default function Pages({ state, update }) {
     { key: 'registered', label: 'Registered', fmt: 'num' },
     { key: 'abandoned', label: 'Abandoned', fmt: 'num' },
     { key: 'buyers', label: 'Buyers', fmt: 'num' },
-  ];
+  ]);
 
   const entry = useMemo(() => [...rows].sort((a, b) => b.entries - a.entries).slice(0, 8), [rows]);
   const converters = useMemo(() => rows.filter(r => r.visitors >= 100).sort((a, b) => b.identification_rate - a.identification_rate).slice(0, 8), [rows]);
@@ -75,7 +75,7 @@ function PageDetail({ state, update, page, row }) {
       <div className="an-stat-strip">
         {[['Views', fmtNum(row.views)], ['Visitors', fmtNum(row.visitors)], ['Entries', fmtNum(row.entries)], ['Bounce', fmtPct(row.bounce_rate)],
           ['Median session', fmtDuration(row.avg_session_seconds)], ['Identified', `${fmtNum(row.identified)} · ${fmtPct(row.identification_rate)}`],
-          ['Registered', fmtNum(row.registered)], ['Abandoned', fmtNum(row.abandoned)], ['Buyers', fmtNum(row.buyers)]].map(([l, v]) => (
+          ['Registered', fmtNum(row.registered)], ['Abandoned', fmtNum(row.abandoned)], ...(SHOW_SALES ? [['Buyers', fmtNum(row.buyers)]] : [])].map(([l, v]) => (
           <div key={l}><span>{l}</span><strong>{v}</strong></div>
         ))}
       </div>

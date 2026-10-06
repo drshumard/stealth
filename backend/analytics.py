@@ -12,6 +12,9 @@ Definitions used throughout:
   buyer       has a sale (refunded / failed / cancelled sales excluded)
 """
 import asyncio
+import contextvars
+import hashlib
+import logging
 import re
 import time
 import uuid
@@ -19,7 +22,9 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Body, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
+
+logger = logging.getLogger('analytics')
 
 REG_TAGS = ['stealth', 'registered']
 BAD_SALE = ['refunded', 'failed', 'cancelled']
@@ -28,13 +33,19 @@ KNOWN = {'$nin': [None, '']}
 WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']   # Mongo $dayOfWeek: 1 = Sunday
 
 
-# ── cache: TTL, shared in-flight work, stale-while-revalidate, never past the proxy timeout ──
-# A request waits at most WAIT seconds; past that it gets 202 {"pending": true} and the work carries on in the
-# background (nginx cuts /api requests at 60s). A stale result (under STALE) is served at once while it refreshes.
+# ── cache ────────────────────────────────────────────────────────────────────
+# Two layers: this process's memory, then MongoDB (analytics_cache) — shared by both uvicorn workers and kept across
+# restarts. A fresh result is returned at once; a stale one (under STALE) is returned at once while it refreshes in
+# the background; only a never-seen view is computed while the request waits — at most WAIT seconds, after which it
+# answers 202 {"pending": true} (nginx cuts /api requests at 60s) and the work carries on.
+# A warmer (below) re-runs the views people actually opened, so they are ready before anyone asks.
 WAIT = 25
-STALE = 3600
+STALE = 24 * 3600
+WARM_AGE = 120            # a warm-up request recomputes anything older than this
 _cache: dict = {}
 _tasks: dict = {}
+_store = {'coll': None}   # set by build_router
+_force = contextvars.ContextVar('analytics_force', default=False)
 
 
 class Pending(Exception):
@@ -46,29 +57,65 @@ async def pending_handler(request, exc):
     return JSONResponse({'pending': True, 'detail': 'Still computing — try again in a few seconds.'}, status_code=202)
 
 
-async def _run(key, compute):
+def _id(key):
+    return hashlib.sha1(key.encode()).hexdigest()
+
+
+async def _l2_get(key):
+    coll = _store['coll']
+    if coll is None:
+        return None
+    try:
+        doc = await coll.find_one({'_id': _id(key)}, {'at': 1, 'value': 1})
+        return (doc['at'], doc['value']) if doc else None
+    except Exception:
+        return None
+
+
+async def _l2_put(key, at, value):
+    coll = _store['coll']
+    if coll is None:
+        return
+    try:
+        await coll.replace_one({'_id': _id(key)}, {'key': key[:500], 'at': at, 'value': value,
+                                                   'expires': datetime.now(timezone.utc) + timedelta(seconds=STALE * 2)}, upsert=True)
+    except Exception as e:   # too large / not storable: memory cache only
+        logger.warning('analytics cache not stored (%s): %s', key[:60], str(e)[:120])
+
+
+async def _run(key, compute, persist):
     try:
         value = await compute()
-        _cache[key] = (time.time(), value)
+        at = time.time()
+        _cache[key] = (at, value)
         if len(_cache) > 400:   # drop the oldest half
             for k, _ in sorted(_cache.items(), key=lambda kv: kv[1][0])[:200]:
                 _cache.pop(k, None)
+        if persist:
+            await _l2_put(key, at, value)
         return value
     finally:
         _tasks.pop(key, None)
 
 
-async def cached(key: str, ttl: int, compute, wait=WAIT):
+async def cached(key: str, ttl: int, compute, wait=WAIT, persist=None):
+    persist = wait is not None if persist is None else persist   # nested helper caches stay in memory
     now = time.time()
+    fresh_for = min(ttl, WARM_AGE) if _force.get() else ttl
     hit = _cache.get(key)
-    if hit and now - hit[0] < ttl:
+    if persist and (not hit or now - hit[0] >= fresh_for):
+        l2 = await _l2_get(key)
+        if l2 and (not hit or l2[0] > hit[0]):
+            hit = l2
+            _cache[key] = l2
+    if hit and now - hit[0] < fresh_for:
         return hit[1]
     task = _tasks.get(key)
     if task is None:
-        task = asyncio.create_task(_run(key, compute))
+        task = asyncio.create_task(_run(key, compute, persist))
         task.add_done_callback(lambda t: t.cancelled() or t.exception())   # never "exception was never retrieved"
         _tasks[key] = task
-    if hit and now - hit[0] < STALE:
+    if hit and now - hit[0] < STALE and not _force.get():
         return hit[1]
     if wait is None:
         return await asyncio.shield(task)
@@ -304,8 +351,86 @@ def hist(values, edges, labels):
 
 
 # ── router ───────────────────────────────────────────────────────────────────
+WARM_EVERY = 300          # seconds between warm-up rounds
+WARM_MAX = 40             # views per round
+WARM_WINDOW = 48 * 3600   # warm views opened in the last 48 hours
+_app = {'app': None}
+_worker = uuid.uuid4().hex[:8]
+
+
 def build_router(db) -> APIRouter:
-    r = APIRouter(prefix='/analytics')
+    _store['coll'] = db.analytics_cache
+
+    async def track(request: Request):
+        """Remember which views people open (for the warmer); mark warm-up requests."""
+        _app['app'] = request.app
+        if request.headers.get('x-analytics-warm') == '1':
+            _force.set(True)
+            return
+        path = request.url.path
+        if request.method == 'GET' and not path.endswith(('/live', '/views', '/dimensions')):
+            url = path + ('?' + request.url.query if request.url.query else '')
+            try:
+                await db.analytics_hits.update_one({'_id': _id(url)}, {'$set': {'url': url, 'last': datetime.now(timezone.utc)},
+                                                                       '$inc': {'hits': 1}}, upsert=True)
+            except Exception:
+                pass
+
+    r = APIRouter(prefix='/analytics', dependencies=[Depends(track)])
+
+    async def warm_round():
+        import httpx
+        app = _app['app']
+        if app is None:
+            return 0
+        since = datetime.now(timezone.utc) - timedelta(seconds=WARM_WINDOW)
+        urls = [d['url'] for d in await db.analytics_hits.find({'last': {'$gte': since}}, {'url': 1})
+                .sort([('hits', -1), ('last', -1)]).limit(WARM_MAX).to_list(WARM_MAX)]
+        done = 0
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://warm', timeout=60) as c:
+            for url in urls:
+                for _ in range(40):             # a heavy view answers 202 until it is ready
+                    res = await c.get(url, headers={'x-analytics-warm': '1'})
+                    if res.status_code != 202:
+                        break
+                    await asyncio.sleep(3)
+                done += 1
+                await db.analytics_meta.update_one({'_id': 'warmer', 'owner': _worker},
+                                                   {'$set': {'until': datetime.now(timezone.utc) + timedelta(seconds=WARM_EVERY)}})
+        return done
+
+    async def warmer():
+        await asyncio.sleep(30)
+        while True:
+            try:
+                now_ = datetime.now(timezone.utc)
+                # one worker at a time: a lease in MongoDB
+                lease = await db.analytics_meta.find_one_and_update(
+                    {'_id': 'warmer', '$or': [{'until': {'$lt': now_}}, {'owner': _worker}]},
+                    {'$set': {'owner': _worker, 'until': now_ + timedelta(seconds=WARM_EVERY)}}, upsert=False)
+                if lease is None and not await db.analytics_meta.find_one({'_id': 'warmer'}):
+                    try:
+                        await db.analytics_meta.insert_one({'_id': 'warmer', 'owner': _worker, 'until': now_ + timedelta(seconds=WARM_EVERY)})
+                        lease = True
+                    except Exception:
+                        lease = None
+                if lease:
+                    t0 = time.time()
+                    n = await warm_round()
+                    if n:
+                        logger.info('analytics warmer: %d views refreshed in %.0fs', n, time.time() - t0)
+            except Exception as e:
+                logger.warning('analytics warmer round failed: %s', str(e)[:200])
+            await asyncio.sleep(WARM_EVERY)
+
+    @r.on_event('startup')
+    async def start_warmer():
+        try:
+            await db.analytics_cache.create_index('expires', expireAfterSeconds=0)
+            await db.analytics_hits.create_index('last', expireAfterSeconds=7 * 24 * 3600)
+        except Exception as e:
+            logger.warning('analytics cache indexes: %s', str(e)[:200])
+        asyncio.create_task(warmer())
 
     async def agg(coll, pipeline, hint=None):
         opts = {'hint': hint} if hint else {}
@@ -434,16 +559,17 @@ def build_router(db) -> APIRouter:
     async def overview(since: Optional[str] = None, until: Optional[str] = None, tz: str = 'UTC',
                        source: Optional[str] = None, medium: Optional[str] = None, campaign: Optional[str] = None,
                        content: Optional[str] = None, term: Optional[str] = None, page: Optional[str] = None,
-                       host: Optional[str] = None):
+                       host: Optional[str] = None, compare: int = 0):
         f = common(since, until, tz, source, medium, campaign, content, term, page, host)
 
         async def compute():
-            cur, prev = await asyncio.gather(kpis(f), kpis(f.previous()))
             p = f.previous()
+            # The previous period only when comparing — it doubles the work.
+            cur, prev = await asyncio.gather(kpis(f), kpis(p)) if compare else (await kpis(f), None)
             return {'range': {'since': f.since.isoformat(), 'until': f.until.isoformat(), 'days': f.days},
                     'previous_range': {'since': p.since.isoformat(), 'until': p.until.isoformat()},
                     'current': cur, 'previous': prev}
-        return await cached('overview|' + f.key(), 120, compute)
+        return await cached(f'overview|{int(bool(compare))}|' + f.key(), 120, compute)
 
     # ── time series ──
     @r.get('/timeseries')

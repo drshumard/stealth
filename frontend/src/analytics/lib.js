@@ -5,6 +5,13 @@ import { useTimezone } from '@/components/TimezoneContext';
 // Analytics state lives in the URL (?tab=&range=&since=&until=&gran=&compare=&source=…), so any view is a link.
 
 export const API = `${process.env.REACT_APP_BACKEND_URL || ''}/api/analytics`;
+
+// Sales arrived in Stealth much later than visits and leads, so sales / revenue figures would skew every comparison.
+// Hidden everywhere in Analytics (and on the home Overview) until this is switched back on. The data keeps flowing.
+export const SHOW_SALES = false;
+export const SALES_KEYS = ['sales', 'revenue', 'buyers', 'purchase_rate', 'revenue_per_contact'];
+// Drop sales columns / measures / steps from a list while sales are hidden.
+export const withoutSales = (list, key = x => x.key) => (SHOW_SALES ? list : list.filter(x => !SALES_KEYS.includes(key(x))));
 export const FIRST_DAY = '2026-02-21';   // first tracked visit
 
 export const FILTER_KEYS = ['source', 'medium', 'campaign', 'content', 'term', 'page', 'host'];
@@ -57,7 +64,7 @@ export function useAnalyticsState() {
   const prev = { until: addDays(range.since, -1), since: addDays(range.since, -days) };
   const state = {
     tab: sp.get('tab') || 'overview', preset, ...range, days, prev, tz: timezone, today,
-    gran: sp.get('gran') || '', compare: sp.get('compare') !== '0', filters, params: sp,
+    gran: sp.get('gran') || '', compare: sp.get('compare') === '1', filters, params: sp,   // compare is off unless turned on
   };
   const update = patch => setSp(current => {
     const next = new URLSearchParams(current);
@@ -96,7 +103,10 @@ export function useA(path, state, extra = {}, { range, ...opts } = {}) {
   const q = qs(state, extra, range || state);
   return useQuery({
     queryKey: ['analytics', path, q], queryFn: ({ signal }) => getAnalytics(`${API}${path}?${q}`, signal),
-    placeholderData: keepPreviousData, staleTime: 60_000, refetchOnWindowFocus: false, ...opts,
+    // The server answers from its cache at once (and refreshes in the background), so re-ask every 2 minutes to pick
+    // up refreshed numbers; keep results for 30 minutes so switching tabs is instant.
+    placeholderData: keepPreviousData, staleTime: 60_000, gcTime: 30 * 60_000, refetchInterval: 120_000,
+    refetchOnWindowFocus: false, ...opts,
   });
 }
 

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { FILTER_KEYS, FORMAT, PALETTE, fmtCompact, fmtNum, useA } from '../lib';
+import { FILTER_KEYS, FORMAT, PALETTE, fmtCompact, fmtNum, useA, withoutSales } from '../lib';
 import { DataTable, Donut, Legend, Panel, Segmented, Select, StackedChart } from '../charts';
 
 // Build-your-own report: pick what to count (people or page views), how to group it, which measures, and a chart.
@@ -28,9 +28,9 @@ export default function Explorer({ state, update }) {
   const base = state.params.get('xb') || 'contacts';
   const dims = DIMS[base];
   const dim = dims.some(([d]) => d === state.params.get('xd')) ? state.params.get('xd') : dims[0][0];
-  const measures = MEASURES[base];
+  const measures = withoutSales(MEASURES[base], m => m[0]);
   const picked = (state.params.get('xm') || '').split(',').filter(m => measures.some(([k]) => k === m));
-  const metrics = picked.length ? picked : base === 'contacts' ? ['contacts', 'registration_rate', 'revenue'] : ['visitors', 'identification_rate'];
+  const metrics = picked.length ? picked : base === 'contacts' ? ['contacts', 'registration_rate', 'abandon_rate'] : ['visitors', 'identification_rate'];
   const chart = state.params.get('xc') || 'bar';
   const top = Number(state.params.get('xn') || 15);
   const minSize = Number(state.params.get('xmin') || 0);

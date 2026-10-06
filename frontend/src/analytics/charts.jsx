@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import { useSearchParams } from 'react-router-dom';
 import { AlertTriangle, ArrowDown, ArrowDownRight, ArrowUp, ArrowUpRight, ChevronDown, CircleHelp, Download, Loader2, Minus } from 'lucide-react';
-import { FORMAT, METRICS, PALETTE, bucketLabel, delta, fmtCompact, fmtMetric, fmtNum, fmtPct } from './lib';
+import { FORMAT, METRICS, PALETTE, SHOW_SALES, bucketLabel, delta, fmtCompact, fmtMetric, fmtNum, fmtPct } from './lib';
 import { KPI_HELP } from './guide';
 
 // Charts and panels for the analytics workspace — recharts, styled to the workspace.
@@ -309,13 +309,13 @@ export function CohortMatrix({ rows, period }) {
   return (
     <div className="an-table-scroll">
       <table className="an-cohort">
-        <thead><tr><th>Cohort</th><th>People</th><th>Identified</th><th>Registered</th><th>Bought</th><th>Revenue</th>
+        <thead><tr><th>Cohort</th><th>People</th><th>Identified</th><th>Registered</th>{SHOW_SALES && <><th>Bought</th><th>Revenue</th></>}
           {Array.from({ length: cols }, (_, i) => <th key={i}>{i === 0 ? (period === 'week' ? 'Week 0' : 'Month 0') : `+${i}`}</th>)}</tr></thead>
         <tbody>
           {rows.map(r => (
             <tr key={r.cohort}>
               <th>{bucketLabel(r.cohort, period, true)}</th><td>{fmtNum(r.size)}</td>
-              <td>{fmtPct(r.identified)}</td><td>{fmtPct(r.registered)}</td><td>{fmtPct(r.buyers, 2)}</td><td>${fmtCompact(r.revenue)}</td>
+              <td>{fmtPct(r.identified)}</td><td>{fmtPct(r.registered)}</td>{SHOW_SALES && <><td>{fmtPct(r.buyers, 2)}</td><td>${fmtCompact(r.revenue)}</td></>}
               {Array.from({ length: cols }, (_, i) => {
                 const v = r.retention[i];
                 return <td key={i} className="an-cohort-cell" style={v != null && i > 0 ? { '--a': Math.min(1, v / 0.06) } : undefined}

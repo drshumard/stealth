@@ -1,19 +1,19 @@
 import { useTimezone } from '@/components/TimezoneContext';
 import { Status } from '@/workspace/ui';
-import { PALETTE, fmtNum, fmtPct, useA } from '../lib';
+import { PALETTE, SHOW_SALES, fmtNum, fmtPct, useA, withoutSales } from '../lib';
 import { DataTable, Heatmap, Histogram, Legend, Panel, Segmented, Select, StackedChart } from '../charts';
-import { useSeries } from './Overview';
+import { HEAT_METRICS, useSeries } from './Overview';
 
-const SEG_ROWS = [
+const SEG_ROWS = withoutSales([
   ['visitors', 'Visitors', fmtNum], ['visits', 'Page views', fmtNum], ['visits_per_visitor', 'Views per visitor', v => fmtNum(v)],
   ['identification_rate', 'Identified', fmtPct], ['registration_rate', 'Registered', fmtPct], ['purchase_rate', 'Bought', v => fmtPct(v, 2)],
-];
+], r => r[0]);
 
 export default function Visitors({ state, update, onSelectContact }) {
   const v = useA('/visitors', state);
   const { ts, gran, series } = useSeries(state);
   const share = state.params.get('vs') === 'share';
-  const heatMetric = state.params.get('hm') || 'visits';
+  const heatMetric = HEAT_METRICS.some(h => h.value === state.params.get('hm')) ? state.params.get('hm') : 'visits';
   const heat = useA('/heatmap', state, { metric: heatMetric });
   const { formatDateTime } = useTimezone();
   const d = v.data;
@@ -32,7 +32,7 @@ export default function Visitors({ state, update, onSelectContact }) {
             })}</tbody>
           </table>
         )}
-        {d && <p className="an-note">New = first seen in this period. Returning = first seen before it and back again. Rates are the share of each group who are identified, registered or bought (ever).</p>}
+        {d && <p className="an-note">New = first seen in this period. Returning = first seen before it and back again. Rates are the share of each group who are identified{SHOW_SALES ? ', registered or bought' : ' or registered'} (ever).</p>}
       </Panel>
       <Panel help="returning-visitors" title="Returning visitors over time" eyebrow={share ? 'Share of visitors' : 'Visitors'} query={ts} empty={!series.length}
         actions={<Segmented label="Scale" value={share ? 'share' : 'count'} onChange={x => update({ vs: x === 'share' ? 'share' : null })}
@@ -65,8 +65,7 @@ export default function Visitors({ state, update, onSelectContact }) {
 
     <Panel help="heatmap" title="When people visit" eyebrow="Weekday × hour" query={heat}
       actions={<Select label="Heatmap metric" value={heatMetric} onChange={x => update({ hm: x === 'visits' ? null : x })}
-        options={[{ value: 'visits', label: 'Page views' }, { value: 'identified', label: 'Identifications' },
-          { value: 'registrations', label: 'Registrations' }, { value: 'sales', label: 'Sales' }]} />}>
+        options={HEAT_METRICS} />}>
       {heat.data && <Heatmap days={heat.data.days} grid={heat.data.grid} label={heatMetric === 'visits' ? 'page views' : heatMetric} />}
     </Panel>
 
@@ -76,8 +75,8 @@ export default function Visitors({ state, update, onSelectContact }) {
         columns={[
           { key: 'name', label: 'Person', render: r => <span className="an-page-cell"><strong>{r.name || r.email}</strong>{r.name && <small>{r.email}</small>}</span>, sortValue: r => r.name || r.email || '' },
           { key: 'source', label: 'Source', render: r => r.source || '—' },
-          { key: 'status', label: 'Status', render: r => <Status tone={r.buyer ? 'green' : r.registered ? 'blue' : 'amber'}>{r.buyer ? 'Buyer' : r.registered ? 'Registered' : 'Abandoned'}</Status>,
-            sortValue: r => (r.buyer ? 2 : r.registered ? 1 : 0) },
+          { key: 'status', label: 'Status', render: r => { const buyer = SHOW_SALES && r.buyer; return <Status tone={buyer ? 'green' : r.registered ? 'blue' : 'amber'}>{buyer ? 'Buyer' : r.registered ? 'Registered' : 'Abandoned'}</Status>; },
+            sortValue: r => (SHOW_SALES && r.buyer ? 2 : r.registered ? 1 : 0) },
           { key: 'visits', label: 'Views', fmt: 'num' }, { key: 'days', label: 'Days', fmt: 'num' },
           { key: 'last', label: 'Last seen', render: r => formatDateTime(r.last), align: 'right' },
         ]} />}

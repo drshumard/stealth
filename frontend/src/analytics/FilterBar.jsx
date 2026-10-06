@@ -28,7 +28,7 @@ export default function FilterBar({ state, update }) {
         <span className="an-range-text"><strong>{rangeText}</strong><small>{state.days} day{state.days !== 1 ? 's' : ''}
           {state.compare && <> · vs {bucketLabel(state.prev.since, 'day')} – {bucketLabel(state.prev.until, 'day', true)}</>}</small></span>
         <span className="an-filter-spacer" />
-        <label className="an-toggle"><input type="checkbox" checked={state.compare} onChange={e => update({ compare: e.target.checked ? null : '0' })} /><span />Compare</label>
+        <label className="an-toggle"><input type="checkbox" checked={state.compare} onChange={e => update({ compare: e.target.checked ? '1' : null })} /><span />Compare</label>
         <Select label="Granularity" value={state.gran} onChange={v => update({ gran: v })} options={GRANS} />
         <SavedViews state={state} update={update} />
       </div>

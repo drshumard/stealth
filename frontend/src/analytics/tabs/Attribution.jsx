@@ -1,4 +1,4 @@
-import { FILTER_KEYS, PALETTE, fmtMoney, fmtNum, fmtPct, useA } from '../lib';
+import { FILTER_KEYS, PALETTE, SHOW_SALES, fmtMoney, fmtNum, fmtPct, useA, withoutSales } from '../lib';
 import { Bubble, DataTable, Legend, Panel, Segmented, Select, StackedChart } from '../charts';
 
 export const CONTACT_DIMS = [
@@ -7,15 +7,20 @@ export const CONTACT_DIMS = [
   { value: 'os', label: 'Operating system' }, { value: 'browser', label: 'Browser / app' }, { value: 'status', label: 'Lead status' },
   { value: 'weekday', label: 'Weekday first seen' }, { value: 'hour', label: 'Hour first seen' },
 ];
-const RATE = [{ value: 'registration_rate', label: 'Registration rate' }, { value: 'identification_rate', label: 'Identification rate' },
-  { value: 'abandon_rate', label: 'Abandon rate' }, { value: 'purchase_rate', label: 'Purchase rate' }];
+const RATE = withoutSales([{ value: 'registration_rate', label: 'Registration rate' }, { value: 'identification_rate', label: 'Identification rate' },
+  { value: 'abandon_rate', label: 'Abandon rate' }, { value: 'purchase_rate', label: 'Purchase rate' }], r => r.value);
+// Bubble size: revenue / buyers, or (while sales are hidden) registered / identified leads.
+const SIZES = SHOW_SALES ? [{ value: 'revenue', label: 'Revenue', fmt: fmtMoney }, { value: 'buyers', label: 'Buyers', fmt: fmtNum }]
+  : [{ value: 'registered', label: 'Registered', fmt: fmtNum }, { value: 'identified', label: 'Identified', fmt: fmtNum }];
 const TREND_METRIC = [{ value: 'contacts', label: 'New people' }, { value: 'identified', label: 'Identified' },
   { value: 'registered', label: 'Registered' }, { value: 'abandoned', label: 'Abandoned' }];
 
 export default function Attribution({ state, update }) {
   const dim = state.params.get('d') || 'campaign';
   const rateKey = state.params.get('r') || 'registration_rate';
-  const size = state.params.get('z') || 'revenue';
+  const size = SIZES.some(s => s.value === state.params.get('z')) ? state.params.get('z') : SIZES[0].value;
+  const sizeInfo = SIZES.find(s => s.value === size);
+  const rateKey_ = RATE.some(r => r.value === rateKey) ? rateKey : 'registration_rate';
   const trendMetric = state.params.get('tm') || 'identified';
   const share = state.params.get('ts') === 'share';
   const q = useA('/breakdown', state, { dimension: dim, base: 'contacts', limit: 300 });
@@ -34,15 +39,15 @@ export default function Attribution({ state, update }) {
     </div>
 
     <div className="an-grid an-grid-2">
-      <Panel help="attribution" title="Volume vs conversion" eyebrow={`Bubble size: ${size === 'revenue' ? 'revenue' : 'buyers'} · groups with ${minSize}+ people`} query={q}
+      <Panel help="attribution" title="Volume vs conversion" eyebrow={`Bubble size: ${sizeInfo.label.toLowerCase()} · groups with ${minSize}+ people`} query={q}
         empty={!rows.filter(r => r.contacts >= minSize).length}
         actions={<>
-          <Select label="Rate" value={rateKey} onChange={v => update({ r: v === 'registration_rate' ? null : v })} options={RATE} />
-          <Segmented label="Bubble size" value={size} onChange={v => update({ z: v === 'revenue' ? null : v })}
-            options={[{ value: 'revenue', label: 'Revenue' }, { value: 'buyers', label: 'Buyers' }]} />
+          <Select label="Rate" value={rateKey_} onChange={v => update({ r: v === 'registration_rate' ? null : v })} options={RATE} />
+          <Segmented label="Bubble size" value={size} onChange={v => update({ z: v === SIZES[0].value ? null : v })}
+            options={SIZES.map(({ value, label }) => ({ value, label }))} />
         </>}>
-        <Bubble rows={rows.filter(r => r.contacts >= minSize)} x="contacts" y={rateKey} z={size} xLabel="People" yLabel={RATE.find(r => r.value === rateKey)?.label}
-          zLabel={size === 'revenue' ? 'Revenue' : 'Buyers'} zFmt={size === 'revenue' ? fmtMoney : fmtNum} onClick={drill} />
+        <Bubble rows={rows.filter(r => r.contacts >= minSize)} x="contacts" y={rateKey_} z={size} xLabel="People" yLabel={RATE.find(r => r.value === rateKey_)?.label}
+          zLabel={sizeInfo.label} zFmt={sizeInfo.fmt} onClick={drill} />
       </Panel>
       <Panel help="attribution" title={`${label} over time`} eyebrow={`Top 6 by ${TREND_METRIC.find(m => m.value === trendMetric)?.label.toLowerCase()}`} query={trend} empty={!trend.data?.series?.length}
         actions={<>
@@ -58,7 +63,7 @@ export default function Attribution({ state, update }) {
     <Panel help="attribution" title={`By ${label?.toLowerCase()}`} eyebrow={`${fmtNum(q.data?.total_rows)} groups`} query={q} empty={!rows.length}>
       <DataTable rows={rows} rowKey={r => String(r.raw)} defaultSort={{ key: 'contacts', dir: 'desc' }} maxRows={30}
         onRowClick={drillable ? drill : undefined} exportName={`attribution-${dim}-${state.since}-${state.until}`}
-        columns={[
+        columns={withoutSales([
           { key: 'key', label, render: r => <strong className="an-key" title={r.key}>{r.key}</strong>, sortValue: r => String(r.key) },
           { key: 'contacts', label: 'People', fmt: 'num', bar: maxContacts },
           { key: 'identified', label: 'Identified', fmt: 'num' },
@@ -70,8 +75,8 @@ export default function Attribution({ state, update }) {
           { key: 'buyers', label: 'Buyers', fmt: 'num' },
           { key: 'revenue', label: 'Revenue', fmt: 'money' },
           { key: 'revenue_per_contact', label: 'Rev. / person', fmt: 'money', render: r => (r.revenue_per_contact ? `$${r.revenue_per_contact.toFixed(2)}` : '—') },
-        ]} />
-      {q.data?.totals && <p className="an-note">Totals: {fmtNum(q.data.totals.contacts)} people · {fmtNum(q.data.totals.identified)} identified ({fmtPct(q.data.totals.identified / q.data.totals.contacts)}) · {fmtNum(q.data.totals.registered)} registered · {fmtNum(q.data.totals.buyers)} buyers · {fmtMoney(q.data.totals.revenue)}</p>}
+        ])} />
+      {q.data?.totals && <p className="an-note">Totals: {fmtNum(q.data.totals.contacts)} people · {fmtNum(q.data.totals.identified)} identified ({fmtPct(q.data.totals.identified / q.data.totals.contacts)}) · {fmtNum(q.data.totals.registered)} registered{SHOW_SALES && <> · {fmtNum(q.data.totals.buyers)} buyers · {fmtMoney(q.data.totals.revenue)}</>}</p>}
     </Panel>
   </>;
 }

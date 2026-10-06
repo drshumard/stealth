@@ -1,5 +1,8 @@
 // The analytics guide: what every number means and exactly how it is calculated (mirrors backend/analytics.py).
-// `id`s are linked from panels (Panel help="…") and KPI cards.
+// `id`s are linked from panels (Panel help="…") and KPI cards. Entries marked `sales` are hidden while SHOW_SALES is off.
+import { SHOW_SALES } from './lib';
+
+const S = (withSales, without) => (SHOW_SALES ? withSales : without);
 
 export const GUIDE = [
   {
@@ -11,8 +14,9 @@ export const GUIDE = [
         note: 'The same person on their phone and their laptop — or on two different domains — starts out as two visitors. When they give their email on both, the records are merged into one person automatically, and their page views move with them.' },
       { id: 'identification', term: 'How a visitor becomes a lead', what: 'When someone types their email or phone into a form we track (opt-in, registration), their visitor record gains that email/phone. From then on they are an identified lead.' },
       { id: 'registration-source', term: 'Registrations and tags', what: 'StealthWebinar sends every webinar registration to Stealth (Registrations page) and tags the contact “stealth”. The tracking script on the thank-you page tags the visitor “registered”. Either tag means the person completed registration.' },
-      { id: 'sales-source', term: 'Sales', what: 'Each sale arrives through the sales webhook and is matched to a contact by email. Refunded, failed and cancelled sales are left out of every revenue figure.' },
-      { id: 'freshness', term: 'How fresh the numbers are', what: 'Each view is cached for 2–3 minutes and refreshed in the background, so new activity appears within a few minutes. Live is refreshed every 10 seconds. The very first time a long period (e.g. “All time”) is opened it can take up to a minute to calculate; after that it opens instantly.' },
+      { sales: true, id: 'sales-source', term: 'Sales', what: 'Each sale arrives through the sales webhook and is matched to a contact by email. Refunded, failed and cancelled sales are left out of every revenue figure.' },
+      { id: 'freshness', term: 'How fresh the numbers are', what: 'Views are saved on the server and kept up to date in the background: anything opened in the last two days is recalculated every 5 minutes, so it opens instantly and is at most a few minutes behind. Live is refreshed every 10 seconds. A view nobody has opened before (a new filter or period) is calculated on the spot — a long period like “All time” can take up to a minute the first time.' },
+      { id: 'sales-hidden', term: 'Why there are no sales figures', what: 'Sales only started arriving in Stealth well after visits and leads, so revenue, buyers and purchase rates would make earlier periods look worse than they were. They are hidden from the dashboard for now; the sales data is still collected.', hiddenWithSales: true },
       { id: 'blind-spots', term: 'What we can’t see', what: 'Visits from browsers that block scripts, and anything that happens off our pages (e.g. inside Facebook before the click). Identification times were only recorded from 24 Jul 2026, so “time to identify” covers people identified since then.' },
     ],
   },
@@ -60,16 +64,16 @@ export const GUIDE = [
         note: 'These are the people worth following up — the Leads & abandonment tab lists them, with the last page they saw, and exports them to CSV.' },
       { id: 'abandon-rate', term: 'Abandon rate', what: 'The share of identified leads who did not register.', how: 'Abandoned ÷ identified.' },
       { id: 'anonymous', term: 'Anonymous', what: 'A visitor we have no email or phone for (yet).' },
-      { id: 'sales', term: 'Sales and revenue', what: 'Sales received in the period and their total value.', how: 'Sales by the time they arrived, excluding refunded, failed and cancelled. Revenue = sum of their amounts.' },
-      { id: 'buyers', term: 'Buyers', what: 'People with at least one (non-refunded) sale.' },
-      { id: 'purchase-rate', term: 'Purchase rate', what: 'How many registered people bought.', how: 'Buyers ÷ registered leads in the tables; on the Visitors tab, buyers ÷ visitors in each group.' },
-      { id: 'revenue-per-person', term: 'Revenue per person', what: 'Lifetime revenue from a group divided by the number of people in it — a quick way to compare what a campaign’s audience is worth.' },
+      { sales: true, id: 'sales', term: 'Sales and revenue', what: 'Sales received in the period and their total value.', how: 'Sales by the time they arrived, excluding refunded, failed and cancelled. Revenue = sum of their amounts.' },
+      { sales: true, id: 'buyers', term: 'Buyers', what: 'People with at least one (non-refunded) sale.' },
+      { sales: true, id: 'purchase-rate', term: 'Purchase rate', what: 'How many registered people bought.', how: 'Buyers ÷ registered leads in the tables; on the Visitors tab, buyers ÷ visitors in each group.' },
+      { sales: true, id: 'revenue-per-person', term: 'Revenue per person', what: 'Lifetime revenue from a group divided by the number of people in it — a quick way to compare what a campaign’s audience is worth.' },
     ],
   },
   {
     id: 'tabs', title: 'The tabs, one by one',
     entries: [
-      { id: 'journey', term: 'Journey (funnel)', what: 'Follows the people first seen in the period and shows how far they got: first visit → came back another day → identified → registered → purchased.',
+      { id: 'journey', term: 'Journey (funnel)', what: `Follows the people first seen in the period and shows how far they got: first visit → came back another day → identified → registered${S(' → purchased', '')}.`,
         how: '“Came back another day” = page views on two or more different days since the period began. Each step shows its share of everyone (“of all”) and of the step before (“of previous”).',
         note: 'Because it follows the same people, a recent period looks weaker — they’ve had less time to come back or buy.' },
       { id: 'lead-outcomes', term: 'Lead outcomes', what: 'Every lead identified on each day / week, split into those who registered (so far) and those who abandoned.' },
@@ -81,12 +85,13 @@ export const GUIDE = [
       { id: 'frequency', term: 'Visits per visitor, days active, sessions per visitor', what: 'How engaged people were within the period: how many pages each person viewed, on how many different days, and in how many separate sessions. Percentages above the bars are the share of all visitors.' },
       { id: 'time-to-return', term: 'Time to come back', what: 'For people with two or more visits in the period: the time between their first and second page view. Gaps under 30 minutes are ignored as part of the same visit.' },
       { id: 'relationship-age', term: 'Relationship age', what: 'For returning visitors: how long it has been between the first time we ever saw them and their latest visit.' },
-      { id: 'timing', term: 'Time to identify / register / purchase', what: 'For people first seen in the period: how long from their first ever page view to giving their email/phone, to registering, and to their first purchase. “Visits before buying” counts their page views up to the first sale. The headline numbers are medians.' },
+      { id: 'timing', term: S('Time to identify / register / purchase', 'Time to identify / register'), what: S('For people first seen in the period: how long from their first ever page view to giving their email/phone, to registering, and to their first purchase. “Visits before buying” counts their page views up to the first sale. The headline numbers are medians.',
+      'For people first seen in the period: how long from their first ever page view to giving their email/phone, and to registering. The headline numbers are medians.') },
       { id: 'where-abandon', term: 'Where leads abandon', what: 'The people first seen in the period, grouped by campaign, ad, device… with how many were identified, registered and abandoned. Sort by abandon rate to find where registration breaks down. Groups with fewer than 5 leads are hidden.' },
-      { id: 'attribution', term: 'Attribution', what: 'Groups the people first seen in the period by where they came from, and shows what they went on to do and spend.',
+      { id: 'attribution', term: 'Attribution', what: S('Groups the people first seen in the period by where they came from, and shows what they went on to do and spend.', 'Groups the people first seen in the period by where they came from, and shows what they went on to do.'),
         how: 'Source, medium, campaign, ad (utm_content) and ad set (utm_term) come from the link they clicked. If someone clicks a newer ad later, their record moves to the newer ad (the latest click wins). Device, operating system and browser / app come from the browser they first used.',
-        note: 'The bubble chart puts size (people) against conversion; bubble size is revenue or buyers. Big, high bubbles are campaigns worth scaling; big, low ones are spending reach without converting.' },
-      { id: 'cohorts', term: 'Cohorts and retention', what: 'People grouped by the week (or month) they were first seen. Each row shows the share who have since identified, registered and bought, and the retention grid shows what share came back in each later week.',
+        note: `The bubble chart puts size (people) against conversion; bubble size is ${S('revenue or buyers', 'registered or identified leads')}. Big, high bubbles are campaigns worth scaling; big, low ones are spending reach without converting.` },
+      { id: 'cohorts', term: 'Cohorts and retention', what: `People grouped by the week (or month) they were first seen. Each row shows the share who have since identified${S(', registered and bought', ' and registered')}, and the retention grid shows what share came back in each later week.`,
         how: 'Week 0 is the week they arrived (always 100%). +1 = the following week, and so on. Weeks start on Monday. Source and campaign filters apply; the period picker doesn’t.' },
       { id: 'report-builder', term: 'Report builder', what: 'Build your own table and chart: choose what to count (people first seen in the period, or page views), how to group it, which measures to show and the chart type. The first measure drives the chart and sort. Save it as a view or download it as CSV.' },
       { id: 'live', term: 'Live', what: 'The last 30 minutes, refreshed every 10 seconds. “Active now” = different visitors with a page view in the last 5 minutes.' },
