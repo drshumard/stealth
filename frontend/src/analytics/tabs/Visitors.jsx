@@ -20,7 +20,7 @@ export default function Visitors({ state, update, onSelectContact }) {
 
   return <>
     <div className="an-grid an-grid-2">
-      <Panel title="New vs returning" eyebrow="How each group behaves in this period" query={v} empty={!d?.new?.visitors && !d?.returning?.visitors}>
+      <Panel help="new-vs-returning" title="New vs returning" eyebrow="How each group behaves in this period" query={v} empty={!d?.new?.visitors && !d?.returning?.visitors}>
         {d && (
           <table className="an-compare">
             <thead><tr><th /><th><i style={{ background: PALETTE[0] }} />New</th><th><i style={{ background: PALETTE[2] }} />Returning</th><th>Returning vs new</th></tr></thead>
@@ -34,7 +34,7 @@ export default function Visitors({ state, update, onSelectContact }) {
         )}
         {d && <p className="an-note">New = first seen in this period. Returning = first seen before it and back again. Rates are the share of each group who are identified, registered or bought (ever).</p>}
       </Panel>
-      <Panel title="Returning visitors over time" eyebrow={share ? 'Share of visitors' : 'Visitors'} query={ts} empty={!series.length}
+      <Panel help="returning-visitors" title="Returning visitors over time" eyebrow={share ? 'Share of visitors' : 'Visitors'} query={ts} empty={!series.length}
         actions={<Segmented label="Scale" value={share ? 'share' : 'count'} onChange={x => update({ vs: x === 'share' ? 'share' : null })}
           options={[{ value: 'count', label: 'Count' }, { value: 'share', label: 'Share' }]} />}
         footer={<Legend items={[{ label: 'New', color: PALETTE[0] }, { label: 'Returning', color: PALETTE[2] }]} />}>
@@ -44,33 +44,33 @@ export default function Visitors({ state, update, onSelectContact }) {
     </div>
 
     <div className="an-grid an-grid-3">
-      <Panel title="Visits per visitor" eyebrow="Page views each person made in the period" query={v} empty={!d}>
+      <Panel help="frequency" title="Visits per visitor" eyebrow="Page views each person made in the period" query={v} empty={!d}>
         {d && <Histogram rows={d.frequency} label="visitors" />}
       </Panel>
-      <Panel title="Days active" eyebrow="Different days each person visited" query={v} empty={!d}>
+      <Panel help="frequency" title="Days active" eyebrow="Different days each person visited" query={v} empty={!d}>
         {d && <Histogram rows={d.days_active} label="visitors" color={PALETTE[1]} />}
       </Panel>
-      <Panel title="Sessions per visitor" eyebrow="Separate browsing sessions" query={v} empty={!d}>
+      <Panel help="frequency" title="Sessions per visitor" eyebrow="Separate browsing sessions" query={v} empty={!d}>
         {d && <Histogram rows={d.sessions} label="visitors" color={PALETTE[3]} />}
       </Panel>
     </div>
     <div className="an-grid an-grid-2">
-      <Panel title="Time to come back" eyebrow="Gap between a visitor's first and second visit (reloads under 30 min ignored)" query={v} empty={!d?.return_gap?.some(x => x.count)}>
+      <Panel help="time-to-return" title="Time to come back" eyebrow="Gap between a visitor's first and second visit (reloads under 30 min ignored)" query={v} empty={!d?.return_gap?.some(x => x.count)}>
         {d && <Histogram rows={d.return_gap} label="visitors" color={PALETTE[2]} />}
       </Panel>
-      <Panel title="Relationship age of returning visitors" eyebrow="From first ever visit to latest visit" query={v} empty={!d?.loyalty_age?.some(x => x.count)}>
+      <Panel help="relationship-age" title="Relationship age of returning visitors" eyebrow="From first ever visit to latest visit" query={v} empty={!d?.loyalty_age?.some(x => x.count)}>
         {d && <Histogram rows={d.loyalty_age} label="visitors" color={PALETTE[4]} />}
       </Panel>
     </div>
 
-    <Panel title="When people visit" eyebrow="Weekday × hour" query={heat}
+    <Panel help="heatmap" title="When people visit" eyebrow="Weekday × hour" query={heat}
       actions={<Select label="Heatmap metric" value={heatMetric} onChange={x => update({ hm: x === 'visits' ? null : x })}
         options={[{ value: 'visits', label: 'Page views' }, { value: 'identified', label: 'Identifications' },
           { value: 'registrations', label: 'Registrations' }, { value: 'sales', label: 'Sales' }]} />}>
       {heat.data && <Heatmap days={heat.data.days} grid={heat.data.grid} label={heatMetric === 'visits' ? 'page views' : heatMetric} />}
     </Panel>
 
-    <Panel title="Most engaged known people" eyebrow="Identified visitors with the most page views in this period" query={v} empty={!d?.top?.length}>
+    <Panel help="identified" title="Most engaged known people" eyebrow="Identified visitors with the most page views in this period" query={v} empty={!d?.top?.length}>
       {d && <DataTable rows={d.top} rowKey={r => r.contact_id} onRowClick={r => onSelectContact?.(r.contact_id)}
         defaultSort={{ key: 'visits', dir: 'desc' }}
         columns={[

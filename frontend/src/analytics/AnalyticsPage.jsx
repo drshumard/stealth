@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { Activity, BarChart3, Blocks, FileText, Layers, Radio, Target, Users } from 'lucide-react';
+import { Activity, BarChart3, Blocks, BookOpen, FileText, Layers, Radio, Target, Users } from 'lucide-react';
 import { PageIntro } from '@/workspace/ui';
 import FilterBar from './FilterBar';
 import { useAnalyticsState } from './lib';
@@ -12,6 +12,7 @@ const Attribution = lazy(() => import('./tabs/Attribution'));
 const Cohorts = lazy(() => import('./tabs/Cohorts'));
 const Explorer = lazy(() => import('./tabs/Explorer'));
 const Live = lazy(() => import('./tabs/Live'));
+const Guide = lazy(() => import('./tabs/Guide'));
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: BarChart3, C: Overview },
@@ -22,6 +23,7 @@ const TABS = [
   { id: 'cohorts', label: 'Cohorts', icon: Activity, C: Cohorts },
   { id: 'explorer', label: 'Report builder', icon: Blocks, C: Explorer },
   { id: 'live', label: 'Live', icon: Radio, C: Live },
+  { id: 'guide', label: 'Guide', icon: BookOpen, C: Guide },
 ];
 
 // Analytics — the workspace's analysis suite over every visit, contact, registration and sale (backend/analytics.py).
@@ -34,12 +36,12 @@ export default function AnalyticsPage({ onSelectContact }) {
     <nav className="an-tabs" aria-label="Analytics sections">
       {TABS.map(t => (
         <button key={t.id} type="button" aria-current={t.id === tab.id ? 'page' : undefined}
-          onClick={() => update({ tab: t.id === 'overview' ? null : t.id, pg: null })}>
+          onClick={() => update({ tab: t.id === 'overview' ? null : t.id, pg: null, g: null })}>
           <t.icon size={15} />{t.label}
         </button>
       ))}
     </nav>
-    {tab.id !== 'live' && <FilterBar state={state} update={update} />}
+    {!['live', 'guide'].includes(tab.id) && <FilterBar state={state} update={update} />}
     <div className="an-body">
       <Suspense fallback={<div className="an-state an-loading"><span className="sp-skeleton" /><span className="sp-skeleton" /></div>}>
         <Tab state={state} update={update} drill={update} onSelectContact={onSelectContact} />

@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  Activity, BarChart3, Check, ChevronRight, Clock3, DollarSign, Globe2, Home, LogOut, Menu,
-  ShieldCheck, Users, Workflow, X,
+  Activity, BarChart3, Check, ChevronRight, Clock3, DollarSign, Globe2, Home, KeyRound, Loader2, LogOut, Menu,
+  ShieldCheck, UserCog, Users, Workflow, X,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useTimezone, TIMEZONE_OPTIONS } from '@/components/TimezoneContext';
+import { PasswordField } from '@/components/LoginPage';
+import { authJson } from './auth';
+import { Drawer, initialsOf } from './ui';
 import './workspace.css';
 
 // The Stealth workspace shell — from the Stealth design prototype (kept locally). Navigation keeps the live URLs:
@@ -18,8 +22,9 @@ const NAV = [
   { label: 'Automations', path: '/automations', icon: Workflow, group: 'Operations' },
   { label: 'Analytics', path: '/analytics', icon: BarChart3, group: 'Insights' },
   { label: 'Activity', path: '/logs', icon: Activity, group: 'Insights' },
+  { label: 'Users', path: '/users', icon: UserCog, group: 'Admin', admin: true },
 ];
-const GROUPS = ['Workspace', 'Acquisition', 'Operations', 'Insights'];
+const GROUPS = ['Workspace', 'Acquisition', 'Operations', 'Insights', 'Admin'];
 
 const isActive = (item, pathname) => (item.path === '/' ? pathname === '/' : pathname.startsWith(item.path));
 
@@ -66,19 +71,29 @@ function TimezoneMenu() {
   );
 }
 
-function Account({ onLogout }) {
+function Account({ user, onLogout, onChangePassword }) {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+  const name = user?.name || user?.username || 'Signed in';
   return (
     <div className="sp-sidebar-foot">
       <button type="button" className="sp-account" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(v => !v)}>
-        <span className="sp-avatar">DS</span>
-        <div><strong>Dr. Shumard</strong><span>Stealth workspace</span></div>
+        <span className="sp-avatar">{initialsOf(name, 'U')}</span>
+        <div><strong>{name}</strong><span>{user?.role === 'admin' ? 'Admin' : 'Member'} · {user?.username}</span></div>
       </button>
       <span className="sp-online" />
       {open && <>
         <button type="button" className="sp-menu-scrim" aria-label="Close account menu" onClick={() => setOpen(false)} />
         <div className="sp-menu" role="menu">
           <div className="sp-menu-list">
+            <button type="button" role="menuitem" className="sp-menu-item" onClick={() => { setOpen(false); onChangePassword(); }}>
+              <span>Change password</span><KeyRound size={14} />
+            </button>
+            {user?.role === 'admin' && (
+              <button type="button" role="menuitem" className="sp-menu-item" onClick={() => { setOpen(false); navigate('/users'); }}>
+                <span>Manage users</span><UserCog size={14} />
+              </button>
+            )}
             <button type="button" role="menuitem" className="sp-menu-item" data-tone="danger" onClick={() => { setOpen(false); onLogout(); }}>
               <span>Log out</span><LogOut size={14} />
             </button>
@@ -89,10 +104,56 @@ function Account({ onLogout }) {
   );
 }
 
-export default function WorkspaceShell({ onLogout, children }) {
+function ChangePassword({ open, onClose }) {
+  const [current, setCurrent] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { if (!open) { setCurrent(''); setPassword(''); setConfirm(''); setError(''); } }, [open]);
+  const submit = async e => {
+    e.preventDefault();
+    setError('');
+    if (password.length < 8) return setError('Use at least 8 characters.');
+    if (password !== confirm) return setError('The two new passwords don’t match.');
+    setSaving(true);
+    try {
+      await authJson('/auth/change-password', { method: 'POST', body: { current, password } });
+      toast.success('Password changed — other devices were signed out');
+      onClose();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <Drawer open={open} onClose={onClose} eyebrow="Account / security" label="Change password">
+      <form className="sp-drawer-body sp-form-drawer" onSubmit={submit}>
+        <span className="sp-drawer-avatar"><KeyRound size={22} /></span>
+        <h2>Change password</h2>
+        <p>At least 8 characters. Your other signed-in devices will be signed out.</p>
+        {error && <div className="sp-login-error" role="alert">{error}</div>}
+        <div className="sp-form-stack">
+          <PasswordField value={current} onChange={setCurrent} placeholder="Current password" autoFocus />
+          <PasswordField value={password} onChange={setPassword} placeholder="New password" autoComplete="new-password" />
+          <PasswordField value={confirm} onChange={setConfirm} placeholder="Repeat new password" autoComplete="new-password" />
+        </div>
+        <div className="sp-builder-foot sp-drawer-foot">
+          <button type="button" className="sp-secondary-button" onClick={onClose}>Cancel</button>
+          <button type="submit" className="sp-primary-button" disabled={saving}>{saving ? <Loader2 size={15} className="sp-spin" /> : null} Save password</button>
+        </div>
+      </form>
+    </Drawer>
+  );
+}
+
+export default function WorkspaceShell({ onLogout, user, children }) {
   const { pathname } = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
-  const current = NAV.find(item => isActive(item, pathname)) || NAV[0];
+  const [pwOpen, setPwOpen] = useState(false);
+  const nav = NAV.filter(item => !item.admin || user?.role === 'admin');
+  const current = nav.find(item => isActive(item, pathname)) || nav[0];
 
   useEffect(() => { setMenuOpen(false); }, [pathname]);
 
@@ -106,11 +167,11 @@ export default function WorkspaceShell({ onLogout, children }) {
           <button className="sp-mobile-close" aria-label="Close navigation" onClick={() => setMenuOpen(false)}><X size={20} /></button>
         </div>
         <div className="sp-nav-scroll">
-          {GROUPS.map(group => (
+          {GROUPS.filter(group => nav.some(item => item.group === group)).map(group => (
             <div className="sp-nav-group" key={group}>
               <p>{group}</p>
               <nav aria-label={group}>
-                {NAV.filter(item => item.group === group).map(item => {
+                {nav.filter(item => item.group === group).map(item => {
                   const Icon = item.icon;
                   return (
                     <Link key={item.path} to={item.path} aria-current={item === current ? 'page' : undefined} onClick={() => setMenuOpen(false)}>
@@ -122,7 +183,7 @@ export default function WorkspaceShell({ onLogout, children }) {
             </div>
           ))}
         </div>
-        <Account onLogout={onLogout} />
+        <Account user={user} onLogout={onLogout} onChangePassword={() => setPwOpen(true)} />
       </aside>
       <div className="sp-workspace">
         <header className="sp-topbar">
@@ -135,6 +196,7 @@ export default function WorkspaceShell({ onLogout, children }) {
         <main id="sp-main" className="sp-main">{children}</main>
         <footer className="sp-footer"><span>Dr. Shumard · Stealth workspace</span></footer>
       </div>
+      <ChangePassword open={pwOpen} onClose={() => setPwOpen(false)} />
     </div>
   );
 }

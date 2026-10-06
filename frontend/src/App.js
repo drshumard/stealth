@@ -2,7 +2,7 @@ import '@/App.css';
 import { useState } from 'react';
 import {
   createBrowserRouter, RouterProvider, Outlet,
-  useSearchParams, useOutletContext,
+  useLocation, useSearchParams, useOutletContext,
 } from 'react-router-dom';
 import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/sonner';
@@ -19,6 +19,9 @@ import AutomationBuilderPage from '@/components/AutomationBuilderPage';
 import SalesPage from '@/components/SalesPage';
 import StealthPage from '@/components/StealthPage';
 import LoginPage from '@/components/LoginPage';
+import ResetPasswordPage from '@/components/ResetPasswordPage';
+import UsersPage from '@/workspace/UsersPage';
+import { TOKEN_KEY, authJson } from '@/workspace/auth';
 import { ContactDetailModal } from '@/components/ContactDetailModal';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
@@ -37,10 +40,27 @@ const queryClient = new QueryClient({
 function AppShell() {
   const qc = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [authToken, setAuthToken] = useState(() => localStorage.getItem('tether_auth'));
+  const { pathname } = useLocation();
+  const [authToken, setAuthToken] = useState(() => localStorage.getItem(TOKEN_KEY));
 
-  const handleLogin  = (token) => { localStorage.setItem('tether_auth', token); setAuthToken(token); };
-  const handleLogout = ()      => { localStorage.removeItem('tether_auth'); setAuthToken(null); };
+  const handleLogin  = (token) => { localStorage.setItem(TOKEN_KEY, token); setAuthToken(token); };
+  const handleLogout = () => {
+    authJson('/auth/logout', { method: 'POST' }).catch(() => {});
+    localStorage.removeItem(TOKEN_KEY);
+    setAuthToken(null);
+    qc.removeQueries({ queryKey: ['me'] });
+  };
+
+  // The server checks the session; a missing, expired or revoked token signs out.
+  const me = useQuery({
+    queryKey: ['me', authToken],
+    queryFn: () => authJson('/auth/me'),
+    enabled: !!authToken,
+    retry: false,
+    staleTime: 300_000,
+  });
+  const sessionRejected = me.error?.status === 401;
+  const user = me.data?.user;
 
 
   const selectedContactId = searchParams.get('contact');
@@ -74,8 +94,21 @@ function AppShell() {
   });
 
   // ── Actions ────────────────────────────────────────────────
+  // Public: the link from a password-reset / invite email.
+  if (pathname === '/reset-password') return <ResetPasswordPage />;
   // Show login page if not authenticated — all hooks already called above
-  if (!authToken) return <LoginPage onLogin={handleLogin} />;
+  if (!authToken || sessionRejected) {
+    if (sessionRejected) localStorage.removeItem(TOKEN_KEY);
+    return <LoginPage onLogin={handleLogin} />;
+  }
+  if (!user) {   // checking the session
+    return me.isError ? (
+      <div className="sp-app sp-login"><main className="sp-login-main"><div className="sp-login-card">
+        <h2>Can’t reach Stealth</h2><p>{me.error?.message || 'The server did not respond.'}</p>
+        <button type="button" className="sp-primary-button sp-login-submit" onClick={() => me.refetch()}>Try again</button>
+      </div></main></div>
+    ) : null;
+  }
 
   const handleRefresh = () => {
     qc.invalidateQueries({ queryKey: ['contacts'] });
@@ -118,6 +151,8 @@ function AppShell() {
     onSelectContact: handleSelectContact,
     onDeleteContact: handleDeleteContact,
     onBulkDelete:    handleBulkDelete,
+    user,
+    mailConfigured: !!me.data?.mail_configured,
   };
 
   return (
@@ -135,7 +170,7 @@ function AppShell() {
           },
         }}
       />
-      <WorkspaceShell onLogout={handleLogout}>
+      <WorkspaceShell onLogout={handleLogout} user={user}>
         {/* Child routes render here and receive the shared context */}
         <Outlet context={shared} />
       </WorkspaceShell>
@@ -186,6 +221,11 @@ function LogsRoute() {
   return <LogsPage onSelectContact={onSelectContact} />;
 }
 
+function UsersRoute() {
+  const { user } = useOutletContext();
+  return <UsersPage me={user} />;
+}
+
 function AnalyticsRoute() {
   const { onSelectContact } = useOutletContext();
   return <AnalyticsPage onSelectContact={onSelectContact} />;
@@ -197,7 +237,6 @@ function AnalyticsRoute() {
 // navigating away with unsaved changes).
 
 const router = createBrowserRouter([
-  // Isolated, fictional-data design preview; the live routes and API remain unchanged.
   {
     element: <AppShell />,
     children: [
@@ -211,6 +250,8 @@ const router = createBrowserRouter([
       { path: '/automations/builder/:id', element: <AutomationBuilderPage /> },
       { path: '/analytics',               element: <AnalyticsRoute /> },
       { path: '/logs',                    element: <LogsRoute /> },
+      { path: '/users',                   element: <UsersRoute /> },
+      { path: '/reset-password',          element: null },
     ],
   },
 ]);

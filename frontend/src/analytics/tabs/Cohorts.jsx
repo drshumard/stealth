@@ -17,7 +17,7 @@ export default function Cohorts({ state, update }) {
         options={(period === 'week' ? [6, 8, 10, 12, 16, 20, 26] : [3, 4, 6, 8]).map(n => ({ value: String(n), label: `Last ${n} ${period}s` }))} />
       <span className="an-note">People grouped by the {period} they were first seen. Source / campaign filters apply; the date range doesn’t.</span>
     </div>
-    <Panel title="Cohort quality" eyebrow="Size and conversion of each cohort" query={q} empty={!rows.length}
+    <Panel help="cohorts" title="Cohort quality" eyebrow="Size and conversion of each cohort" query={q} empty={!rows.length}
       footer={<Legend items={[{ label: 'People', color: '#c9d6f2' }, { label: 'Identified %', color: PALETTE[0] },
         { label: 'Registered %', color: PALETTE[1] }, { label: `Came back the next ${period}`, color: PALETTE[2] }]} />}>
       <ResponsiveContainer width="100%" height={260}>
@@ -34,7 +34,7 @@ export default function Cohorts({ state, update }) {
         </ComposedChart>
       </ResponsiveContainer>
     </Panel>
-    <Panel title="Retention" eyebrow={`Share of each cohort that visited again in later ${period}s`} query={q} empty={!rows.length}>
+    <Panel help="cohorts" title="Retention" eyebrow={`Share of each cohort that visited again in later ${period}s`} query={q} empty={!rows.length}>
       <CohortMatrix rows={rows} period={period} />
       <p className="an-note">Darker = more of the cohort came back. Identified / registered / bought are what the cohort has done so far.</p>
     </Panel>

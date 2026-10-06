@@ -3193,47 +3193,7 @@ async def get_sales(limit: int = 500):
 
 
 # ─────────────────────────── Auth ───────────────────────────────────────────
-
-class LoginRequest(BaseModel):
-    email: str
-    password: str
-
-def _make_token(email: str, password: str) -> str:
-    """
-    Daily-rotating HMAC token.  Valid until midnight UTC — users are automatically
-    re-prompted after a day.  Simple enough for a single-user dashboard.
-    """
-    day = str(int(datetime.now(timezone.utc).timestamp()) // 86400)
-    raw = __import__('hmac').new(
-        password.encode(), f"{email.lower()}:{day}".encode(), __import__('hashlib').sha256
-    ).hexdigest()
-    import base64
-    return base64.urlsafe_b64encode(raw.encode()).decode()
-
-@api_router.post("/auth/login")
-async def auth_login(data: LoginRequest):
-    expected_email    = os.environ.get('TETHER_EMAIL',    'admin@tether.com')
-    expected_password = os.environ.get('TETHER_PASSWORD', 'tether2024')
-
-    email_ok    = data.email.strip().lower() == expected_email.strip().lower()
-    password_ok = data.password == expected_password
-
-    if not (email_ok and password_ok):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-
-    token = _make_token(expected_email, expected_password)
-    return {"token": token, "email": expected_email}
-
-@api_router.post("/auth/verify")
-async def auth_verify(payload: dict):
-    expected_email    = os.environ.get('TETHER_EMAIL',    'admin@tether.com')
-    expected_password = os.environ.get('TETHER_PASSWORD', 'tether2024')
-    token = payload.get('token', '')
-    expected = _make_token(expected_email, expected_password)
-    if __import__('hmac').compare_digest(token, expected):
-        return {"valid": True, "email": expected_email}
-    raise HTTPException(status_code=401, detail="Token invalid or expired")
-
+# Users, sessions and password resets live in auth.py (mounted below).
 
 
 # ─────────────────────────── StealthWebinar Registrations ────────────────────
@@ -3489,6 +3449,8 @@ async def create_indexes():
         logger.warning(f"Index creation warning: {e}")
 
 
+from auth import build_router as build_auth_router  # noqa: E402
+api_router.include_router(build_auth_router(db))
 from analytics import Pending as AnalyticsPending, build_router as build_analytics_router, pending_handler  # noqa: E402
 api_router.include_router(build_analytics_router(db))
 app.add_exception_handler(AnalyticsPending, pending_handler)

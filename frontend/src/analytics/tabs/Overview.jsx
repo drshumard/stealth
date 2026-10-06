@@ -50,7 +50,7 @@ export default function Overview({ state, update, drill }) {
       ))}
     </div>
 
-    <Panel title="Trend" eyebrow={`${METRICS[selected[0]]?.label || ''}${selected.length > 1 ? ` + ${selected.length - 1} more` : ''} · by ${gran || '…'}`}
+    <Panel help="compare" title="Trend" eyebrow={`${METRICS[selected[0]]?.label || ''}${selected.length > 1 ? ` + ${selected.length - 1} more` : ''} · by ${gran || '…'}`}
       query={ts} empty={!series.length}
       actions={<Segmented label="Chart type" value={kind} onChange={v => update({ ck: v === 'area' ? null : v })}
         options={[{ value: 'area', label: 'Area' }, { value: 'line', label: 'Line' }, { value: 'bar', label: 'Bars' }]} />}
@@ -61,25 +61,25 @@ export default function Overview({ state, update, drill }) {
     </Panel>
 
     <div className="an-grid an-grid-2">
-      <Panel title="New vs returning visitors" eyebrow="Who came" query={ts} empty={!series.length}
+      <Panel help="new-vs-returning" title="New vs returning visitors" eyebrow="Who came" query={ts} empty={!series.length}
         footer={<Legend items={[{ label: 'New (first seen that period)', color: PALETTE[0] }, { label: 'Returning', color: PALETTE[2] }]} />}>
         <StackedChart data={series.map(d => ({ bucket: d.bucket, New: d.new_visitors, Returning: d.returning_visitors }))}
           keys={['New', 'Returning']} gran={gran} kind="bar" colors={[PALETTE[0], PALETTE[2]]} />
       </Panel>
-      <Panel title="Journey" eyebrow="People first seen in this period" query={funnel} empty={!funnel.data?.steps?.[0]?.count}
+      <Panel help="journey" title="Journey" eyebrow="People first seen in this period" query={funnel} empty={!funnel.data?.steps?.[0]?.count}
         footer={funnel.data && <small>{fmtNum(funnel.data.abandoned)} identified but never registered · ${fmtNum(funnel.data.revenue)} lifetime revenue from this group</small>}>
         {funnel.data && <Funnel steps={funnel.data.steps} />}
       </Panel>
     </div>
 
     <div className="an-grid an-grid-2">
-      <Panel title="Lead outcomes" eyebrow="Identified leads, by when they were identified" query={ts} empty={!series.length}
+      <Panel help="lead-outcomes" title="Lead outcomes" eyebrow="Identified leads, by when they were identified" query={ts} empty={!series.length}
         footer={<Legend items={[{ label: 'Registered', color: PALETTE[1] }, { label: 'Abandoned (no registration)', color: PALETTE[4] }]} />}
         actions={<button type="button" className="sp-clear" onClick={() => update({ tab: 'leads' })}>Abandonment analysis →</button>}>
         <StackedChart data={series.map(d => ({ bucket: d.bucket, Registered: Math.max(0, d.identified - d.abandoned), Abandoned: d.abandoned }))}
           keys={['Registered', 'Abandoned']} gran={gran} kind="bar" colors={[PALETTE[1], PALETTE[4]]} />
       </Panel>
-      <Panel title="When it happens" eyebrow="Weekday × hour" query={heat}
+      <Panel help="heatmap" title="When it happens" eyebrow="Weekday × hour" query={heat}
         actions={<Select label="Heatmap metric" value={heatMetric} onChange={v => update({ hm: v === 'visits' ? null : v })}
           options={[{ value: 'visits', label: 'Page views' }, { value: 'identified', label: 'Identifications' },
             { value: 'registrations', label: 'Registrations' }, { value: 'sales', label: 'Sales' }]} />}>
@@ -88,14 +88,14 @@ export default function Overview({ state, update, drill }) {
     </div>
 
     <div className="an-grid an-grid-3">
-      <Panel title="Sources" eyebrow="New people by UTM source" query={sources} empty={!sources.data?.rows?.length}
+      <Panel help="attribution" title="Sources" eyebrow="New people by UTM source" query={sources} empty={!sources.data?.rows?.length}
         actions={<button type="button" className="sp-clear" onClick={() => update({ tab: 'attribution' })}>Attribution →</button>}>
         {sources.data && <Donut rows={sources.data.rows} valueKey="contacts" labelKey="key" centerLabel="people" />}
       </Panel>
-      <Panel title="Devices" eyebrow="New people by device" query={devices} empty={!devices.data?.rows?.length}>
+      <Panel help="attribution" title="Devices" eyebrow="New people by device" query={devices} empty={!devices.data?.rows?.length}>
         {devices.data && <Donut rows={devices.data.rows} valueKey="contacts" labelKey="key" centerLabel="people" />}
       </Panel>
-      <Panel title="Top pages" eyebrow="By visitors" query={pages} empty={!pages.data?.rows?.length}
+      <Panel help="pages" title="Top pages" eyebrow="By visitors" query={pages} empty={!pages.data?.rows?.length}
         actions={<button type="button" className="sp-clear" onClick={() => update({ tab: 'pages' })}>All pages →</button>}>
         {pages.data && <BarList rows={pages.data.rows} value="visitors" secondary={r => fmtPct(r.identification_rate)}
           onClick={r => drill({ tab: 'pages', pg: r.raw })} />}

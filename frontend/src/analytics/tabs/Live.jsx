@@ -20,7 +20,7 @@ export default function Live() {
       <div><span>New leads</span><strong>{fmtNum(d?.identified_30m)}</strong><small>identified in 30 minutes</small></div>
       <div><span>Registrations</span><strong>{fmtNum(d?.registrations_30m)}</strong><small>in 30 minutes</small></div>
     </div>
-    <Panel title="Page views per minute" eyebrow="Last 30 minutes · updates every 10 seconds" query={q} empty={!d?.series?.length}>
+    <Panel help="live" title="Page views per minute" eyebrow="Last 30 minutes · updates every 10 seconds" query={q} empty={!d?.series?.length}>
       {d && (
         <ResponsiveContainer width="100%" height={240}>
           <BarChart data={d.series} margin={{ top: 10, right: 8, bottom: 0, left: 0 }}>
@@ -35,10 +35,10 @@ export default function Live() {
       )}
     </Panel>
     <div className="an-grid an-grid-2">
-      <Panel title="Pages right now" eyebrow="Visitors in the last 5 minutes" query={q} empty={!d?.pages?.length && 'Nobody on the site in the last 5 minutes.'}>
+      <Panel help="live" title="Pages right now" eyebrow="Visitors in the last 5 minutes" query={q} empty={!d?.pages?.length && 'Nobody on the site in the last 5 minutes.'}>
         {d && <BarList rows={d.pages} label="page" value="visitors" />}
       </Panel>
-      <Panel title="Sources" eyebrow="Visitors in the last 30 minutes" query={q} empty={!d?.sources?.length}>
+      <Panel help="live" title="Sources" eyebrow="Visitors in the last 30 minutes" query={q} empty={!d?.sources?.length}>
         {d && <BarList rows={d.sources} label="source" value="visitors" tone="green" />}
       </Panel>
     </div>

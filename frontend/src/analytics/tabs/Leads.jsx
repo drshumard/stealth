@@ -42,16 +42,16 @@ export default function Leads({ state, update, onSelectContact }) {
     <p className="an-note an-note-top">Abandoned = gave an email or phone but has no <code>stealth</code> or <code>registered</code> tag — they never completed registration.</p>
 
     <div className="an-grid an-grid-2">
-      <Panel title="Funnel" eyebrow="People first seen in this period" query={funnel} empty={!funnel.data?.steps?.[0]?.count}>
+      <Panel help="journey" title="Funnel" eyebrow="People first seen in this period" query={funnel} empty={!funnel.data?.steps?.[0]?.count}>
         {funnel.data && <Funnel steps={funnel.data.steps} />}
       </Panel>
-      <Panel title="Registered vs abandoned" eyebrow="Leads by the day they were identified" query={ts} empty={!series.length}
+      <Panel help="abandoned" title="Registered vs abandoned" eyebrow="Leads by the day they were identified" query={ts} empty={!series.length}
         footer={<Legend items={[{ label: 'Registered', color: PALETTE[1] }, { label: 'Abandoned', color: PALETTE[4] }]} />}>
         <StackedChart data={withRate} keys={['Registered', 'Abandoned']} gran={gran} kind="bar" colors={[PALETTE[1], PALETTE[4]]} />
       </Panel>
     </div>
 
-    <Panel title="Where leads abandon" eyebrow="Abandon rate of the people first seen in this period (5+ identified)" query={byDim} empty={!dimRows.length}
+    <Panel help="where-abandon" title="Where leads abandon" eyebrow="Abandon rate of the people first seen in this period (5+ identified)" query={byDim} empty={!dimRows.length}
       actions={<Select label="Group by" value={dim} onChange={v => update({ ad: v === 'campaign' ? null : v })} options={DIMS} />}>
       <DataTable rows={dimRows} rowKey={r => String(r.raw)} defaultSort={{ key: 'abandoned', dir: 'desc' }} maxRows={15}
         exportName={`abandonment-by-${dim}-${state.since}-${state.until}`}
@@ -69,31 +69,31 @@ export default function Leads({ state, update, onSelectContact }) {
     </Panel>
 
     <div className="an-grid an-grid-2">
-      <Panel title="Last page before abandoning" eyebrow="The final page abandoned leads viewed" query={people} empty={!a?.last_pages?.length}>
+      <Panel help="abandoned" title="Last page before abandoning" eyebrow="The final page abandoned leads viewed" query={people} empty={!a?.last_pages?.length}>
         {a && <BarList rows={a.last_pages} label="page" value="count" tone="red" secondary={r => fmtPct(r.count / Math.max(1, a.abandoned), 0)}
           onClick={r => update({ tab: 'pages', pg: r.page })} />}
       </Panel>
-      <Panel title="How engaged were they?" eyebrow="Page views per abandoned lead (all time)" query={people} empty={!a?.visits}>
+      <Panel help="abandoned" title="How engaged were they?" eyebrow="Page views per abandoned lead (all time)" query={people} empty={!a?.visits}>
         {a && <Histogram rows={a.visits} label="leads" color={PALETTE[4]} />}
       </Panel>
     </div>
 
     <div className="an-grid an-grid-2">
-      <Panel title="Time to identify" eyebrow={`First visit → email/phone · ${fmtNum(t?.to_identify?.n)} people`} query={timing} empty={!t?.to_identify?.n}>
+      <Panel help="timing" title="Time to identify" eyebrow={`First visit → email/phone · ${fmtNum(t?.to_identify?.n)} people`} query={timing} empty={!t?.to_identify?.n}>
         {t && <Histogram rows={t.to_identify.histogram} label="people" />}
       </Panel>
-      <Panel title="Time to register" eyebrow={`First visit → webinar registration · ${fmtNum(t?.to_register?.n)} people`} query={timing} empty={!t?.to_register?.n}>
+      <Panel help="timing" title="Time to register" eyebrow={`First visit → webinar registration · ${fmtNum(t?.to_register?.n)} people`} query={timing} empty={!t?.to_register?.n}>
         {t && <Histogram rows={t.to_register.histogram} label="people" color={PALETTE[1]} />}
       </Panel>
-      <Panel title="Time to purchase" eyebrow={`First visit → first sale · ${fmtNum(t?.to_purchase?.n)} buyers`} query={timing} empty={!t?.to_purchase?.n}>
+      <Panel help="timing" title="Time to purchase" eyebrow={`First visit → first sale · ${fmtNum(t?.to_purchase?.n)} buyers`} query={timing} empty={!t?.to_purchase?.n}>
         {t && <Histogram rows={t.to_purchase.histogram} label="buyers" color={PALETTE[2]} />}
       </Panel>
-      <Panel title="Visits before buying" eyebrow={`Page views up to the first sale · median ${fmtNum(t?.visits_before_purchase?.median)}`} query={timing} empty={!t?.visits_before_purchase?.n}>
+      <Panel help="timing" title="Visits before buying" eyebrow={`Page views up to the first sale · median ${fmtNum(t?.visits_before_purchase?.median)}`} query={timing} empty={!t?.visits_before_purchase?.n}>
         {t && <Histogram rows={t.visits_before_purchase.histogram} label="buyers" color={PALETTE[3]} />}
       </Panel>
     </div>
 
-    <Panel title="Abandoned leads" eyebrow={`${fmtNum(a?.matching)} people · identified in this period, never registered`} query={people}
+    <Panel help="abandoned" title="Abandoned leads" eyebrow={`${fmtNum(a?.matching)} people · identified in this period, never registered`} query={people}
       actions={<>
         <label className="sp-search an-search"><Search size={15} /><input value={q} placeholder="Search name, email, phone"
           onChange={e => { setQ(e.target.value); setOffset(0); }} aria-label="Search abandoned leads" /></label>

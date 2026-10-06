@@ -74,7 +74,7 @@ export default function Explorer({ state, update }) {
       </div>
     </section>
 
-    <Panel title={`${labelOf(primary)} by ${dims.find(([d]) => d === dim)?.[1].toLowerCase()}`}
+    <Panel help="report-builder" title={`${labelOf(primary)} by ${dims.find(([d]) => d === dim)?.[1].toLowerCase()}`}
       eyebrow={`${base === 'contacts' ? 'People first seen in the period' : 'Page views in the period'} · ${fmtNum(q.data?.total_rows)} groups`}
       query={chart === 'trend' ? trend : q} empty={chart === 'trend' ? !trend.data?.series?.length : !shown.length}
       footer={chart === 'trend' && trend.data && <Legend items={trend.data.keys.map((k, i) => ({ label: k, color: PALETTE[i] }))} />}>

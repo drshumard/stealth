@@ -36,19 +36,19 @@ export default function Pages({ state, update }) {
 
   return <>
     <div className="an-grid an-grid-3">
-      <Panel title="Sites" eyebrow="Views by domain" query={q} empty={!q.data?.hosts?.length}>
+      <Panel help="pages" title="Sites" eyebrow="Views by domain" query={q} empty={!q.data?.hosts?.length}>
         {q.data && <BarList rows={q.data.hosts} label="host" value="views" secondary={h => `${h.pages} pages`}
           onClick={h => update({ host: h.host })} />}
       </Panel>
-      <Panel title="Landing pages" eyebrow="Where sessions start" query={q} empty={!entry.length}>
+      <Panel help="pages" title="Landing pages" eyebrow="Where sessions start" query={q} empty={!entry.length}>
         <BarList rows={entry} label="raw" value="entries" secondary={r => `${fmtPct(r.bounce_rate, 0)} bounce`} onClick={r => update({ pg: r.raw })} />
       </Panel>
-      <Panel title="Lead-generating pages" eyebrow="Visitors who became leads (100+ visitors)" query={q} empty={!converters.length}>
+      <Panel help="pages" title="Lead-generating pages" eyebrow="Visitors who became leads (100+ visitors)" query={q} empty={!converters.length}>
         <BarList rows={converters} label="raw" value="identification_rate" fmt={v => fmtPct(v)} tone="green"
           secondary={r => `${fmtCompact(r.identified)} of ${fmtCompact(r.visitors)}`} onClick={r => update({ pg: r.raw })} />
       </Panel>
     </div>
-    <Panel title="All pages" eyebrow={`${fmtNum(q.data?.total_rows)} pages · query strings removed, www. ignored`} query={q} empty={!rows.length}>
+    <Panel help="pages" title="All pages" eyebrow={`${fmtNum(q.data?.total_rows)} pages · query strings removed, www. ignored`} query={q} empty={!rows.length}>
       <DataTable columns={columns} rows={rows} rowKey={r => r.raw} defaultSort={{ key: 'views', dir: 'desc' }} maxRows={25}
         onRowClick={r => update({ pg: r.raw })} exportName={`pages-${state.since}-${state.until}`} />
     </Panel>
@@ -80,17 +80,17 @@ function PageDetail({ state, update, page, row }) {
         ))}
       </div>
     )}
-    <Panel title="Visitors to this page" eyebrow={`by ${gran || '…'}`} query={ts} empty={!series.length}
+    <Panel help="pages" title="Visitors to this page" eyebrow={`by ${gran || '…'}`} query={ts} empty={!series.length}
       footer={<Legend items={[{ label: 'Visitors', color: PALETTE[0] }, { label: 'Identified that period (of these visitors)', color: PALETTE[1] },
         ...(state.compare ? [{ label: 'Previous period', color: '#8a98aa', dashed: true, faded: true }] : [])]} />}>
       <TrendChart data={series} prev={state.compare ? prevSeries : null} metrics={['visitors', 'identified']} gran={gran} />
     </Panel>
     <div className="an-grid an-grid-2">
-      <Panel title="Came from" eyebrow="The page viewed just before (same session)" query={flow} empty={!flow.data?.previous?.length}>
+      <Panel help="pages" title="Came from" eyebrow="The page viewed just before (same session)" query={flow} empty={!flow.data?.previous?.length}>
         {flow.data && <BarList rows={flow.data.previous} label="page" value="count" secondary={r => fmtPct(r.count / flow.data.views, 0)}
           onClick={r => !r.page.startsWith('(') && update({ pg: r.page })} />}
       </Panel>
-      <Panel title="Went next" eyebrow="The page viewed just after (same session)" query={flow} empty={!flow.data?.next?.length}>
+      <Panel help="pages" title="Went next" eyebrow="The page viewed just after (same session)" query={flow} empty={!flow.data?.next?.length}>
         {flow.data && <BarList rows={flow.data.next} label="page" value="count" tone="green" secondary={r => fmtPct(r.count / flow.data.views, 0)}
           onClick={r => !r.page.startsWith('(') && update({ pg: r.page })} />}
       </Panel>

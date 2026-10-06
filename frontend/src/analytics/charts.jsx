@@ -3,8 +3,10 @@ import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, Pie, PieChart, ResponsiveContainer,
   Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis,
 } from 'recharts';
-import { AlertTriangle, ArrowDown, ArrowDownRight, ArrowUp, ArrowUpRight, ChevronDown, Download, Loader2, Minus } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { AlertTriangle, ArrowDown, ArrowDownRight, ArrowUp, ArrowUpRight, ChevronDown, CircleHelp, Download, Loader2, Minus } from 'lucide-react';
 import { FORMAT, METRICS, PALETTE, bucketLabel, delta, fmtCompact, fmtMetric, fmtNum, fmtPct } from './lib';
+import { KPI_HELP } from './guide';
 
 // Charts and panels for the analytics workspace — recharts, styled to the workspace.
 
@@ -12,14 +14,24 @@ const AXIS = { stroke: '#c9d3e1', tick: { fill: '#8a98aa', fontSize: 11 }, tickL
 const GRID = <CartesianGrid stroke="#edf1f6" vertical={false} />;
 
 // ── frame: title, actions, loading / error / empty ──
-export function Panel({ title, eyebrow, actions, children, query, empty, className = '', footer, span }) {
+export function HelpLink({ id }) {
+  const [, setSp] = useSearchParams();
+  return (
+    <button type="button" className="an-help" title="What does this mean?" aria-label="What does this mean? Open the guide"
+      onClick={() => setSp(cur => { const n = new URLSearchParams(cur); n.set('tab', 'guide'); n.set('g', id); return n; })}>
+      <CircleHelp size={14} />
+    </button>
+  );
+}
+
+export function Panel({ title, eyebrow, actions, children, query, empty, className = '', footer, span, help }) {
   const loading = query?.isLoading;
   const error = query?.isError && !query?.data;
   return (
     <section className={`sp-surface an-panel ${className}`} data-span={span}>
       {(title || actions) && (
         <div className="an-panel-head">
-          <div>{eyebrow && <span className="sp-eyebrow">{eyebrow}</span>}{title && <h2>{title}</h2>}</div>
+          <div>{eyebrow && <span className="sp-eyebrow">{eyebrow}</span>}{title && <h2>{title}{help && <HelpLink id={help} />}</h2>}</div>
           <div className="an-panel-actions">
             {query?.isFetching && !loading && <Loader2 size={14} className="sp-spin an-refreshing" aria-label="Updating" />}
             {actions}
@@ -88,7 +100,7 @@ function Tip({ active, payload, label, gran, fmt, labelFmt }) {
 export function Kpi({ metric, cur, prev, series, active, onClick, compare }) {
   const m = METRICS[metric];
   return (
-    <button type="button" className="an-kpi" aria-pressed={!!active} onClick={onClick}>
+    <button type="button" className="an-kpi" aria-pressed={!!active} onClick={onClick} title={KPI_HELP[metric] ? `${m.label}: ${KPI_HELP[metric]} Click to chart it.` : undefined}>
       <span className="an-kpi-label">{m.label}</span>
       <strong>{fmtMetric(metric, cur)}</strong>
       <span className="an-kpi-foot">{compare ? <><Delta cur={cur} prev={prev} good={m.good} /><small>vs {fmtMetric(metric, prev)}</small></> : <small>&nbsp;</small>}</span>

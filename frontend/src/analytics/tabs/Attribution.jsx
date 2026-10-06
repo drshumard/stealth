@@ -34,7 +34,7 @@ export default function Attribution({ state, update }) {
     </div>
 
     <div className="an-grid an-grid-2">
-      <Panel title="Volume vs conversion" eyebrow={`Bubble size: ${size === 'revenue' ? 'revenue' : 'buyers'} · groups with ${minSize}+ people`} query={q}
+      <Panel help="attribution" title="Volume vs conversion" eyebrow={`Bubble size: ${size === 'revenue' ? 'revenue' : 'buyers'} · groups with ${minSize}+ people`} query={q}
         empty={!rows.filter(r => r.contacts >= minSize).length}
         actions={<>
           <Select label="Rate" value={rateKey} onChange={v => update({ r: v === 'registration_rate' ? null : v })} options={RATE} />
@@ -44,7 +44,7 @@ export default function Attribution({ state, update }) {
         <Bubble rows={rows.filter(r => r.contacts >= minSize)} x="contacts" y={rateKey} z={size} xLabel="People" yLabel={RATE.find(r => r.value === rateKey)?.label}
           zLabel={size === 'revenue' ? 'Revenue' : 'Buyers'} zFmt={size === 'revenue' ? fmtMoney : fmtNum} onClick={drill} />
       </Panel>
-      <Panel title={`${label} over time`} eyebrow={`Top 6 by ${TREND_METRIC.find(m => m.value === trendMetric)?.label.toLowerCase()}`} query={trend} empty={!trend.data?.series?.length}
+      <Panel help="attribution" title={`${label} over time`} eyebrow={`Top 6 by ${TREND_METRIC.find(m => m.value === trendMetric)?.label.toLowerCase()}`} query={trend} empty={!trend.data?.series?.length}
         actions={<>
           <Select label="Metric" value={trendMetric} onChange={v => update({ tm: v === 'identified' ? null : v })} options={TREND_METRIC} />
           <Segmented label="Scale" value={share ? 'share' : 'count'} onChange={v => update({ ts: v === 'share' ? 'share' : null })}
@@ -55,7 +55,7 @@ export default function Attribution({ state, update }) {
       </Panel>
     </div>
 
-    <Panel title={`By ${label?.toLowerCase()}`} eyebrow={`${fmtNum(q.data?.total_rows)} groups`} query={q} empty={!rows.length}>
+    <Panel help="attribution" title={`By ${label?.toLowerCase()}`} eyebrow={`${fmtNum(q.data?.total_rows)} groups`} query={q} empty={!rows.length}>
       <DataTable rows={rows} rowKey={r => String(r.raw)} defaultSort={{ key: 'contacts', dir: 'desc' }} maxRows={30}
         onRowClick={drillable ? drill : undefined} exportName={`attribution-${dim}-${state.since}-${state.until}`}
         columns={[
