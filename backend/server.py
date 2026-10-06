@@ -1,5 +1,7 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Request, BackgroundTasks, Query
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, Response
+from fastapi.encoders import jsonable_encoder
+from analytics import cached as shared_cached, forget as forget_cached   # memory + MongoDB cache, serve-stale-while-refreshing
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -2272,6 +2274,18 @@ async def stitch_by_session(session_id: str):
 
 @api_router.get("/contacts", response_model=List[ContactWithStats])
 async def get_contacts(search: Optional[str] = None, include_merged: bool = False):
+    # The default list (newest 10,000, ~14MB) is built at most every 30s and shared by every open tab; until a fresh
+    # copy is ready the last one is served at once.
+    if not search and not include_merged:
+        async def build():
+            rows = await _contacts_list(None, False)
+            return json.dumps(jsonable_encoder(rows), separators=(',', ':')).encode()
+        body = await shared_cached('contacts_list', 30, build, wait=None, persist=False)
+        return Response(content=body, media_type='application/json')
+    return await _contacts_list(search, include_merged)
+
+
+async def _contacts_list(search: Optional[str], include_merged: bool):
     try:
         query: dict = {}
         if not include_merged:
@@ -2344,6 +2358,7 @@ async def get_contact_detail(contact_id: str):
 async def delete_contact(contact_id: str):
     try:
         result = await db.contacts.delete_one({"contact_id": contact_id})
+        forget_cached('contacts_list', 'stats_totals')   # deletions show at once, not after the 30s cache
         if result.deleted_count == 0:
             raise HTTPException(status_code=404, detail="Contact not found")
         # Also remove all page visits associated with this contact
@@ -2378,6 +2393,11 @@ async def _cached(key: str, compute, ttl: int = 60):
 
 @api_router.get("/stats")
 async def get_stats():
+    # Counted over every record (seconds of work) — shared by every open tab, refreshed at most every 30s.
+    return await shared_cached('stats_totals', 30, _compute_stats, wait=None, persist=True)
+
+
+async def _compute_stats():
     try:
         total_contacts = await db.contacts.count_documents({"merged_into": None})
         total_visits   = await db.page_visits.count_documents({})
@@ -3410,6 +3430,20 @@ async def get_stealth_registrations(limit: int = 1000):
 
 # ─────────────────────────── Startup: create indexes ───────────────────────────
 
+
+@app.on_event("startup")
+async def prewarm_shared_caches():
+    """Build the stats and the contacts list shortly after start, so the first person in doesn't wait for them."""
+    async def warm():
+        await asyncio.sleep(5)
+        try:
+            await get_stats()
+            await get_contacts()
+        except Exception as e:
+            logger.warning(f"Cache pre-warm failed: {e}")
+    asyncio.create_task(warm())
+
+
 @app.on_event("startup")
 async def create_indexes():
     try:
@@ -3419,6 +3453,7 @@ async def create_indexes():
         await db.contacts.create_index("client_ip",    sparse=True)
         await db.contacts.create_index("merged_into",  sparse=True)
         await db.contacts.create_index("created_at")
+        await db.contacts.create_index([("merged_into", 1), ("updated_at", -1)])   # the contacts list sort
         await db.contacts.create_index("tags",         sparse=True)
         await db.page_visits.create_index("contact_id")
         await db.page_visits.create_index("session_id", sparse=True)

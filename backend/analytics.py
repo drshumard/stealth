@@ -98,6 +98,12 @@ async def _run(key, compute, persist):
         _tasks.pop(key, None)
 
 
+def forget(*keys):
+    """Drop memory-cached results (this worker), e.g. after a deletion."""
+    for k in keys:
+        _cache.pop(k, None)
+
+
 async def cached(key: str, ttl: int, compute, wait=WAIT, persist=None):
     persist = wait is not None if persist is None else persist   # nested helper caches stay in memory
     now = time.time()

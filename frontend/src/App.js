@@ -1,5 +1,5 @@
 import '@/App.css';
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import {
   createBrowserRouter, RouterProvider, Outlet,
   useLocation, useSearchParams, useOutletContext,
@@ -10,7 +10,8 @@ import { toast } from 'sonner';
 import { TimezoneProvider } from '@/components/TimezoneContext';
 import WorkspaceShell from '@/workspace/WorkspaceShell';
 import OverviewPage from '@/workspace/OverviewPage';
-import AnalyticsPage from '@/analytics/AnalyticsPage';
+// Analytics (and its charting library) loads only when opened, so every other page starts faster.
+const AnalyticsPage = lazy(() => import('@/analytics/AnalyticsPage'));
 import LeadsPage from '@/components/LeadsPage';
 import VisitorsPage from '@/components/VisitorsPage';
 import LogsPage from '@/components/LogsPage';
@@ -78,8 +79,9 @@ function AppShell() {
       if (!r.ok) throw new Error('Failed to load contacts');
       return r.json();
     }),
-    refetchInterval: 15_000,
-    enabled: !!authToken,
+    refetchInterval: 60_000,
+    // The full contacts list (~14MB) is only needed by Leads and Visitors.
+    enabled: !!authToken && ['/leads', '/visitors'].includes(pathname),
   });
 
   // ── Stats ──────────────────────────────────────────────────
@@ -89,7 +91,7 @@ function AppShell() {
       if (!r.ok) throw new Error('Failed to load stats');
       return r.json();
     }),
-    refetchInterval: 15_000,
+    refetchInterval: 60_000,
     enabled: !!authToken,
   });
 
@@ -228,7 +230,7 @@ function UsersRoute() {
 
 function AnalyticsRoute() {
   const { onSelectContact } = useOutletContext();
-  return <AnalyticsPage onSelectContact={onSelectContact} />;
+  return <Suspense fallback={<div className="an-state an-loading"><span className="sp-skeleton" /><span className="sp-skeleton" /></div>}><AnalyticsPage onSelectContact={onSelectContact} /></Suspense>;
 }
 
 // ── Data Router ───────────────────────────────────────────────
