@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { Activity, BarChart3, Blocks, BookOpen, FileText, Layers, Radio, Target, Users } from 'lucide-react';
+import { Activity, BarChart3, Blocks, BookOpen, Clock, FileText, Layers, Radio, Target, Users } from 'lucide-react';
 import { PageIntro } from '@/workspace/ui';
 import FilterBar from './FilterBar';
 import { useAnalyticsState } from './lib';
@@ -9,6 +9,7 @@ const Pages = lazy(() => import('./tabs/Pages'));
 const Visitors = lazy(() => import('./tabs/Visitors'));
 const Leads = lazy(() => import('./tabs/Leads'));
 const Attribution = lazy(() => import('./tabs/Attribution'));
+const Hourly = lazy(() => import('./tabs/Hourly'));
 const Cohorts = lazy(() => import('./tabs/Cohorts'));
 const Explorer = lazy(() => import('./tabs/Explorer'));
 const Live = lazy(() => import('./tabs/Live'));
@@ -20,6 +21,7 @@ const TABS = [
   { id: 'visitors', label: 'Visitors', icon: Users, C: Visitors },
   { id: 'leads', label: 'Leads & abandonment', icon: Target, C: Leads },
   { id: 'attribution', label: 'Attribution', icon: Layers, C: Attribution },
+  { id: 'hourly', label: 'Hourly & bots', icon: Clock, C: Hourly },
   { id: 'cohorts', label: 'Cohorts', icon: Activity, C: Cohorts },
   { id: 'explorer', label: 'Report builder', icon: Blocks, C: Explorer },
   { id: 'live', label: 'Live', icon: Radio, C: Live },

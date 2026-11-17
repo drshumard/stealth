@@ -861,6 +861,13 @@ body, body *, body *::before, body *::after { font-family: 'Stealth Inter', Inte
 .sp-app .an-cohort td { color: #44546c; }
 .sp-app .an-cohort-cell { min-width: 56px; background: rgba(49, 95, 209, calc(var(--a, 0) * .85)); color: #2c3c54 !important; }
 .sp-app .an-cohort-cell[data-first] { background: #eef2f8; color: #8a98aa !important; }
+/* hourly: ad × hour-of-day grid, bot reasons */
+.sp-app .an-hourgrid th, .sp-app .an-hourgrid td { padding: 6px 4px; }
+.sp-app .an-hourgrid .an-cohort-cell { min-width: 30px; font-size: 11px; text-align: center; }
+.sp-app .an-hourgrid .an-cohort-cell[data-dark] { color: #fff !important; }
+.sp-app .an-hourgrid tbody th button { display: block; max-width: 220px; overflow: hidden; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; text-overflow: ellipsis; cursor: pointer; }
+.sp-app .an-hourgrid tbody th button:hover { color: #315fd1; }
+.sp-app .an-bot-reasons { display: grid; gap: 2px; margin: 10px 0 0; padding: 0; list-style: none; }
 /* stat strips, toolbars, page detail, report builder, live */
 .sp-app .an-stat-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--sp-line); border-radius: 4px; background: var(--sp-line); }
 .sp-app .an-stat-strip > div { display: flex; flex-direction: column; gap: 3px; padding: 12px 14px; background: #fff; }

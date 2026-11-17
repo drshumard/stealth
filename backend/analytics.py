@@ -32,6 +32,16 @@ ATTR = {'source': 'utm_source', 'medium': 'utm_medium', 'campaign': 'utm_campaig
 KNOWN = {'$nin': [None, '']}
 WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']   # Mongo $dayOfWeek: 1 = Sunday
 
+# Suspected bots (the hourly view). A visitor is flagged for an hour when any rule hits:
+#   ip_burst  their IP produced BOT_IP_VISITORS+ different visitor IDs in that hour (a script that drops its cookie each hit)
+#   rapid     they loaded BOT_RAPID_VIEWS+ pages in that hour
+#   bot_ua    their contact's user agent names a crawler / headless browser / HTTP library
+HOURLY_MAX_DAYS = 31
+BOT_IP_VISITORS = 10
+BOT_RAPID_VIEWS = 30
+BOT_UA = (r'bot/|\bbot\b|crawl|spider|slurp|headless|phantom|selenium|puppeteer|playwright|webdriver|lighthouse|pagespeed|'
+          r'python|curl|wget|httpclient|okhttp|go-http|java/|axios|node-fetch|scrapy|facebookexternalhit|preview')
+
 
 # ── cache ────────────────────────────────────────────────────────────────────
 # Two layers: this process's memory, then MongoDB (analytics_cache) — shared by both uvicorn workers and kept across
@@ -943,6 +953,78 @@ def build_router(db) -> APIRouter:
                     grid[(x['_id']['d'] + 5) % 7][x['_id']['h']] = x['n']     # Monday first
             return {'metric': metric, 'days': ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], 'grid': grid}
         return await cached(f'heat|{metric}|' + f.key(), 180, compute)
+
+    # ── hourly: traffic per clock hour × UTM value, with suspected bots flagged ──
+    async def bot_ua_ids():
+        async def compute():
+            return set(await db.contacts.distinct('contact_id', {'user_agent': {'$regex': BOT_UA, '$options': 'i'}}))
+        return await cached('bot_ua_ids', 600, compute, wait=None)
+
+    @r.get('/hourly')
+    async def hourly(dimension: str = 'content', since: Optional[str] = None, until: Optional[str] = None, tz: str = 'UTC',
+                     source: Optional[str] = None, medium: Optional[str] = None, campaign: Optional[str] = None,
+                     content: Optional[str] = None, term: Optional[str] = None, page: Optional[str] = None,
+                     host: Optional[str] = None):
+        f = common(since, until, tz, source, medium, campaign, content, term, page, host)
+        if dimension not in ATTR:
+            raise HTTPException(status_code=400, detail='dimension must be one of ' + ', '.join(ATTR))
+        if f.days > HOURLY_MAX_DAYS:
+            raise HTTPException(status_code=400, detail=f'Hourly figures cover up to {HOURLY_MAX_DAYS} days — pick a shorter period.')
+
+        async def compute():
+            # one row per visitor × hour × UTM value
+            rows, bot_ua = await asyncio.gather(
+                agg('page_visits', [{'$match': f.visit_match()},
+                                    {'$group': {'_id': {'b': bucket_expr('timestamp', 'hour', f.tz), 'k': visit_dim(dimension, f.tz),
+                                                        'c': '$contact_id'},
+                                                'n': {'$sum': 1}, 's': {'$addToSet': '$session_id'}, 'ip': {'$addToSet': '$client_ip'}}}]),
+                bot_ua_ids())
+            ip_visitors, visitor_views = {}, {}
+            for x in rows:
+                b, c = x['_id']['b'], x['_id']['c']
+                visitor_views[(b, c)] = visitor_views.get((b, c), 0) + x['n']
+                for ip in x['ip']:
+                    if ip:
+                        ip_visitors.setdefault((b, ip), set()).add(c)
+            burst = {k for k, v in ip_visitors.items() if len(v) >= BOT_IP_VISITORS}
+            rapid = {k for k, v in visitor_views.items() if v >= BOT_RAPID_VIEWS}
+
+            cells, reasons, suspects, ips = {}, {'ip_burst': set(), 'rapid': set(), 'bot_ua': set()}, set(), {}
+            for x in rows:
+                b, k, c = x['_id']['b'], label_value(dimension, x['_id']['k']), x['_id']['c']
+                why = [w for w, hit in (('ip_burst', any((b, ip) in burst for ip in x['ip'])), ('rapid', (b, c) in rapid),
+                                        ('bot_ua', c in bot_ua)) if hit]
+                cell = cells.setdefault((b, k), {'bucket': b, 'key': k, 'views': 0, 'visitors': 0, 'sessions': 0,
+                                                 'suspect_views': 0, 'suspect_visitors': 0, 'suspect_sessions': 0})
+                sessions = len([s for s in x['s'] if s])
+                cell['views'] += x['n']
+                cell['visitors'] += 1
+                cell['sessions'] += sessions
+                if not why:
+                    continue
+                cell['suspect_views'] += x['n']
+                cell['suspect_visitors'] += 1
+                cell['suspect_sessions'] += sessions
+                suspects.add(c)
+                for w in why:
+                    reasons[w].add(c)
+                for ip in filter(None, x['ip']):
+                    e = ips.setdefault(ip, {'visitors': set(), 'views': 0, 'hours': set(), 'reasons': set(), 'keys': {}})
+                    e['visitors'].add(c)
+                    e['views'] += x['n']
+                    e['hours'].add(b)
+                    e['reasons'].update(why)
+                    e['keys'][k] = e['keys'].get(k, 0) + x['n']
+            top_ips = sorted(ips.items(), key=lambda kv: (-len(kv[1]['visitors']), -kv[1]['views']))[:50]
+            return {'dimension': dimension, 'label': DIM_LABELS[dimension], 'buckets': bucket_keys(f, 'hour'),
+                    'rows': sorted(cells.values(), key=lambda r: (r['bucket'], -r['visitors'])),
+                    'bots': {'visitors': len({x['_id']['c'] for x in rows}), 'suspect_visitors': len(suspects),
+                             'by_reason': {w: len(v) for w, v in reasons.items()},
+                             'rules': {'ip_burst': BOT_IP_VISITORS, 'rapid': BOT_RAPID_VIEWS},
+                             'ips': [{'ip': ip, 'visitors': len(e['visitors']), 'views': e['views'], 'hours': len(e['hours']),
+                                      'first': min(e['hours']), 'last': max(e['hours']), 'reasons': sorted(e['reasons']),
+                                      'top_key': max(e['keys'].items(), key=lambda kv: kv[1])[0]} for ip, e in top_ips]}}
+        return await cached(f'hourly|{dimension}|' + f.key(), 180, compute)
 
     # ── funnel: what the people first seen in the period went on to do ──
     @r.get('/funnel')
