@@ -24,6 +24,8 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 
+import meta_names
+
 logger = logging.getLogger('analytics')
 
 REG_TAGS = ['stealth', 'registered']
@@ -307,6 +309,8 @@ def label_value(dim, v):
         return WEEKDAYS[v - 1]
     if dim == 'hour' and isinstance(v, int):
         return f'{v:02d}:00'
+    if dim in ATTR and v not in (None, ''):
+        return meta_names.label(v)      # a Meta ad / ad set / campaign id shows its name
     return v if v not in (None, '') else '(none)'
 
 
@@ -447,6 +451,7 @@ def build_router(db) -> APIRouter:
         except Exception as e:
             logger.warning('analytics cache indexes: %s', str(e)[:200])
         asyncio.create_task(warmer())
+        asyncio.create_task(meta_names.run(db))
 
     async def agg(coll, pipeline, hint=None):
         opts = {'hint': hint} if hint else {}
@@ -991,10 +996,11 @@ def build_router(db) -> APIRouter:
 
             cells, reasons, suspects, ips = {}, {'ip_burst': set(), 'rapid': set(), 'bot_ua': set()}, set(), {}
             for x in rows:
-                b, k, c = x['_id']['b'], label_value(dimension, x['_id']['k']), x['_id']['c']
+                b, raw, c = x['_id']['b'], x['_id']['k'], x['_id']['c']
+                k = label_value(dimension, raw)
                 why = [w for w, hit in (('ip_burst', any((b, ip) in burst for ip in x['ip'])), ('rapid', (b, c) in rapid),
                                         ('bot_ua', c in bot_ua)) if hit]
-                cell = cells.setdefault((b, k), {'bucket': b, 'key': k, 'views': 0, 'visitors': 0, 'sessions': 0,
+                cell = cells.setdefault((b, raw), {'bucket': b, 'key': k, 'raw': raw, 'views': 0, 'visitors': 0, 'sessions': 0,
                                                  'suspect_views': 0, 'suspect_visitors': 0, 'suspect_sessions': 0})
                 sessions = len([s for s in x['s'] if s])
                 cell['views'] += x['n']
@@ -1264,7 +1270,8 @@ def build_router(db) -> APIRouter:
                 k: [{'$group': {'_id': f'$attribution.{field}', 'n': {'$sum': 1}}}, {'$sort': {'n': -1}}, {'$limit': 60}]
                 for k, field in ATTR.items()}}])
             for k in ATTR:
-                out[k] = [{'value': x['_id'] if x['_id'] not in (None, '') else '(none)', 'count': x['n']} for x in facet[0][k]]
+                out[k] = [{'value': v, 'label': label_value(k, v), 'count': x['n']}
+                          for x in facet[0][k] for v in [x['_id'] if x['_id'] not in (None, '') else '(none)']]
             since = iso(datetime.now(timezone.utc) - timedelta(days=90))
             pages = await agg('page_visits', [{'$match': {'timestamp': {'$gte': since}}}, {'$group': {'_id': PAGE, 'n': {'$sum': 1}}},
                                               {'$sort': {'n': -1}}, {'$limit': 80}])

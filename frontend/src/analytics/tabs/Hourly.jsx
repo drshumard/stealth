@@ -37,8 +37,8 @@ export default function Hourly({ state, update }) {
       const x = exclude ? human(r) : r;
       return { ...x, id: `${r.bucket}|${r.key}`, bot_share: r.visitors ? r.suspect_visitors / r.visitors : null };
     }).filter(r => r.views > 0);
-    const totals = {};
-    rows.forEach(r => { totals[r.key] = (totals[r.key] || 0) + r.visitors; });
+    const totals = {}, rawOf = {};
+    rows.forEach(r => { totals[r.key] = (totals[r.key] || 0) + r.visitors; rawOf[r.key] = r.raw; });
     const ranked = Object.keys(totals).sort((a, b) => totals[b] - totals[a]);
     const top = ranked.slice(0, TOP);
     const byBucket = Object.fromEntries(d.buckets.map(b => [b, { bucket: b, ...Object.fromEntries([...top, 'Other'].map(k => [k, 0])) }]));
@@ -55,10 +55,10 @@ export default function Hourly({ state, update }) {
       const s = bots[botIdx[r.bucket]];
       if (s) { s['Likely human'] += r.visitors - r.suspect_visitors; s['Suspected bot'] += r.suspect_visitors; }
     });
-    return { rows, totals, top, series: Object.values(byBucket), keys: hasOther ? [...top, 'Other'] : top, gridKeys, grid, gridMax, bots };
+    return { rows, totals, rawOf, top, series: Object.values(byBucket), keys: hasOther ? [...top, 'Other'] : top, gridKeys, grid, gridMax, bots };
   }, [d, exclude]);
 
-  const filter = key => update({ [dim]: key });
+  const filter = raw => update({ [dim]: String(raw) });   // filters take the stored UTM value, not its display name
   const tooLongMsg = `Hourly figures cover up to ${MAX_DAYS} days — pick a shorter period.`;
   const b = d?.bots;
 
@@ -85,7 +85,7 @@ export default function Hourly({ state, update }) {
             <tbody>
               {v.gridKeys.map(k => (
                 <tr key={k}>
-                  <th><button type="button" className="an-key" title={k} onClick={() => filter(k)}>{k}</button></th>
+                  <th><button type="button" className="an-key" title={k} onClick={() => filter(v.rawOf[k])}>{k}</button></th>
                   <td>{fmtNum(v.totals[k])}</td>
                   {v.grid[k].map((n, h) => {
                     const a = (n / v.gridMax) ** 0.75;
@@ -129,7 +129,7 @@ export default function Hourly({ state, update }) {
     <Panel help="hourly" title={`Every hour × ${label?.toLowerCase()}`} eyebrow={v ? `${fmtNum(v.rows.length)} rows` : undefined}
       query={q} empty={tooLong ? tooLongMsg : !v?.rows.length}>
       {v && <DataTable rows={v.rows} rowKey={r => r.id} defaultSort={{ key: 'bucket', dir: 'desc' }} maxRows={50}
-        onRowClick={r => filter(r.key)} exportName={`hourly-${dim}-${state.since}-${state.until}`}
+        onRowClick={r => filter(r.raw)} exportName={`hourly-${dim}-${state.since}-${state.until}`}
         columns={[
           { key: 'bucket', label: 'Hour', render: r => bucketLabel(r.bucket, 'hour', true), csv: r => r.bucket },
           { key: 'key', label, render: r => <strong className="an-key" title={r.key}>{r.key}</strong>, sortValue: r => String(r.key) },

@@ -12,6 +12,10 @@ const GRANS = [{ value: '', label: 'Auto' }, { value: 'hour', label: 'Hourly' },
 // The analytics toolbar: period, comparison, granularity, filters and saved views. Everything writes to the URL.
 export default function FilterBar({ state, update }) {
   const rangeText = `${bucketLabel(state.since, 'day', true)} – ${bucketLabel(state.until, 'day', true)}`;
+  // Chips show a value's display name (a Meta id → its ad / campaign name) when the value list knows it.
+  const dims = useQuery({ queryKey: ['analytics-dims'], queryFn: () => getJson(`${API}/dimensions`), staleTime: 600_000,
+    enabled: Object.keys(state.filters).length > 0 });
+  const nameOf = (k, val) => dims.data?.[k]?.find(o => String(o.value) === val)?.label || val;
   return (
     <div className="an-filterbar">
       <div className="an-filter-row">
@@ -35,7 +39,7 @@ export default function FilterBar({ state, update }) {
       <div className="an-filter-row an-chips">
         <Filter size={14} className="an-chips-icon" />
         {Object.entries(state.filters).flatMap(([k, v]) => v.split(',').map(val => (
-          <span key={`${k}:${val}`} className="an-chip"><small>{FILTER_LABELS[k]}</small>{val}
+          <span key={`${k}:${val}`} className="an-chip" title={val}><small>{FILTER_LABELS[k]}</small>{nameOf(k, val)}
             <button type="button" aria-label={`Remove ${FILTER_LABELS[k]} ${val}`} onClick={() => {
               const rest = v.split(',').filter(x => x !== val);
               update({ [k]: rest.join(',') || null });
@@ -58,7 +62,7 @@ function AddFilter({ state, update }) {
   const [q, setQ] = useState('');
   const dims = useQuery({ queryKey: ['analytics-dims'], queryFn: () => getJson(`${API}/dimensions`), staleTime: 600_000, enabled: open });
   const current = (state.filters[key] || '').split(',').filter(Boolean);
-  const options = useMemo(() => (dims.data?.[key] || []).filter(o => !q || String(o.value).toLowerCase().includes(q.toLowerCase())), [dims.data, key, q]);
+  const options = useMemo(() => (dims.data?.[key] || []).filter(o => !q || `${o.value} ${o.label ?? ''}`.toLowerCase().includes(q.toLowerCase())), [dims.data, key, q]);
   const toggle = value => {
     const next = current.includes(value) ? current.filter(v => v !== value) : [...current, value];
     update({ [key]: next.join(',') || null });
@@ -80,7 +84,7 @@ function AddFilter({ state, update }) {
           ) : options.map(o => (
             <button key={o.value} type="button" aria-pressed={current.includes(String(o.value))} onClick={() => toggle(String(o.value))}>
               <span className="an-check">{current.includes(String(o.value)) && <Check size={11} />}</span>
-              <span title={o.value}>{o.value}</span><small>{fmtCompact(o.count)}</small>
+              <span title={o.value}>{o.label ?? o.value}</span><small>{fmtCompact(o.count)}</small>
             </button>
           ))}
         </div>
