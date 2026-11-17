@@ -19,8 +19,12 @@ logger = logging.getLogger('meta_names')
 
 GRAPH = os.environ.get('FB_GRAPH_URL', 'https://graph.facebook.com')
 VERSION = os.environ.get('FB_API_VERSION', 'v21.0')
-SYNC_EVERY = 3 * 3600
-RELOAD_EVERY = 600
+SYNC_EVERY = 3 * 3600     # full ad tree from Facebook (~6 Graph calls)
+FILL_EVERY = 300          # look up only ids seen in recent traffic that have no name yet
+FILL_MAX = 25             # Graph calls per fill round, at most
+MISS_RETRY = 24 * 3600    # an id Facebook could not name is asked again after this
+RELOAD_EVERY = 60         # reload names from Mongo into memory (no Facebook call)
+UTM_KINDS = {'utm_content': 'ad', 'utm_term': 'adset', 'utm_campaign': 'campaign'}
 STATUSES = ['ACTIVE', 'PAUSED', 'DELETED', 'ARCHIVED', 'PENDING_REVIEW', 'DISAPPROVED', 'PREAPPROVED',
             'PENDING_BILLING_INFO', 'CAMPAIGN_PAUSED', 'ADSET_PAUSED', 'IN_PROCESS', 'WITH_ISSUES']
 
@@ -62,9 +66,36 @@ async def sync(db):
     return len(ops)
 
 
+async def fill(db):
+    """Name the ids in the last day's UTMs that no sync has named (an ad launched since the last sync, another account).
+    One Graph call per id, at most FILL_MAX; an id Facebook can't name is stored as missing and retried after MISS_RETRY."""
+    token = os.environ.get('FB_ACCESS_TOKEN')
+    if not token:
+        return 0
+    now = datetime.now(timezone.utc)
+    since = (now - timedelta(days=1)).isoformat()
+    seen = {}
+    for field, kind in UTM_KINDS.items():
+        for v in await db.page_visits.distinct(f'attribution.{field}', {'timestamp': {'$gte': since}, f'attribution.{field}': {'$regex': r'^\d{10,}$'}}):
+            seen.setdefault(v, kind)
+    if not seen:
+        return 0
+    done = set(await db.meta_names.distinct('_id', {'_id': {'$in': list(seen)},
+                                                    '$or': [{'name': {'$exists': True}}, {'missing_at': {'$gte': now - timedelta(seconds=MISS_RETRY)}}]}))
+    todo = [i for i in seen if i not in done][:FILL_MAX]
+    async with httpx.AsyncClient(timeout=30) as c:
+        for id_ in todo:
+            res = await c.get(f'{GRAPH}/{VERSION}/{id_}', params={'fields': 'name', 'access_token': token})
+            name = res.json().get('name') if res.status_code < 400 else None
+            upd = {'$set': {'kind': seen[id_], 'name': name, 'source': 'lookup', 'updated_at': now}} if name else \
+                  {'$set': {'missing_at': now}}
+            await db.meta_names.update_one({'_id': id_}, upd, upsert=True)
+    return len(todo)
+
+
 async def load(db):
     """Reload names into memory. A name shared by several ids of the same kind gets the id's last 4 digits."""
-    docs = await db.meta_names.find({}, {'kind': 1, 'name': 1}).to_list(None)
+    docs = await db.meta_names.find({'name': {'$exists': True}}, {'kind': 1, 'name': 1}).to_list(None)
     seen = {}
     for d in docs:
         seen[(d['kind'], d['name'])] = seen.get((d['kind'], d['name']), 0) + 1
@@ -72,27 +103,32 @@ async def load(db):
     _labels.update({d['_id']: d['name'] if seen[(d['kind'], d['name'])] == 1 else f"{d['name']} ·{d['_id'][-4:]}" for d in docs})
 
 
-async def _due(db):
-    """True for exactly one worker once per SYNC_EVERY (a lease in analytics_meta)."""
+async def _due(db, job='meta_names', every=SYNC_EVERY):
+    """True for exactly one worker once per `every` seconds (a lease in analytics_meta)."""
     now = datetime.now(timezone.utc)
-    nxt = now + timedelta(seconds=SYNC_EVERY)
-    if (await db.analytics_meta.update_one({'_id': 'meta_names', 'next': {'$lt': now}}, {'$set': {'next': nxt}})).modified_count:
+    nxt = now + timedelta(seconds=every)
+    if (await db.analytics_meta.update_one({'_id': job, 'next': {'$lt': now}}, {'$set': {'next': nxt}})).modified_count:
         return True
     try:
-        await db.analytics_meta.insert_one({'_id': 'meta_names', 'next': nxt})
+        await db.analytics_meta.insert_one({'_id': job, 'next': nxt})
         return True
     except DuplicateKeyError:
         return False
 
 
 async def run(db):
-    """Background loop: sync when due, reload names every RELOAD_EVERY seconds."""
+    """Background loop: full sync every SYNC_EVERY, unknown-id fill every FILL_EVERY (one worker each), and every worker
+    reloads names from Mongo every RELOAD_EVERY."""
     if not os.environ.get('FB_ACCESS_TOKEN'):
         logger.info('meta names: FB_ACCESS_TOKEN not set — UTM values show as they are')
     while True:
         try:
             if os.environ.get('FB_ACCESS_TOKEN') and await _due(db):
                 logger.info('meta names: synced %d ids', await sync(db))
+            if os.environ.get('FB_ACCESS_TOKEN') and await _due(db, 'meta_names_fill', FILL_EVERY):
+                n = await fill(db)
+                if n:
+                    logger.info('meta names: looked up %d unnamed ids', n)
             await load(db)
         except Exception as e:
             logger.warning('meta names: %s', str(e)[:300])
