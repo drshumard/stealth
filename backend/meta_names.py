@@ -94,13 +94,18 @@ async def fill(db):
 
 
 async def load(db):
-    """Reload names into memory. A name shared by several ids of the same kind gets the id's last 4 digits."""
+    """Reload names into memory. A name shared by several ids of the same kind is numbered in launch order — "(1)", "(2)" —
+    since Meta ids grow over time (their last digits are the same account-wide, so they can't tell copies apart)."""
     docs = await db.meta_names.find({'name': {'$exists': True}}, {'kind': 1, 'name': 1}).to_list(None)
-    seen = {}
+    groups = {}
     for d in docs:
-        seen[(d['kind'], d['name'])] = seen.get((d['kind'], d['name']), 0) + 1
+        groups.setdefault((d['kind'], d['name']), []).append(d['_id'])
+    labels = {}
+    for (_, name), ids in groups.items():
+        ids.sort(key=lambda i: (len(i), i))
+        labels.update({i: name if len(ids) == 1 else f'{name} ({n})' for n, i in enumerate(ids, 1)})
     _labels.clear()
-    _labels.update({d['_id']: d['name'] if seen[(d['kind'], d['name'])] == 1 else f"{d['name']} ·{d['_id'][-4:]}" for d in docs})
+    _labels.update(labels)
 
 
 async def _due(db, job='meta_names', every=SYNC_EVERY):
