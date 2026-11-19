@@ -24,6 +24,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 
+import last_click
 import meta_names
 
 logger = logging.getLogger('analytics')
@@ -189,13 +190,16 @@ class Filters:
         return any(self.attr.values())
 
     def attr_match(self, prefix=''):
-        m = {}
+        """UTM filters, read last-click: `lc` when the doc has it, else `attribution` (see last_click.py)."""
+        conds = []
         for k, field in ATTR.items():
             vals = self.attr[k]
             if vals:
                 vs = [None if v == '(none)' else v for v in vals]
-                m[f'{prefix}attribution.{field}'] = {'$in': vs + ([''] if None in vs else [])}
-        return m
+                inq = {'$in': vs + ([''] if None in vs else [])}
+                conds.append({'$or': [{f'{prefix}lc': {'$exists': True}, f'{prefix}lc.{field}': inq},
+                                      {f'{prefix}lc': {'$exists': False}, f'{prefix}attribution.{field}': inq}]})
+        return {'$and': conds} if conds else {}
 
     def url_match(self):
         pats = [r'^https?://(www\.)?' + re.escape(p) + r'/?([?#]|$)' for p in self.pages]
@@ -229,8 +233,13 @@ REFERRER = {'$cond': [{'$eq': [_ref, '']}, '(direct)',
                       {'$cond': [{'$eq': [{'$substrCP': [_rh, 0, 4]}, 'www.']}, {'$substrCP': [_rh, 4, 100000]}, _rh]}]}
 
 
+def attr_val(field, prefix=''):
+    """A UTM field, last-click: from `lc` when the doc has it, else from `attribution` (see last_click.py)."""
+    return {'$cond': [{'$eq': [{'$type': f'${prefix}lc'}, 'object']}, f'${prefix}lc.{field}', f'${prefix}attribution.{field}']}
+
+
 def attr_expr(field, prefix=''):
-    v = {'$ifNull': [f'${prefix}attribution.{field}', '']}
+    v = {'$ifNull': [attr_val(field, prefix), '']}
     return {'$cond': [{'$eq': [v, '']}, '(none)', v]}
 
 
@@ -452,6 +461,7 @@ def build_router(db) -> APIRouter:
             logger.warning('analytics cache indexes: %s', str(e)[:200])
         asyncio.create_task(warmer())
         asyncio.create_task(meta_names.run(db))
+        asyncio.create_task(last_click.run(db))
 
     async def agg(coll, pipeline, hint=None):
         opts = {'hint': hint} if hint else {}
@@ -521,7 +531,7 @@ def build_router(db) -> APIRouter:
         pipe = [{'$match': first}]
         if f.has_attr:
             pipe += [{'$lookup': {'from': 'contacts', 'localField': 'contact_id', 'foreignField': 'contact_id', 'as': 'c',
-                                  'pipeline': [{'$project': {'_id': 0, 'attribution': 1}}]}},
+                                  'pipeline': [{'$project': {'_id': 0, 'attribution': 1, 'lc': 1}}]}},
                      {'$unwind': '$c'}, {'$match': f.attr_match('c.')}]
         return pipe
 
@@ -905,7 +915,7 @@ def build_router(db) -> APIRouter:
             top = sorted(per, key=lambda x: -x['n'])[:200]
             top_ids = [x['_id'] for x in top if x['_id'] in sets['identified']][:25]
             people = {d['contact_id']: d for d in await db.contacts.find(
-                {'contact_id': {'$in': top_ids}}, {'_id': 0, 'contact_id': 1, 'name': 1, 'email': 1, 'tags': 1, 'attribution.utm_source': 1}).to_list(None)}
+                {'contact_id': {'$in': top_ids}}, {'_id': 0, 'contact_id': 1, 'name': 1, 'email': 1, 'tags': 1, 'attribution.utm_source': 1, 'lc': 1}).to_list(None)}
             P = {x['_id']: x for x in per}
             return {
                 'new': seg(new), 'returning': seg(ret),
@@ -917,7 +927,7 @@ def build_router(db) -> APIRouter:
                                    ['< 1 hour', '1–6 hours', '6–24 hours', '1–3 days', '3–7 days', '1–4 weeks', '4+ weeks']),
                 'loyalty_age': hist(since_first, [0, 1, 7, 30, 90, 10 ** 9], ['< 1 day', '1–7 days', '1–4 weeks', '1–3 months', '3+ months']),
                 'top': [{'contact_id': cid, 'name': people[cid].get('name'), 'email': people[cid].get('email'),
-                         'source': (people[cid].get('attribution') or {}).get('utm_source'),
+                         'source': (people[cid].get('lc') or people[cid].get('attribution') or {}).get('utm_source'),
                          'registered': cid in sets['registered'], 'buyer': cid in sets['buyers'],
                          'visits': P[cid]['n'], 'days': P[cid]['days'], 'last': P[cid]['last']}
                         for cid in top_ids if cid in people],
@@ -1218,14 +1228,15 @@ def build_router(db) -> APIRouter:
             find = {'$and': [m, {'$or': [{'name': rx}, {'email': rx}, {'phone': rx}]}]}
         h = {'hint': ch(m)} if ch(m) else {}
         docs = await db.contacts.find(find, {'_id': 0, 'contact_id': 1, 'name': 1, 'email': 1, 'phone': 1, 'tags': 1,
-                                             'attribution.utm_source': 1, 'attribution.utm_campaign': 1, 'attribution.utm_content': 1,
+                                             'attribution.utm_source': 1, 'attribution.utm_campaign': 1, 'attribution.utm_content': 1, 'lc': 1,
                                              'created_at': 1, 'updated_at': 1, 'first_identified_at': 1}, **h) \
             .sort('updated_at', -1).skip(offset).limit(limit).to_list(limit)
         counts = {x['_id']: x['n'] for x in await agg('page_visits', [{'$match': {'contact_id': {'$in': [d['contact_id'] for d in docs]}}},
                                                                      {'$group': {'_id': '$contact_id', 'n': {'$sum': 1}}}])}
         for d in docs:
             d['visits'] = counts.get(d['contact_id'], 0)
-            a = d.pop('attribution', {}) or {}
+            stored, lc = d.pop('attribution', {}), d.pop('lc', None)
+            a = lc or stored or {}          # last click when it differs from the stored attribution
             d['source'], d['campaign'], d['ad'] = a.get('utm_source'), a.get('utm_campaign'), a.get('utm_content')
         matching = await db.contacts.count_documents(find, **h) if q else summ['abandoned']
         return {**summ, 'matching': matching, 'offset': offset, 'people': docs}
@@ -1267,7 +1278,7 @@ def build_router(db) -> APIRouter:
         async def compute():
             out = {}
             facet = await agg('contacts', [{'$match': {'merged_into': None}}, {'$facet': {
-                k: [{'$group': {'_id': f'$attribution.{field}', 'n': {'$sum': 1}}}, {'$sort': {'n': -1}}, {'$limit': 60}]
+                k: [{'$group': {'_id': attr_val(field), 'n': {'$sum': 1}}}, {'$sort': {'n': -1}}, {'$limit': 60}]
                 for k, field in ATTR.items()}}])
             for k in ATTR:
                 out[k] = [{'value': v, 'label': label_value(k, v), 'count': x['n']}
